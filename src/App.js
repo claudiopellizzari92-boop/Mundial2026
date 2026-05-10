@@ -987,11 +987,9 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Handle password reset token in URL
-    const hash = window.location.hash;
-    if (hash && hash.includes("type=recovery")) {
-      setBooting(false);
-      return;
+    // Limpiar tokens de la URL sin recargar la página
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname);
     }
 
     sb.auth.getSession().then(async ({ data: { session } }) => {
@@ -1001,17 +999,25 @@ export default function App() {
       }
       setBooting(false);
     });
+
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+      // Limpiar URL en cualquier evento de auth
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+      if (event === "SIGNED_OUT") {
+        setUser(null); setIsAdmin(false); setBooting(false); return;
+      }
       if (event === "PASSWORD_RECOVERY") {
-        setBooting(false);
-        return;
+        setBooting(false); return;
       }
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
-      } else { setUser(null); setIsAdmin(false); }
+      }
       setBooting(false);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
