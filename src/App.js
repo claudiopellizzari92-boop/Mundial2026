@@ -6,19 +6,20 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── World Cup 2026 Groups ────────────────────────────────────────────────────
+const FLAG = (code) => `https://flagcdn.com/24x18/${code}.png`;
 const GROUPS = {
-  A: [{ name: "México", flag: "🇲🇽" }, { name: "Sudáfrica", flag: "🇿🇦" }, { name: "Corea del Sur", flag: "🇰🇷" }, { name: "Chequia", flag: "🇨🇿" }],
-  B: [{ name: "Canadá", flag: "🇨🇦" }, { name: "Bosnia", flag: "🇧🇦" }, { name: "Qatar", flag: "🇶🇦" }, { name: "Suiza", flag: "🇨🇭" }],
-  C: [{ name: "Brasil", flag: "🇧🇷" }, { name: "Marruecos", flag: "🇲🇦" }, { name: "Haití", flag: "🇭🇹" }, { name: "Escocia", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }],
-  D: [{ name: "USA", flag: "🇺🇸" }, { name: "Paraguay", flag: "🇵🇾" }, { name: "Australia", flag: "🇦🇺" }, { name: "Türkiye", flag: "🇹🇷" }],
-  E: [{ name: "Alemania", flag: "🇩🇪" }, { name: "Curazao", flag: "🇨🇼" }, { name: "Costa de Marfil", flag: "🇨🇮" }, { name: "Ecuador", flag: "🇪🇨" }],
-  F: [{ name: "Países Bajos", flag: "🇳🇱" }, { name: "Japón", flag: "🇯🇵" }, { name: "Suecia", flag: "🇸🇪" }, { name: "Túnez", flag: "🇹🇳" }],
-  G: [{ name: "Bélgica", flag: "🇧🇪" }, { name: "Egipto", flag: "🇪🇬" }, { name: "Irán", flag: "🇮🇷" }, { name: "Nueva Zelanda", flag: "🇳🇿" }],
-  H: [{ name: "España", flag: "🇪🇸" }, { name: "Cabo Verde", flag: "🇨🇻" }, { name: "Arabia Saudita", flag: "🇸🇦" }, { name: "Uruguay", flag: "🇺🇾" }],
-  I: [{ name: "Francia", flag: "🇫🇷" }, { name: "Senegal", flag: "🇸🇳" }, { name: "Irak", flag: "🇮🇶" }, { name: "Noruega", flag: "🇳🇴" }],
-  J: [{ name: "Argentina", flag: "🇦🇷" }, { name: "Argelia", flag: "🇩🇿" }, { name: "Austria", flag: "🇦🇹" }, { name: "Jordania", flag: "🇯🇴" }],
-  K: [{ name: "Portugal", flag: "🇵🇹" }, { name: "Congo DR", flag: "🇨🇩" }, { name: "Uzbekistán", flag: "🇺🇿" }, { name: "Colombia", flag: "🇨🇴" }],
-  L: [{ name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "Croacia", flag: "🇭🇷" }, { name: "Ghana", flag: "🇬🇭" }, { name: "Panamá", flag: "🇵🇦" }],
+  A: [{ name: "México", flag: FLAG("mx") }, { name: "Sudáfrica", flag: FLAG("za") }, { name: "Corea del Sur", flag: FLAG("kr") }, { name: "Chequia", flag: FLAG("cz") }],
+  B: [{ name: "Canadá", flag: FLAG("ca") }, { name: "Bosnia", flag: FLAG("ba") }, { name: "Qatar", flag: FLAG("qa") }, { name: "Suiza", flag: FLAG("ch") }],
+  C: [{ name: "Brasil", flag: FLAG("br") }, { name: "Marruecos", flag: FLAG("ma") }, { name: "Haití", flag: FLAG("ht") }, { name: "Escocia", flag: FLAG("gb-sct") }],
+  D: [{ name: "USA", flag: FLAG("us") }, { name: "Paraguay", flag: FLAG("py") }, { name: "Australia", flag: FLAG("au") }, { name: "Türkiye", flag: FLAG("tr") }],
+  E: [{ name: "Alemania", flag: FLAG("de") }, { name: "Curazao", flag: FLAG("cw") }, { name: "Costa de Marfil", flag: FLAG("ci") }, { name: "Ecuador", flag: FLAG("ec") }],
+  F: [{ name: "Países Bajos", flag: FLAG("nl") }, { name: "Japón", flag: FLAG("jp") }, { name: "Suecia", flag: FLAG("se") }, { name: "Túnez", flag: FLAG("tn") }],
+  G: [{ name: "Bélgica", flag: FLAG("be") }, { name: "Egipto", flag: FLAG("eg") }, { name: "Irán", flag: FLAG("ir") }, { name: "Nueva Zelanda", flag: FLAG("nz") }],
+  H: [{ name: "España", flag: FLAG("es") }, { name: "Cabo Verde", flag: FLAG("cv") }, { name: "Arabia Saudita", flag: FLAG("sa") }, { name: "Uruguay", flag: FLAG("uy") }],
+  I: [{ name: "Francia", flag: FLAG("fr") }, { name: "Senegal", flag: FLAG("sn") }, { name: "Irak", flag: FLAG("iq") }, { name: "Noruega", flag: FLAG("no") }],
+  J: [{ name: "Argentina", flag: FLAG("ar") }, { name: "Argelia", flag: FLAG("dz") }, { name: "Austria", flag: FLAG("at") }, { name: "Jordania", flag: FLAG("jo") }],
+  K: [{ name: "Portugal", flag: FLAG("pt") }, { name: "Congo DR", flag: FLAG("cd") }, { name: "Uzbekistán", flag: FLAG("uz") }, { name: "Colombia", flag: FLAG("co") }],
+  L: [{ name: "Inglaterra", flag: FLAG("gb-eng") }, { name: "Croacia", flag: FLAG("hr") }, { name: "Ghana", flag: FLAG("gh") }, { name: "Panamá", flag: FLAG("pa") }],
 };
 
 const ALL_TEAMS = Object.entries(GROUPS).map(([g, teams]) => teams.map(t => ({ ...t, group: g }))).flat();
@@ -92,7 +93,7 @@ input,button,select{font-family:inherit;}
 .match-card.locked{border-left:3px solid var(--gold);}
 .team{display:flex;align-items:center;gap:8px;}
 .team.away{flex-direction:row-reverse;text-align:right;}
-.team-flag{font-size:22px;line-height:1;}
+.team-flag{width:28px;height:21px;object-fit:cover;border-radius:2px;}
 .team-name{font-size:13px;font-weight:500;}
 .match-center{display:flex;flex-direction:column;align-items:center;gap:7px;}
 .match-meta{font-size:11px;color:var(--muted);white-space:nowrap;}
@@ -577,7 +578,7 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
         return (
           <div key={m.id}>
             <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`}>
-              <div className="team"><span className="team-flag">{m.home_flag}</span><span className="team-name">{m.home}</span></div>
+              <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
                   <span className="group-badge">Grupo {m.group_name}</span>
@@ -600,7 +601,7 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
                     ? <button className="save-btn" onClick={()=>save(m)} disabled={saving[m.id]}>{saving[m.id]?"...":wasSaved?"✓ GUARDADO":myPred?"ACTUALIZAR":"GUARDAR"}</button>
                     : myPred ? <span className="saved-tag">✓ Guardado</span> : null}
               </div>
-              <div className="team away"><span className="team-flag">{m.away_flag}</span><span className="team-name">{m.away}</span></div>
+              <div className="team away"><img className="team-flag" src={m.away_flag} alt={m.away}/><span className="team-name">{m.away}</span></div>
             </div>
             {locked && othersReveal.length > 0 && (
               <div className="reveal-card">
@@ -986,6 +987,13 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    // Handle password reset token in URL
+    const hash = window.location.hash;
+    if (hash && hash.includes("type=recovery")) {
+      setBooting(false);
+      return;
+    }
+
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
@@ -993,11 +1001,16 @@ export default function App() {
       }
       setBooting(false);
     });
-    const { data: { subscription } } = sb.auth.onAuthStateChange(async (_, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setBooting(false);
+        return;
+      }
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
       } else { setUser(null); setIsAdmin(false); }
+      setBooting(false);
     });
     return () => subscription.unsubscribe();
   }, []);
