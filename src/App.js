@@ -987,23 +987,10 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Limpiar tokens de la URL sin recargar la página
-    if (window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname);
-    }
-
-    sb.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
-        setUser({ ...session.user, profile });
-      }
-      setBooting(false);
-    });
-
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      // Limpiar URL en cualquier evento de auth
+      // Limpiar URL después de que Supabase procesó el token
       if (window.location.hash) {
-        window.history.replaceState(null, "", window.location.pathname);
+        setTimeout(() => window.history.replaceState(null, "", window.location.pathname), 100);
       }
       if (event === "SIGNED_OUT") {
         setUser(null); setIsAdmin(false); setBooting(false); return;
@@ -1011,6 +998,17 @@ export default function App() {
       if (event === "PASSWORD_RECOVERY") {
         setBooting(false); return;
       }
+      if (session?.user) {
+        const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+        setUser({ ...session.user, profile });
+      } else {
+        setUser(null); setIsAdmin(false);
+      }
+      setBooting(false);
+    });
+
+    // Cargar sesión existente
+    sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
