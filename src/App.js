@@ -233,7 +233,18 @@ input,button,select{font-family:inherit;}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-const isLocked = (kickoff) => new Date(kickoff) <= new Date();
+
+// Calcula el cierre para un partido: 24hs antes del primer partido del mismo día
+function isLocked(kickoff, allMatches) {
+  const matchDate = new Date(kickoff).toISOString().slice(0, 10); // YYYY-MM-DD
+  const sameDayMatches = (allMatches || []).filter(m => {
+    return new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate;
+  });
+  if (sameDayMatches.length === 0) return new Date(kickoff) <= new Date();
+  const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
+  const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000); // 24hs antes
+  return new Date() >= deadline;
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function AuthScreen({ onAuth }) {
@@ -500,7 +511,7 @@ function PreTournament({ user }) {
 function Dashboard({ user, matches, predictions, onGoTab }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
-  const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at)).length;
+  const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).length;
   const locked = isPreTournamentLocked();
   return (<>
     <div className="banner">
@@ -525,7 +536,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
     )}
     <div className="sec-hdr"><h2>PRÓXIMOS SIN PREDECIR</h2></div>
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)"}}>
-      {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at)).slice(0,5).map((m,i,arr) => (
+      {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).slice(0,5).map((m,i,arr) => (
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
           <span style={{fontSize:13,display:"flex",alignItems:"center",gap:6}}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{color:"var(--muted)"}}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
           <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{m.match_date} · {m.match_time}</span>
@@ -576,7 +587,7 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
     <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Fase de Grupos</span></div>
     <div className="matches-grid">
       {matches.map(m => {
-        const locked = isLocked(m.kickoff_at);
+        const locked = isLocked(m.kickoff_at, matches);
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
@@ -670,10 +681,10 @@ function Compare({ user, matches, allPredictions, profiles }) {
   const profileMap = {};
   (profiles || []).forEach(p => { profileMap[p.id] = p; });
   const dates = [...new Set(matches.map(m => m.match_date))];
-  const lockedDates = dates.filter(d => matches.filter(m => m.match_date === d).some(m => isLocked(m.kickoff_at)));
+  const lockedDates = dates.filter(d => matches.filter(m => m.match_date === d).some(m => isLocked(m.kickoff_at, matches)));
   const visibleMatches = filter === "all"
-    ? matches.filter(m => isLocked(m.kickoff_at))
-    : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at));
+    ? matches.filter(m => isLocked(m.kickoff_at, matches))
+    : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at, matches));
 
   function resultIcon(pred, match) {
     if (match.home_score === null || match.away_score === null) return null;
