@@ -520,7 +520,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)"}}>
       {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at)).slice(0,5).map((m,i,arr) => (
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
-          <span style={{fontSize:13}}>{m.home_flag} {m.home} <span style={{color:"var(--muted)",margin:"0 6px"}}>vs</span> {m.away} {m.away_flag}</span>
+          <span style={{fontSize:13,display:"flex",alignItems:"center",gap:6}}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{color:"var(--muted)"}}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
           <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{m.match_date} · {m.match_time}</span>
         </div>
       ))}
@@ -707,7 +707,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
               <div style={{ padding: "13px 18px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span className="group-badge">Grupo {m.group_name}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>{m.home_flag} {m.home} <span style={{ color: "var(--muted)", margin: "0 5px" }}>vs</span> {m.away} {m.away_flag}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, display:"flex", alignItems:"center", gap:6 }}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {hasResult
@@ -883,7 +883,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
               return (
                 <div key={m.id} className="admin-match-row">
                   <div style={{fontSize:11,color:"var(--muted)"}}>{m.match_date}<br/><span style={{color:"var(--txt)"}}>Grupo {m.group_name}</span></div>
-                  <div style={{fontSize:13,fontWeight:500}}>{m.home_flag} {m.home}<br/>{m.away_flag} {m.away}</div>
+                  <div style={{fontSize:13,fontWeight:500,display:"flex",flexDirection:"column",gap:3}}><span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.home_flag} alt={m.home} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.home}</span><span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.away}</span></div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0"/>
                     <span style={{color:"var(--muted)",fontFamily:"Bebas Neue",fontSize:16}}>–</span>
