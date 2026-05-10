@@ -1,91 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import React, { useState, useEffect, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = 'https://bheziohaquiwnvbzrlio.supabase.co';
-const SUPABASE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZXppb2hhcXVpd252YnpybGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQzNzEsImV4cCI6MjA5Mzk0MDM3MX0.p53LDuRulCzO_ceRjS47jNbirEpfDTk5NYCi9AT92CM';
+const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZXppb2hhcXVpd252YnpybGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQzNzEsImV4cCI6MjA5Mzk0MDM3MX0.p53LDuRulCzO_ceRjS47jNbirEpfDTk5NYCi9AT92CM";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── World Cup 2026 Groups ────────────────────────────────────────────────────
 const GROUPS = {
-  A: [
-    { name: 'México', flag: '🇲🇽' },
-    { name: 'Sudáfrica', flag: '🇿🇦' },
-    { name: 'Corea del Sur', flag: '🇰🇷' },
-    { name: 'Chequia', flag: '🇨🇿' },
-  ],
-  B: [
-    { name: 'Canadá', flag: '🇨🇦' },
-    { name: 'Bosnia', flag: '🇧🇦' },
-    { name: 'Qatar', flag: '🇶🇦' },
-    { name: 'Suiza', flag: '🇨🇭' },
-  ],
-  C: [
-    { name: 'Brasil', flag: '🇧🇷' },
-    { name: 'Marruecos', flag: '🇲🇦' },
-    { name: 'Haití', flag: '🇭🇹' },
-    { name: 'Escocia', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
-  ],
-  D: [
-    { name: 'USA', flag: '🇺🇸' },
-    { name: 'Paraguay', flag: '🇵🇾' },
-    { name: 'Australia', flag: '🇦🇺' },
-    { name: 'Türkiye', flag: '🇹🇷' },
-  ],
-  E: [
-    { name: 'Alemania', flag: '🇩🇪' },
-    { name: 'Curazao', flag: '🇨🇼' },
-    { name: 'Costa de Marfil', flag: '🇨🇮' },
-    { name: 'Ecuador', flag: '🇪🇨' },
-  ],
-  F: [
-    { name: 'Países Bajos', flag: '🇳🇱' },
-    { name: 'Japón', flag: '🇯🇵' },
-    { name: 'Suecia', flag: '🇸🇪' },
-    { name: 'Túnez', flag: '🇹🇳' },
-  ],
-  G: [
-    { name: 'Bélgica', flag: '🇧🇪' },
-    { name: 'Egipto', flag: '🇪🇬' },
-    { name: 'Irán', flag: '🇮🇷' },
-    { name: 'Nueva Zelanda', flag: '🇳🇿' },
-  ],
-  H: [
-    { name: 'España', flag: '🇪🇸' },
-    { name: 'Cabo Verde', flag: '🇨🇻' },
-    { name: 'Arabia Saudita', flag: '🇸🇦' },
-    { name: 'Uruguay', flag: '🇺🇾' },
-  ],
-  I: [
-    { name: 'Francia', flag: '🇫🇷' },
-    { name: 'Senegal', flag: '🇸🇳' },
-    { name: 'Irak', flag: '🇮🇶' },
-    { name: 'Noruega', flag: '🇳🇴' },
-  ],
-  J: [
-    { name: 'Argentina', flag: '🇦🇷' },
-    { name: 'Argelia', flag: '🇩🇿' },
-    { name: 'Austria', flag: '🇦🇹' },
-    { name: 'Jordania', flag: '🇯🇴' },
-  ],
-  K: [
-    { name: 'Portugal', flag: '🇵🇹' },
-    { name: 'Congo DR', flag: '🇨🇩' },
-    { name: 'Uzbekistán', flag: '🇺🇿' },
-    { name: 'Colombia', flag: '🇨🇴' },
-  ],
-  L: [
-    { name: 'Inglaterra', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-    { name: 'Croacia', flag: '🇭🇷' },
-    { name: 'Ghana', flag: '🇬🇭' },
-    { name: 'Panamá', flag: '🇵🇦' },
-  ],
+  A: [{ name: "México", flag: "🇲🇽" }, { name: "Sudáfrica", flag: "🇿🇦" }, { name: "Corea del Sur", flag: "🇰🇷" }, { name: "Chequia", flag: "🇨🇿" }],
+  B: [{ name: "Canadá", flag: "🇨🇦" }, { name: "Bosnia", flag: "🇧🇦" }, { name: "Qatar", flag: "🇶🇦" }, { name: "Suiza", flag: "🇨🇭" }],
+  C: [{ name: "Brasil", flag: "🇧🇷" }, { name: "Marruecos", flag: "🇲🇦" }, { name: "Haití", flag: "🇭🇹" }, { name: "Escocia", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }],
+  D: [{ name: "USA", flag: "🇺🇸" }, { name: "Paraguay", flag: "🇵🇾" }, { name: "Australia", flag: "🇦🇺" }, { name: "Türkiye", flag: "🇹🇷" }],
+  E: [{ name: "Alemania", flag: "🇩🇪" }, { name: "Curazao", flag: "🇨🇼" }, { name: "Costa de Marfil", flag: "🇨🇮" }, { name: "Ecuador", flag: "🇪🇨" }],
+  F: [{ name: "Países Bajos", flag: "🇳🇱" }, { name: "Japón", flag: "🇯🇵" }, { name: "Suecia", flag: "🇸🇪" }, { name: "Túnez", flag: "🇹🇳" }],
+  G: [{ name: "Bélgica", flag: "🇧🇪" }, { name: "Egipto", flag: "🇪🇬" }, { name: "Irán", flag: "🇮🇷" }, { name: "Nueva Zelanda", flag: "🇳🇿" }],
+  H: [{ name: "España", flag: "🇪🇸" }, { name: "Cabo Verde", flag: "🇨🇻" }, { name: "Arabia Saudita", flag: "🇸🇦" }, { name: "Uruguay", flag: "🇺🇾" }],
+  I: [{ name: "Francia", flag: "🇫🇷" }, { name: "Senegal", flag: "🇸🇳" }, { name: "Irak", flag: "🇮🇶" }, { name: "Noruega", flag: "🇳🇴" }],
+  J: [{ name: "Argentina", flag: "🇦🇷" }, { name: "Argelia", flag: "🇩🇿" }, { name: "Austria", flag: "🇦🇹" }, { name: "Jordania", flag: "🇯🇴" }],
+  K: [{ name: "Portugal", flag: "🇵🇹" }, { name: "Congo DR", flag: "🇨🇩" }, { name: "Uzbekistán", flag: "🇺🇿" }, { name: "Colombia", flag: "🇨🇴" }],
+  L: [{ name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "Croacia", flag: "🇭🇷" }, { name: "Ghana", flag: "🇬🇭" }, { name: "Panamá", flag: "🇵🇦" }],
 };
 
-const ALL_TEAMS = Object.entries(GROUPS)
-  .map(([g, teams]) => teams.map((t) => ({ ...t, group: g })))
-  .flat();
-const TOURNAMENT_START = new Date('2026-06-11T19:00:00Z');
+const ALL_TEAMS = Object.entries(GROUPS).map(([g, teams]) => teams.map(t => ({ ...t, group: g }))).flat();
+const TOURNAMENT_START = new Date("2026-06-11T19:00:00Z");
 const isPreTournamentLocked = () => new Date() >= TOURNAMENT_START;
 
 const css = `
@@ -287,79 +224,47 @@ input,button,select{font-family:inherit;}
 .admin-pos-badge{font-family:'Bebas Neue';font-size:14px;width:20px;flex-shrink:0;color:var(--muted);}
 `;
 
-const initials = (name = '') =>
-  name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const isLocked = (kickoff) => new Date(kickoff) <= new Date();
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState('login');
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
-  const [name, setName] = useState('');
-  const [invite, setInvite] = useState('');
-  const [msg, setMsg] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState(""); const [pass, setPass] = useState("");
+  const [name, setName] = useState(""); const [invite, setInvite] = useState("");
+  const [msg, setMsg] = useState(null); const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
-    setLoading(true);
-    setMsg(null);
-    const { data, error } = await sb.auth.signInWithPassword({
-      email,
-      password: pass,
+    setLoading(true); setMsg(null);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) { setMsg({ type: "err", text: "Email o contraseña incorrectos" }); setLoading(false); return; }
+    const { data: profile } = await sb.from("profiles").select("*").eq("id", data.user.id).single();
+    onAuth({ ...data.user, profile }); setLoading(false);
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) { setMsg({ type: "err", text: "Ingresa tu email primero" }); return; }
+    setLoading(true); setMsg(null);
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://mundial2026-plum.vercel.app"
     });
-    if (error) {
-      setMsg({ type: 'err', text: 'Email o contraseña incorrectos' });
-      setLoading(false);
-      return;
-    }
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
-    onAuth({ ...data.user, profile });
+    if (error) { setMsg({ type: "err", text: error.message }); }
+    else { setMsg({ type: "ok", text: "✅ Te enviamos un link para restablecer tu contraseña. Revisa tu email." }); }
     setLoading(false);
   }
 
   async function handleRegister() {
-    if (!name.trim()) {
-      setMsg({ type: 'err', text: 'Ingresa tu nombre' });
-      return;
-    }
-    if (pass.length < 6) {
-      setMsg({ type: 'err', text: 'Mínimo 6 caracteres' });
-      return;
-    }
-    setLoading(true);
-    setMsg(null);
-    const { data: codes } = await sb
-      .from('invite_codes')
-      .select('*')
-      .eq('code', invite.trim().toLowerCase())
-      .eq('active', true);
-    if (!codes?.length) {
-      setMsg({ type: 'err', text: 'Código de invitación inválido' });
-      setLoading(false);
-      return;
-    }
+    if (!name.trim()) { setMsg({ type: "err", text: "Ingresa tu nombre" }); return; }
+    if (pass.length < 6) { setMsg({ type: "err", text: "Mínimo 6 caracteres" }); return; }
+    setLoading(true); setMsg(null);
+    const { data: codes } = await sb.from("invite_codes").select("*").eq("code", invite.trim().toLowerCase()).eq("active", true);
+    if (!codes?.length) { setMsg({ type: "err", text: "Código de invitación inválido" }); setLoading(false); return; }
     const { data, error } = await sb.auth.signUp({ email, password: pass });
-    if (error) {
-      setMsg({ type: 'err', text: error.message });
-      setLoading(false);
-      return;
-    }
+    if (error) { setMsg({ type: "err", text: error.message }); setLoading(false); return; }
     if (data.user) {
-      await sb.from('profiles').insert({ id: data.user.id, name: name.trim() });
-      setMsg({ type: 'ok', text: '¡Cuenta creada! Ya puedes ingresar.' });
-      setMode('login');
-      setEmail('');
-      setPass('');
+      await sb.from("profiles").insert({ id: data.user.id, name: name.trim() });
+      setMsg({ type: "ok", text: "¡Cuenta creada! Ya puedes ingresar." });
+      setMode("login"); setEmail(""); setPass("");
     }
     setLoading(false);
   }
@@ -367,114 +272,27 @@ function AuthScreen({ onAuth }) {
   return (
     <div className="auth-wrap">
       <div className="auth-box">
-        <div className="auth-logo">
-          <span className="icon">🏆</span>
-          <h1>QUINIELA 2026</h1>
-          <p>Copa del Mundo · USA · CAN · MEX</p>
-        </div>
+        <div className="auth-logo"><span className="icon">🏆</span><h1>QUINIELA 2026</h1><p>Copa del Mundo · USA · CAN · MEX</p></div>
         <div className="auth-tabs">
-          <button
-            className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('login');
-              setMsg(null);
-            }}
-          >
-            Entrar
-          </button>
-          <button
-            className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('register');
-              setMsg(null);
-            }}
-          >
-            Registrarse
-          </button>
+          <button className={`auth-tab ${mode==="login"?"active":""}`} onClick={() => { setMode("login"); setMsg(null); }}>Entrar</button>
+          <button className={`auth-tab ${mode==="register"?"active":""}`} onClick={() => { setMode("register"); setMsg(null); }}>Registrarse</button>
         </div>
-        {mode === 'login' ? (
-          <>
-            <div className="field">
-              <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                placeholder="tu@email.com"
-              />
-            </div>
-            <div className="field">
-              <label>Contraseña</label>
-              <input
-                type="password"
-                value={pass}
-                onChange={(e) => setPass(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                placeholder="••••••"
-              />
-            </div>
-            <button
-              className="btn-gold"
-              onClick={handleLogin}
-              disabled={loading}
-            >
-              {loading ? 'CARGANDO...' : 'ENTRAR'}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="invite-note">
-              🔗 Necesitas un código de invitación
-            </div>
-            <div className="field">
-              <label>Tu nombre</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Como te verán los demás"
-              />
-            </div>
-            <div className="field">
-              <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-              />
-            </div>
-            <div className="field">
-              <label>Contraseña</label>
-              <input
-                type="password"
-                value={pass}
-                onChange={(e) => setPass(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-              />
-            </div>
-            <div className="field">
-              <label>Código de invitación</label>
-              <input
-                value={invite}
-                onChange={(e) => setInvite(e.target.value)}
-                placeholder="Código que te compartieron"
-              />
-            </div>
-            <button
-              className="btn-gold"
-              onClick={handleRegister}
-              disabled={loading}
-            >
-              {loading ? 'CREANDO CUENTA...' : 'CREAR CUENTA'}
-            </button>
-          </>
-        )}
-        {msg && (
-          <p className={msg.type === 'err' ? 'msg-err' : 'msg-ok'}>
-            {msg.text}
-          </p>
-        )}
+        {mode === "login" ? (<>
+          <div className="field"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="tu@email.com"/></div>
+          <div className="field"><label>Contraseña</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••"/></div>
+          <button className="btn-gold" onClick={handleLogin} disabled={loading}>{loading?"CARGANDO...":"ENTRAR"}</button>
+          <button onClick={handleForgotPassword} disabled={loading} style={{marginTop:12,width:"100%",background:"none",border:"none",color:"var(--muted)",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>
+            ¿Olvidaste tu contraseña?
+          </button>
+        </>) : (<>
+          <div className="invite-note">🔗 Necesitas un código de invitación</div>
+          <div className="field"><label>Tu nombre</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Como te verán los demás"/></div>
+          <div className="field"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com"/></div>
+          <div className="field"><label>Contraseña</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mínimo 6 caracteres"/></div>
+          <div className="field"><label>Código de invitación</label><input value={invite} onChange={e=>setInvite(e.target.value)} placeholder="Código que te compartieron"/></div>
+          <button className="btn-gold" onClick={handleRegister} disabled={loading}>{loading?"CREANDO CUENTA...":"CREAR CUENTA"}</button>
+        </>)}
+        {msg && <p className={msg.type==="err"?"msg-err":"msg-ok"}>{msg.text}</p>}
       </div>
     </div>
   );
@@ -482,7 +300,7 @@ function AuthScreen({ onAuth }) {
 
 // ── Pre-Tournament Predictions ────────────────────────────────────────────────
 function PreTournament({ user }) {
-  const [subTab, setSubTab] = useState('groups');
+  const [subTab, setSubTab] = useState("groups");
   const [groupPreds, setGroupPreds] = useState({});
   const [savedGroups, setSavedGroups] = useState({});
   const [savingGroup, setSavingGroup] = useState({});
@@ -492,73 +310,55 @@ function PreTournament({ user }) {
   const locked = isPreTournamentLocked();
 
   useEffect(() => {
-    sb.from('pretournament_predictions')
-      .select('*')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        if (!data) return;
-        const gp = {};
-        const tp = [];
-        data.forEach((p) => {
-          if (p.prediction_type === 'group_standing') {
-            if (!gp[p.group_name]) gp[p.group_name] = {};
-            gp[p.group_name][p.position] = p.team;
-          } else if (p.prediction_type === 'third_place') {
-            tp.push(p.team);
-          }
-        });
-        setGroupPreds(gp);
-        setSavedGroups(
-          Object.fromEntries(Object.keys(gp).map((k) => [k, true]))
-        );
-        setThirdPreds(tp);
-        if (tp.length === 8) setThirdsSaved(true);
+    sb.from("pretournament_predictions").select("*").eq("user_id", user.id).then(({ data }) => {
+      if (!data) return;
+      const gp = {};
+      const tp = [];
+      data.forEach(p => {
+        if (p.prediction_type === "group_standing") {
+          if (!gp[p.group_name]) gp[p.group_name] = {};
+          gp[p.group_name][p.position] = p.team;
+        } else if (p.prediction_type === "third_place") {
+          tp.push(p.team);
+        }
       });
+      setGroupPreds(gp);
+      setSavedGroups(Object.fromEntries(Object.keys(gp).map(k => [k, true])));
+      setThirdPreds(tp);
+      if (tp.length === 8) setThirdsSaved(true);
+    });
   }, [user.id]);
 
   async function saveGroup(groupName) {
     const preds = groupPreds[groupName] || {};
     if (!preds[1] || !preds[2]) return;
     if (preds[1] === preds[2]) return;
-    setSavingGroup((s) => ({ ...s, [groupName]: true }));
+    setSavingGroup(s => ({ ...s, [groupName]: true }));
     for (const pos of [1, 2]) {
-      await sb.from('pretournament_predictions').upsert(
-        {
-          user_id: user.id,
-          prediction_type: 'group_standing',
-          group_name: groupName,
-          position: pos,
-          team: preds[pos],
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,prediction_type,group_name,position' }
-      );
+      await sb.from("pretournament_predictions").upsert({
+        user_id: user.id, prediction_type: "group_standing",
+        group_name: groupName, position: pos, team: preds[pos],
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id,prediction_type,group_name,position" });
     }
-    setSavedGroups((s) => ({ ...s, [groupName]: true }));
-    setSavingGroup((s) => ({ ...s, [groupName]: false }));
+    setSavedGroups(s => ({ ...s, [groupName]: true }));
+    setSavingGroup(s => ({ ...s, [groupName]: false }));
   }
 
   async function saveThirds() {
     if (thirdPreds.length !== 8) return;
     setSavingThirds(true);
-    await sb
-      .from('pretournament_predictions')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('prediction_type', 'third_place');
+    await sb.from("pretournament_predictions").delete().eq("user_id", user.id).eq("prediction_type", "third_place");
     for (const team of thirdPreds) {
-      await sb
-        .from('pretournament_predictions')
-        .insert({ user_id: user.id, prediction_type: 'third_place', team });
+      await sb.from("pretournament_predictions").insert({ user_id: user.id, prediction_type: "third_place", team });
     }
-    setThirdsSaved(true);
-    setSavingThirds(false);
+    setThirdsSaved(true); setSavingThirds(false);
   }
 
   function toggleThird(teamName) {
     if (locked) return;
-    setThirdPreds((prev) => {
-      if (prev.includes(teamName)) return prev.filter((t) => t !== teamName);
+    setThirdPreds(prev => {
+      if (prev.includes(teamName)) return prev.filter(t => t !== teamName);
       if (prev.length >= 8) return prev;
       return [...prev, teamName];
     });
@@ -568,941 +368,405 @@ function PreTournament({ user }) {
   const completedGroups = Object.keys(savedGroups).length;
   const allGroupsComplete = completedGroups === 12;
 
-  return (
-    <>
-      <div className="sec-hdr">
-        <h2>PRE-TORNEO</h2>
-        <span>Se cierran el 11 Jun · 15:00 ET</span>
+  return (<>
+    <div className="sec-hdr"><h2>PRE-TORNEO</h2><span>Se cierran el 11 Jun · 15:00 ET</span></div>
+
+    {locked
+      ? <div className="pre-alert locked">🔒 Las predicciones pre-torneo están cerradas. El torneo ya comenzó.</div>
+      : allGroupsComplete && thirdsSaved
+        ? <div className="pre-alert complete">✅ ¡Todas tus predicciones pre-torneo están completas!</div>
+        : <div className="pre-alert warning">⏰ Completa tus predicciones antes del 11 de junio a las 3:00 PM ET. Grupos completados: {completedGroups}/12 · Terceros: {thirdPreds.length}/8</div>}
+
+    <div className="pre-tabs">
+      <button className={`pre-tab ${subTab==="groups"?"active":""}`} onClick={() => setSubTab("groups")}>🏆 1ro y 2do de Grupo ({completedGroups}/12)</button>
+      <button className={`pre-tab ${subTab==="thirds"?"active":""}`} onClick={() => setSubTab("thirds")}>🥉 Terceros Clasificados ({thirdPreds.length}/8)</button>
+    </div>
+
+    {subTab === "groups" && (
+      <div className="groups-grid">
+        {Object.entries(GROUPS).map(([groupName, teams]) => {
+          const preds = groupPreds[groupName] || {};
+          const isComplete = savedGroups[groupName];
+          const isSaving = savingGroup[groupName];
+          const hasChange = !isComplete || (preds[1] && preds[2]);
+          return (
+            <div key={groupName} className={`group-card ${isComplete?"complete":""}`}>
+              <div className="group-card-hdr">
+                <h4>GRUPO {groupName}</h4>
+                {isComplete && <span className="group-complete-badge">✓ Guardado</span>}
+              </div>
+              <div className="group-card-body">
+                {[1, 2].map(pos => (
+                  <div key={pos} className="group-select-row">
+                    <span className={`pos-badge pos-${pos}`}>{pos}°</span>
+                    <select
+                      className="group-select"
+                      value={preds[pos] || ""}
+                      onChange={e => {
+                        setGroupPreds(p => ({ ...p, [groupName]: { ...p[groupName], [pos]: e.target.value } }));
+                        setSavedGroups(s => ({ ...s, [groupName]: false }));
+                      }}
+                      disabled={locked}
+                    >
+                      <option value="">— Seleccionar —</option>
+                      {teams.map(t => (
+                        <option key={t.name} value={t.name} disabled={Object.values(preds).includes(t.name) && preds[pos] !== t.name}>
+                          {t.flag} {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {!locked && (
+                  <button className="group-save-btn" onClick={() => saveGroup(groupName)} disabled={!preds[1] || !preds[2] || preds[1]===preds[2] || isSaving}>
+                    {isSaving ? "Guardando..." : isComplete ? "✓ Actualizar" : "Guardar"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
+    )}
 
-      {locked ? (
-        <div className="pre-alert locked">
-          🔒 Las predicciones pre-torneo están cerradas. El torneo ya comenzó.
-        </div>
-      ) : allGroupsComplete && thirdsSaved ? (
-        <div className="pre-alert complete">
-          ✅ ¡Todas tus predicciones pre-torneo están completas!
-        </div>
-      ) : (
-        <div className="pre-alert warning">
-          ⏰ Completa tus predicciones antes del 11 de junio a las 3:00 PM ET.
-          Grupos completados: {completedGroups}/12 · Terceros:{' '}
-          {thirdPreds.length}/8
-        </div>
-      )}
-
-      <div className="pre-tabs">
-        <button
-          className={`pre-tab ${subTab === 'groups' ? 'active' : ''}`}
-          onClick={() => setSubTab('groups')}
-        >
-          🏆 1ro y 2do de Grupo ({completedGroups}/12)
-        </button>
-        <button
-          className={`pre-tab ${subTab === 'thirds' ? 'active' : ''}`}
-          onClick={() => setSubTab('thirds')}
-        >
-          🥉 Terceros Clasificados ({thirdPreds.length}/8)
-        </button>
-      </div>
-
-      {subTab === 'groups' && (
-        <div className="groups-grid">
+    {subTab === "thirds" && (
+      <div>
+        <p className="thirds-counter">
+          Elige <strong>1 equipo por grupo</strong> que crees terminará 3ro y clasificará. Selecciona <strong>8 de los 12 grupos</strong>. ({thirdPreds.length}/8 seleccionados)
+        </p>
+        <div className="thirds-grid">
           {Object.entries(GROUPS).map(([groupName, teams]) => {
-            const preds = groupPreds[groupName] || {};
-            const isComplete = savedGroups[groupName];
-            const isSaving = savingGroup[groupName];
-            const hasChange = !isComplete || (preds[1] && preds[2]);
+            // Find which team from this group is selected (if any)
+            const selectedTeam = teams.find(t => thirdPreds.includes(t.name));
+            const isGroupSelected = !!selectedTeam;
+            const isDisabled = !isGroupSelected && thirdPreds.length >= 8;
+
             return (
               <div
                 key={groupName}
-                className={`group-card ${isComplete ? 'complete' : ''}`}
+                className={`third-card ${isGroupSelected ? "selected" : ""} ${isDisabled && !locked ? "disabled" : ""} ${locked ? "locked-card" : ""}`}
+                style={{ flexDirection: "column", alignItems: "stretch", gap: 8, cursor: "default" }}
               >
-                <div className="group-card-hdr">
-                  <h4>GRUPO {groupName}</h4>
-                  {isComplete && (
-                    <span className="group-complete-badge">✓ Guardado</span>
-                  )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: isGroupSelected ? "var(--green)" : "var(--muted)", letterSpacing: 1 }}>
+                    GRUPO {groupName}
+                  </span>
+                  <div className="third-check" style={{ width: 18, height: 18, fontSize: 10 }}>{isGroupSelected ? "✓" : ""}</div>
                 </div>
-                <div className="group-card-body">
-                  {[1, 2].map((pos) => (
-                    <div key={pos} className="group-select-row">
-                      <span className={`pos-badge pos-${pos}`}>{pos}°</span>
-                      <select
-                        className="group-select"
-                        value={preds[pos] || ''}
-                        onChange={(e) => {
-                          setGroupPreds((p) => ({
-                            ...p,
-                            [groupName]: {
-                              ...p[groupName],
-                              [pos]: e.target.value,
-                            },
-                          }));
-                          setSavedGroups((s) => ({ ...s, [groupName]: false }));
-                        }}
-                        disabled={locked}
-                      >
-                        <option value="">— Seleccionar —</option>
-                        {teams.map((t) => (
-                          <option
-                            key={t.name}
-                            value={t.name}
-                            disabled={
-                              Object.values(preds).includes(t.name) &&
-                              preds[pos] !== t.name
-                            }
-                          >
-                            {t.flag} {t.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <select
+                  className="group-select"
+                  style={{ fontSize: 12, padding: "7px 10px" }}
+                  value={selectedTeam?.name || ""}
+                  disabled={locked || (isDisabled)}
+                  onChange={e => {
+                    const newTeam = e.target.value;
+                    setThirdPreds(prev => {
+                      // Remove any previously selected team from this group
+                      const withoutGroup = prev.filter(t => !teams.map(tm => tm.name).includes(t));
+                      if (!newTeam) return withoutGroup;
+                      return [...withoutGroup, newTeam];
+                    });
+                    setThirdsSaved(false);
+                  }}
+                >
+                  <option value="">— No seleccionado —</option>
+                  {teams.map(t => (
+                    <option key={t.name} value={t.name}>{t.flag} {t.name}</option>
                   ))}
-                  {!locked && (
-                    <button
-                      className="group-save-btn"
-                      onClick={() => saveGroup(groupName)}
-                      disabled={
-                        !preds[1] ||
-                        !preds[2] ||
-                        preds[1] === preds[2] ||
-                        isSaving
-                      }
-                    >
-                      {isSaving
-                        ? 'Guardando...'
-                        : isComplete
-                        ? '✓ Actualizar'
-                        : 'Guardar'}
-                    </button>
-                  )}
-                </div>
+                </select>
               </div>
             );
           })}
         </div>
-      )}
-
-      {subTab === 'thirds' && (
-        <div>
-          <p className="thirds-counter">
-            Elige <strong>1 equipo por grupo</strong> que crees terminará 3ro y
-            clasificará. Selecciona <strong>8 de los 12 grupos</strong>. (
-            {thirdPreds.length}/8 seleccionados)
-          </p>
-          <div className="thirds-grid">
-            {Object.entries(GROUPS).map(([groupName, teams]) => {
-              // Find which team from this group is selected (if any)
-              const selectedTeam = teams.find((t) =>
-                thirdPreds.includes(t.name)
-              );
-              const isGroupSelected = !!selectedTeam;
-              const isDisabled = !isGroupSelected && thirdPreds.length >= 8;
-
-              return (
-                <div
-                  key={groupName}
-                  className={`third-card ${isGroupSelected ? 'selected' : ''} ${
-                    isDisabled && !locked ? 'disabled' : ''
-                  } ${locked ? 'locked-card' : ''}`}
-                  style={{
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    gap: 8,
-                    cursor: 'default',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: 'Bebas Neue',
-                        fontSize: 15,
-                        color: isGroupSelected
-                          ? 'var(--green)'
-                          : 'var(--muted)',
-                        letterSpacing: 1,
-                      }}
-                    >
-                      GRUPO {groupName}
-                    </span>
-                    <div
-                      className="third-check"
-                      style={{ width: 18, height: 18, fontSize: 10 }}
-                    >
-                      {isGroupSelected ? '✓' : ''}
-                    </div>
-                  </div>
-                  <select
-                    className="group-select"
-                    style={{ fontSize: 12, padding: '7px 10px' }}
-                    value={selectedTeam?.name || ''}
-                    disabled={locked || isDisabled}
-                    onChange={(e) => {
-                      const newTeam = e.target.value;
-                      setThirdPreds((prev) => {
-                        // Remove any previously selected team from this group
-                        const withoutGroup = prev.filter(
-                          (t) => !teams.map((tm) => tm.name).includes(t)
-                        );
-                        if (!newTeam) return withoutGroup;
-                        return [...withoutGroup, newTeam];
-                      });
-                      setThirdsSaved(false);
-                    }}
-                  >
-                    <option value="">— No seleccionado —</option>
-                    {teams.map((t) => (
-                      <option key={t.name} value={t.name}>
-                        {t.flag} {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })}
-          </div>
-          {!locked && (
-            <button
-              className="thirds-save-btn"
-              onClick={saveThirds}
-              disabled={thirdPreds.length !== 8 || savingThirds}
-            >
-              {savingThirds
-                ? 'GUARDANDO...'
-                : thirdsSaved
-                ? '✓ GUARDADO'
-                : `GUARDAR (${thirdPreds.length}/8 grupos seleccionados)`}
-            </button>
-          )}
-        </div>
-      )}
-    </>
-  );
+        {!locked && (
+          <button className="thirds-save-btn" onClick={saveThirds} disabled={thirdPreds.length !== 8 || savingThirds}>
+            {savingThirds ? "GUARDANDO..." : thirdsSaved ? "✓ GUARDADO" : `GUARDAR (${thirdPreds.length}/8 grupos seleccionados)`}
+          </button>
+        )}
+      </div>
+    )}
+  </>);
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ user, matches, predictions, onGoTab }) {
-  const myPreds = predictions.filter((p) => p.user_id === user.id);
+  const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
-  const pending = matches.filter(
-    (m) => !myPreds.find((p) => p.match_id === m.id) && !isLocked(m.kickoff_at)
-  ).length;
+  const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at)).length;
   const locked = isPreTournamentLocked();
-  return (
-    <>
-      <div className="banner">
-        <h3>BIENVENIDO, {user.profile?.name?.toUpperCase() || 'JUGADOR'} 👋</h3>
-        <p>
-          {!locked ? (
-            <>
-              ⏰{' '}
-              <strong style={{ color: 'var(--gold)' }}>
-                ¡El torneo arranca el 11 de junio!
-              </strong>{' '}
-              Completa tus predicciones pre-torneo antes de que cierren.
-            </>
-          ) : pending > 0 ? (
-            <>
-              <strong style={{ color: 'var(--gold)' }}>
-                {pending} partido{pending !== 1 ? 's' : ''} pendiente
-                {pending !== 1 ? 's' : ''}
-              </strong>{' '}
-              de predecir. Se bloquean al inicio de cada partido.
-            </>
-          ) : (
-            <>¡Todo al día! Sigue de cerca la tabla de posiciones.</>
-          )}
-        </p>
+  return (<>
+    <div className="banner">
+      <h3>BIENVENIDO, {user.profile?.name?.toUpperCase() || "JUGADOR"} 👋</h3>
+      <p>{!locked
+        ? <>⏰ <strong style={{color:"var(--gold)"}}>¡El torneo arranca el 11 de junio!</strong> Completa tus predicciones pre-torneo antes de que cierren.</>
+        : pending > 0
+          ? <><strong style={{color:"var(--gold)"}}>{pending} partido{pending!==1?"s":""} pendiente{pending!==1?"s":""}</strong> de predecir. Se bloquean al inicio de cada partido.</>
+          : <>¡Todo al día! Sigue de cerca la tabla de posiciones.</>}
+      </p>
+    </div>
+    <div className="dash-grid">
+      <div className="stat-card"><span className="stat-label">Tus puntos</span><span className="stat-value">{totalPts}</span><span className="stat-sub">Total acumulado</span></div>
+      <div className="stat-card"><span className="stat-label">Predicciones</span><span className="stat-value">{myPreds.length}</span><span className="stat-sub">de {matches.length} partidos</span></div>
+      <div className="stat-card"><span className="stat-label">Pendientes</span><span className="stat-value" style={{color:pending>0?"var(--red)":"var(--green)"}}>{pending}</span><span className="stat-sub">{pending>0?"¡A predecir!":"Todo listo ✓"}</span></div>
+    </div>
+    {!locked && (
+      <div style={{background:"var(--card)",border:"1px solid rgba(245,183,49,.3)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div><div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>📋 PREDICCIONES PRE-TORNEO</div><div style={{fontSize:13,color:"var(--muted)",marginTop:3}}>1ro y 2do de grupo + 8 terceros clasificados</div></div>
+        <button className="save-btn" onClick={() => onGoTab("pre")}>Completar →</button>
       </div>
-      <div className="dash-grid">
-        <div className="stat-card">
-          <span className="stat-label">Tus puntos</span>
-          <span className="stat-value">{totalPts}</span>
-          <span className="stat-sub">Total acumulado</span>
+    )}
+    <div className="sec-hdr"><h2>PRÓXIMOS SIN PREDECIR</h2></div>
+    <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)"}}>
+      {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at)).slice(0,5).map((m,i,arr) => (
+        <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
+          <span style={{fontSize:13}}>{m.home_flag} {m.home} <span style={{color:"var(--muted)",margin:"0 6px"}}>vs</span> {m.away} {m.away_flag}</span>
+          <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{m.match_date} · {m.match_time}</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-label">Predicciones</span>
-          <span className="stat-value">{myPreds.length}</span>
-          <span className="stat-sub">de {matches.length} partidos</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Pendientes</span>
-          <span
-            className="stat-value"
-            style={{ color: pending > 0 ? 'var(--red)' : 'var(--green)' }}
-          >
-            {pending}
-          </span>
-          <span className="stat-sub">
-            {pending > 0 ? '¡A predecir!' : 'Todo listo ✓'}
-          </span>
-        </div>
-      </div>
-      {!locked && (
-        <div
-          style={{
-            background: 'var(--card)',
-            border: '1px solid rgba(245,183,49,.3)',
-            borderRadius: 'var(--r)',
-            padding: '18px 20px',
-            marginBottom: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: 'Bebas Neue',
-                fontSize: 17,
-                color: 'var(--gold)',
-                letterSpacing: 1,
-              }}
-            >
-              📋 PREDICCIONES PRE-TORNEO
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>
-              1ro y 2do de grupo + 8 terceros clasificados
-            </div>
-          </div>
-          <button className="save-btn" onClick={() => onGoTab('pre')}>
-            Completar →
-          </button>
-        </div>
-      )}
-      <div className="sec-hdr">
-        <h2>PRÓXIMOS SIN PREDECIR</h2>
-      </div>
-      <div
-        style={{
-          background: 'var(--card)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--r)',
-        }}
-      >
-        {matches
-          .filter(
-            (m) =>
-              !myPreds.find((p) => p.match_id === m.id) &&
-              !isLocked(m.kickoff_at)
-          )
-          .slice(0, 5)
-          .map((m, i, arr) => (
-            <div
-              key={m.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 18px',
-                borderBottom:
-                  i < arr.length - 1 ? '1px solid var(--border)' : 'none',
-              }}
-            >
-              <span style={{ fontSize: 13 }}>
-                {m.home_flag} {m.home}{' '}
-                <span style={{ color: 'var(--muted)', margin: '0 6px' }}>
-                  vs
-                </span>{' '}
-                {m.away} {m.away_flag}
-              </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'var(--muted)',
-                  whiteSpace: 'nowrap',
-                  marginLeft: 8,
-                }}
-              >
-                {m.match_date} · {m.match_time}
-              </span>
-            </div>
-          ))}
-        {pending === 0 && (
-          <div
-            style={{
-              padding: '20px 18px',
-              color: 'var(--muted)',
-              fontSize: 14,
-            }}
-          >
-            ¡Todos los partidos disponibles ya tienen predicción! 🎉
-          </div>
-        )}
-      </div>
-    </>
-  );
+      ))}
+      {pending===0 && <div style={{padding:"20px 18px",color:"var(--muted)",fontSize:14}}>¡Todos los partidos disponibles ya tienen predicción! 🎉</div>}
+    </div>
+  </>);
 }
 
 // ── Matches ──────────────────────────────────────────────────────────────────
-function Matches({
-  user,
-  matches,
-  predictions,
-  allPredictions,
-  profiles,
-  onSave,
-}) {
+function Matches({ user, matches, predictions, allPredictions, profiles, onSave }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
 
   useEffect(() => {
     const init = {};
-    predictions.forEach((p) => {
-      init[p.match_id] = {
-        home: String(p.home_score),
-        away: String(p.away_score),
-      };
-    });
+    predictions.forEach(p => { init[p.match_id] = { home: String(p.home_score), away: String(p.away_score) }; });
     setScores(init);
   }, [predictions]);
 
   function setScore(matchId, side, val) {
-    const v = val.replace(/[^0-9]/g, '').slice(0, 2);
-    setScores((s) => ({ ...s, [matchId]: { ...s[matchId], [side]: v } }));
-    setSaved((s) => ({ ...s, [matchId]: false }));
+    const v = val.replace(/[^0-9]/g,"").slice(0,2);
+    setScores(s => ({ ...s, [matchId]: { ...s[matchId], [side]: v } }));
+    setSaved(s => ({ ...s, [matchId]: false }));
   }
 
   async function save(match) {
     const sc = scores[match.id] || {};
-    if (
-      sc.home === undefined ||
-      sc.away === undefined ||
-      sc.home === '' ||
-      sc.away === ''
-    )
-      return;
-    setSaving((s) => ({ ...s, [match.id]: true }));
-    const existing = predictions.find((p) => p.match_id === match.id);
+    if (sc.home===undefined||sc.away===undefined||sc.home===""||sc.away==="") return;
+    setSaving(s => ({ ...s, [match.id]: true }));
+    const existing = predictions.find(p => p.match_id === match.id);
     if (existing) {
-      await sb
-        .from('predictions')
-        .update({
-          home_score: parseInt(sc.home),
-          away_score: parseInt(sc.away),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
+      await sb.from("predictions").update({ home_score: parseInt(sc.home), away_score: parseInt(sc.away), updated_at: new Date().toISOString() }).eq("id", existing.id);
     } else {
-      await sb
-        .from('predictions')
-        .insert({
-          user_id: user.id,
-          match_id: match.id,
-          home_score: parseInt(sc.home),
-          away_score: parseInt(sc.away),
-        });
+      await sb.from("predictions").insert({ user_id: user.id, match_id: match.id, home_score: parseInt(sc.home), away_score: parseInt(sc.away) });
     }
-    setSaved((s) => ({ ...s, [match.id]: true }));
-    setSaving((s) => ({ ...s, [match.id]: false }));
+    setSaved(s => ({ ...s, [match.id]: true }));
+    setSaving(s => ({ ...s, [match.id]: false }));
     onSave();
   }
 
   const profileMap = {};
-  (profiles || []).forEach((p) => {
-    profileMap[p.id] = p;
-  });
+  (profiles||[]).forEach(p => { profileMap[p.id] = p; });
 
-  return (
-    <>
-      <div className="sec-hdr">
-        <h2>MIS PREDICCIONES</h2>
-        <span>Fase de Grupos</span>
-      </div>
-      <div className="matches-grid">
-        {matches.map((m) => {
-          const locked = isLocked(m.kickoff_at);
-          const myPred = predictions.find((p) => p.match_id === m.id);
-          const sc = scores[m.id] || {};
-          const hasScore =
-            sc.home !== undefined &&
-            sc.away !== undefined &&
-            sc.home !== '' &&
-            sc.away !== '';
-          const wasSaved = saved[m.id];
-          const othersReveal = locked
-            ? (allPredictions || []).filter((p) => p.match_id === m.id)
-            : [];
-          return (
-            <div key={m.id}>
-              <div
-                className={`match-card ${
-                  locked ? 'locked' : myPred || wasSaved ? 'saved' : ''
-                }`}
-              >
-                <div className="team">
-                  <span className="team-flag">{m.home_flag}</span>
-                  <span className="team-name">{m.home}</span>
+  return (<>
+    <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Fase de Grupos</span></div>
+    <div className="matches-grid">
+      {matches.map(m => {
+        const locked = isLocked(m.kickoff_at);
+        const myPred = predictions.find(p => p.match_id === m.id);
+        const sc = scores[m.id] || {};
+        const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
+        const wasSaved = saved[m.id];
+        const othersReveal = locked ? (allPredictions||[]).filter(p => p.match_id === m.id) : [];
+        return (
+          <div key={m.id}>
+            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`}>
+              <div className="team"><span className="team-flag">{m.home_flag}</span><span className="team-name">{m.home}</span></div>
+              <div className="match-center">
+                <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                  <span className="group-badge">Grupo {m.group_name}</span>
+                  <span className="match-meta">{m.match_date} · {m.match_time}</span>
                 </div>
-                <div className="match-center">
-                  <div
-                    style={{ display: 'flex', gap: 5, alignItems: 'center' }}
-                  >
-                    <span className="group-badge">Grupo {m.group_name}</span>
-                    <span className="match-meta">
-                      {m.match_date} · {m.match_time}
-                    </span>
+                {locked ? (
+                  myPred
+                    ? <div className="score-display"><span>{myPred.home_score}</span><span style={{color:"var(--muted)",fontSize:16}}>–</span><span>{myPred.away_score}</span></div>
+                    : <span className="no-pred">Sin predicción</span>
+                ) : (
+                  <div className="score-inputs">
+                    <input className="score-input" value={sc.home??""} onChange={e=>setScore(m.id,"home",e.target.value)} placeholder="0"/>
+                    <span className="score-sep">–</span>
+                    <input className="score-input" value={sc.away??""} onChange={e=>setScore(m.id,"away",e.target.value)} placeholder="0"/>
                   </div>
-                  {locked ? (
-                    myPred ? (
-                      <div className="score-display">
-                        <span>{myPred.home_score}</span>
-                        <span style={{ color: 'var(--muted)', fontSize: 16 }}>
-                          –
-                        </span>
-                        <span>{myPred.away_score}</span>
-                      </div>
-                    ) : (
-                      <span className="no-pred">Sin predicción</span>
-                    )
-                  ) : (
-                    <div className="score-inputs">
-                      <input
-                        className="score-input"
-                        value={sc.home ?? ''}
-                        onChange={(e) => setScore(m.id, 'home', e.target.value)}
-                        placeholder="0"
-                      />
-                      <span className="score-sep">–</span>
-                      <input
-                        className="score-input"
-                        value={sc.away ?? ''}
-                        onChange={(e) => setScore(m.id, 'away', e.target.value)}
-                        placeholder="0"
-                      />
+                )}
+                {locked
+                  ? <span className="locked-tag">🔒 Partido iniciado</span>
+                  : hasScore
+                    ? <button className="save-btn" onClick={()=>save(m)} disabled={saving[m.id]}>{saving[m.id]?"...":wasSaved?"✓ GUARDADO":myPred?"ACTUALIZAR":"GUARDAR"}</button>
+                    : myPred ? <span className="saved-tag">✓ Guardado</span> : null}
+              </div>
+              <div className="team away"><span className="team-flag">{m.away_flag}</span><span className="team-name">{m.away}</span></div>
+            </div>
+            {locked && othersReveal.length > 0 && (
+              <div className="reveal-card">
+                <div className="reveal-title">🔓 Predicciones de todos</div>
+                {othersReveal.map(op => {
+                  const prof = profileMap[op.user_id];
+                  return (
+                    <div className="reveal-row" key={op.id}>
+                      <div className="reveal-user"><div className="avatar sm">{initials(prof?.name||"?")}</div><span>{prof?.name||"Jugador"}</span>{op.user_id===user.id&&<span className="me-badge">TÚ</span>}</div>
+                      <span className="reveal-score">{op.home_score} – {op.away_score}</span>
+                      {op.points>0&&<span className="reveal-pts">+{op.points} pts</span>}
                     </div>
-                  )}
-                  {locked ? (
-                    <span className="locked-tag">🔒 Partido iniciado</span>
-                  ) : hasScore ? (
-                    <button
-                      className="save-btn"
-                      onClick={() => save(m)}
-                      disabled={saving[m.id]}
-                    >
-                      {saving[m.id]
-                        ? '...'
-                        : wasSaved
-                        ? '✓ GUARDADO'
-                        : myPred
-                        ? 'ACTUALIZAR'
-                        : 'GUARDAR'}
-                    </button>
-                  ) : myPred ? (
-                    <span className="saved-tag">✓ Guardado</span>
-                  ) : null}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </>);
+}
+
+// ── Standings ────────────────────────────────────────────────────────────────
+function Standings({ user, predictions, profiles }) {
+  const rows = profiles.map(p => {
+    const preds = predictions.filter(pr => pr.user_id === p.id);
+    const pts = preds.reduce((s,pr) => s+(pr.points||0),0);
+    const exact = preds.filter(pr => pr.points>=3).length;
+    const result = preds.filter(pr => pr.points>0&&pr.points<3).length;
+    return { ...p, pts, exact, result, played: preds.length };
+  }).sort((a,b) => b.pts-a.pts||b.exact-a.exact);
+
+  return (<>
+    <div className="sec-hdr"><h2>TABLA DE POSICIONES</h2><span>{profiles.length} participantes</span></div>
+    <div className="standings-wrap">
+      <table className="standings-table">
+        <thead><tr><th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
+        <tbody>
+          {rows.map((row,i) => (
+            <tr key={row.id}>
+              <td><span className={`rank-num rank-${i+1}`}>{i+1}</span></td>
+              <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id===user.id&&<span className="me-badge">TÚ</span>}</div></td>
+              <td className="c"><span className="pts-big">{row.pts}</span></td>
+              <td className="c"><span className="pill">{row.exact}</span></td>
+              <td className="c"><span className="pill">{row.result}</span></td>
+              <td className="c" style={{color:"var(--muted)",fontSize:13}}>{row.played}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </>);
+}
+
+// ── Compare View ─────────────────────────────────────────────────────────────
+function Compare({ user, matches, allPredictions, profiles }) {
+  const [filter, setFilter] = useState("all");
+  const profileMap = {};
+  (profiles || []).forEach(p => { profileMap[p.id] = p; });
+  const dates = [...new Set(matches.map(m => m.match_date))];
+  const lockedDates = dates.filter(d => matches.filter(m => m.match_date === d).some(m => isLocked(m.kickoff_at)));
+  const visibleMatches = filter === "all"
+    ? matches.filter(m => isLocked(m.kickoff_at))
+    : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at));
+
+  function resultIcon(pred, match) {
+    if (match.home_score === null || match.away_score === null) return null;
+    if (pred.home_score === match.home_score && pred.away_score === match.away_score)
+      return <span style={{ color: "var(--gold)", fontSize: 13 }}>★</span>;
+    const real = match.home_score > match.away_score ? "H" : match.away_score > match.home_score ? "A" : "D";
+    const predicted = pred.home_score > pred.away_score ? "H" : pred.away_score > pred.home_score ? "A" : "D";
+    if (real === predicted) return <span style={{ color: "var(--green)", fontSize: 13 }}>✓</span>;
+    return <span style={{ color: "var(--red)", fontSize: 13 }}>✗</span>;
+  }
+
+  return (<>
+    <div className="sec-hdr"><h2>👁️ COMPARAR</h2><span>Predicciones reveladas al pitazo inicial</span></div>
+
+    {visibleMatches.length === 0 && (
+      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "50px 20px", textAlign: "center", color: "var(--muted)" }}>
+        <div style={{ fontSize: 44, marginBottom: 14 }}>🔒</div>
+        <div style={{ fontSize: 15, marginBottom: 6, color: "var(--txt)" }}>Aún no hay partidos iniciados</div>
+        <div style={{ fontSize: 13 }}>Las predicciones se revelan automáticamente al inicio de cada partido</div>
+      </div>
+    )}
+
+    {visibleMatches.length > 0 && (<>
+      <div className="match-filter" style={{ marginBottom: 20 }}>
+        <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>Todos</button>
+        {lockedDates.map(d => (
+          <button key={d} className={`filter-btn ${filter === d ? "active" : ""}`} onClick={() => setFilter(d)}>{d}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {visibleMatches.map(m => {
+          const matchPreds = allPredictions.filter(p => p.match_id === m.id);
+          const hasResult = m.home_score !== null && m.away_score !== null;
+          return (
+            <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+              {/* Match header */}
+              <div style={{ padding: "13px 18px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="group-badge">Grupo {m.group_name}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{m.home_flag} {m.home} <span style={{ color: "var(--muted)", margin: "0 5px" }}>vs</span> {m.away} {m.away_flag}</span>
                 </div>
-                <div className="team away">
-                  <span className="team-flag">{m.away_flag}</span>
-                  <span className="team-name">{m.away}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {hasResult
+                    ? <span style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--gold)" }}>{m.home_score} – {m.away_score}</span>
+                    : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽ En curso</span>}
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{m.match_date} · {m.match_time}</span>
                 </div>
               </div>
-              {locked && othersReveal.length > 0 && (
-                <div className="reveal-card">
-                  <div className="reveal-title">🔓 Predicciones de todos</div>
-                  {othersReveal.map((op) => {
-                    const prof = profileMap[op.user_id];
+
+              {/* Predictions per user */}
+              {matchPreds.length === 0
+                ? <div style={{ padding: "14px 18px", color: "var(--muted)", fontSize: 13 }}>Nadie predijo este partido</div>
+                : profiles.map((prof, idx) => {
+                    const pred = matchPreds.find(p => p.user_id === prof.id);
+                    const isMe = prof.id === user.id;
                     return (
-                      <div className="reveal-row" key={op.id}>
-                        <div className="reveal-user">
-                          <div className="avatar sm">
-                            {initials(prof?.name || '?')}
-                          </div>
-                          <span>{prof?.name || 'Jugador'}</span>
-                          {op.user_id === user.id && (
-                            <span className="me-badge">TÚ</span>
+                      <div key={prof.id} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 18px",
+                        borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none",
+                        background: isMe ? "rgba(245,183,49,.04)" : "transparent"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div className="avatar sm">{initials(prof.name)}</div>
+                          <span style={{ fontSize: 13 }}>{prof.name}</span>
+                          {isMe && <span className="me-badge">TÚ</span>}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          {pred ? (<>
+                            {resultIcon(pred, m)}
+                            <span style={{ fontFamily: "Bebas Neue", fontSize: 20 }}>{pred.home_score} – {pred.away_score}</span>
+                            {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points} pts</span>}
+                          </>) : (
+                            <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin predicción</span>
                           )}
                         </div>
-                        <span className="reveal-score">
-                          {op.home_score} – {op.away_score}
-                        </span>
-                        {op.points > 0 && (
-                          <span className="reveal-pts">+{op.points} pts</span>
-                        )}
                       </div>
                     );
-                  })}
+                  })
+              }
+
+              {/* Legend */}
+              {hasResult && (
+                <div style={{ padding: "7px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 14, fontSize: 11, color: "var(--muted)" }}>
+                  <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
+                  <span><span style={{ color: "var(--green)" }}>✓</span> Resultado correcto</span>
+                  <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
                 </div>
               )}
             </div>
           );
         })}
       </div>
-    </>
-  );
-}
-
-// ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, profiles }) {
-  const rows = profiles
-    .map((p) => {
-      const preds = predictions.filter((pr) => pr.user_id === p.id);
-      const pts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
-      const exact = preds.filter((pr) => pr.points >= 3).length;
-      const result = preds.filter(
-        (pr) => pr.points > 0 && pr.points < 3
-      ).length;
-      return { ...p, pts, exact, result, played: preds.length };
-    })
-    .sort((a, b) => b.pts - a.pts || b.exact - a.exact);
-
-  return (
-    <>
-      <div className="sec-hdr">
-        <h2>TABLA DE POSICIONES</h2>
-        <span>{profiles.length} participantes</span>
-      </div>
-      <div className="standings-wrap">
-        <table className="standings-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Jugador</th>
-              <th className="c">PTS</th>
-              <th className="c">Exactos</th>
-              <th className="c">Resultado</th>
-              <th className="c">Jugados</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.id}>
-                <td>
-                  <span className={`rank-num rank-${i + 1}`}>{i + 1}</span>
-                </td>
-                <td>
-                  <div className="user-cell">
-                    <div className="avatar sm">{initials(row.name)}</div>
-                    <span>{row.name}</span>
-                    {row.id === user.id && <span className="me-badge">TÚ</span>}
-                  </div>
-                </td>
-                <td className="c">
-                  <span className="pts-big">{row.pts}</span>
-                </td>
-                <td className="c">
-                  <span className="pill">{row.exact}</span>
-                </td>
-                <td className="c">
-                  <span className="pill">{row.result}</span>
-                </td>
-                <td
-                  className="c"
-                  style={{ color: 'var(--muted)', fontSize: 13 }}
-                >
-                  {row.played}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-// ── Compare View ─────────────────────────────────────────────────────────────
-function Compare({ user, matches, allPredictions, profiles }) {
-  const [filter, setFilter] = useState('all');
-  const profileMap = {};
-  (profiles || []).forEach((p) => {
-    profileMap[p.id] = p;
-  });
-  const dates = [...new Set(matches.map((m) => m.match_date))];
-  const lockedDates = dates.filter((d) =>
-    matches
-      .filter((m) => m.match_date === d)
-      .some((m) => isLocked(m.kickoff_at))
-  );
-  const visibleMatches =
-    filter === 'all'
-      ? matches.filter((m) => isLocked(m.kickoff_at))
-      : matches.filter(
-          (m) => m.match_date === filter && isLocked(m.kickoff_at)
-        );
-
-  function resultIcon(pred, match) {
-    if (match.home_score === null || match.away_score === null) return null;
-    if (
-      pred.home_score === match.home_score &&
-      pred.away_score === match.away_score
-    )
-      return <span style={{ color: 'var(--gold)', fontSize: 13 }}>★</span>;
-    const real =
-      match.home_score > match.away_score
-        ? 'H'
-        : match.away_score > match.home_score
-        ? 'A'
-        : 'D';
-    const predicted =
-      pred.home_score > pred.away_score
-        ? 'H'
-        : pred.away_score > pred.home_score
-        ? 'A'
-        : 'D';
-    if (real === predicted)
-      return <span style={{ color: 'var(--green)', fontSize: 13 }}>✓</span>;
-    return <span style={{ color: 'var(--red)', fontSize: 13 }}>✗</span>;
-  }
-
-  return (
-    <>
-      <div className="sec-hdr">
-        <h2>👁️ COMPARAR</h2>
-        <span>Predicciones reveladas al pitazo inicial</span>
-      </div>
-
-      {visibleMatches.length === 0 && (
-        <div
-          style={{
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r)',
-            padding: '50px 20px',
-            textAlign: 'center',
-            color: 'var(--muted)',
-          }}
-        >
-          <div style={{ fontSize: 44, marginBottom: 14 }}>🔒</div>
-          <div style={{ fontSize: 15, marginBottom: 6, color: 'var(--txt)' }}>
-            Aún no hay partidos iniciados
-          </div>
-          <div style={{ fontSize: 13 }}>
-            Las predicciones se revelan automáticamente al inicio de cada
-            partido
-          </div>
-        </div>
-      )}
-
-      {visibleMatches.length > 0 && (
-        <>
-          <div className="match-filter" style={{ marginBottom: 20 }}>
-            <button
-              className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              Todos
-            </button>
-            {lockedDates.map((d) => (
-              <button
-                key={d}
-                className={`filter-btn ${filter === d ? 'active' : ''}`}
-                onClick={() => setFilter(d)}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {visibleMatches.map((m) => {
-              const matchPreds = allPredictions.filter(
-                (p) => p.match_id === m.id
-              );
-              const hasResult = m.home_score !== null && m.away_score !== null;
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Match header */}
-                  <div
-                    style={{
-                      padding: '13px 18px',
-                      background: 'var(--surface)',
-                      borderBottom: '1px solid var(--border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                    >
-                      <span className="group-badge">Grupo {m.group_name}</span>
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>
-                        {m.home_flag} {m.home}{' '}
-                        <span
-                          style={{ color: 'var(--muted)', margin: '0 5px' }}
-                        >
-                          vs
-                        </span>{' '}
-                        {m.away} {m.away_flag}
-                      </span>
-                    </div>
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: 10 }}
-                    >
-                      {hasResult ? (
-                        <span
-                          style={{
-                            fontFamily: 'Bebas Neue',
-                            fontSize: 22,
-                            color: 'var(--gold)',
-                          }}
-                        >
-                          {m.home_score} – {m.away_score}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--gold)' }}>
-                          ⚽ En curso
-                        </span>
-                      )}
-                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {m.match_date} · {m.match_time}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Predictions per user */}
-                  {matchPreds.length === 0 ? (
-                    <div
-                      style={{
-                        padding: '14px 18px',
-                        color: 'var(--muted)',
-                        fontSize: 13,
-                      }}
-                    >
-                      Nadie predijo este partido
-                    </div>
-                  ) : (
-                    profiles.map((prof, idx) => {
-                      const pred = matchPreds.find(
-                        (p) => p.user_id === prof.id
-                      );
-                      const isMe = prof.id === user.id;
-                      return (
-                        <div
-                          key={prof.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 18px',
-                            borderBottom:
-                              idx < profiles.length - 1
-                                ? '1px solid var(--border)'
-                                : 'none',
-                            background: isMe
-                              ? 'rgba(245,183,49,.04)'
-                              : 'transparent',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                            }}
-                          >
-                            <div className="avatar sm">
-                              {initials(prof.name)}
-                            </div>
-                            <span style={{ fontSize: 13 }}>{prof.name}</span>
-                            {isMe && <span className="me-badge">TÚ</span>}
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 10,
-                            }}
-                          >
-                            {pred ? (
-                              <>
-                                {resultIcon(pred, m)}
-                                <span
-                                  style={{
-                                    fontFamily: 'Bebas Neue',
-                                    fontSize: 20,
-                                  }}
-                                >
-                                  {pred.home_score} – {pred.away_score}
-                                </span>
-                                {pred.points > 0 && (
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      padding: '2px 8px',
-                                      borderRadius: 20,
-                                      background: 'var(--green-dim)',
-                                      color: 'var(--green)',
-                                    }}
-                                  >
-                                    +{pred.points} pts
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  color: 'var(--muted)',
-                                  fontStyle: 'italic',
-                                }}
-                              >
-                                Sin predicción
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-
-                  {/* Legend */}
-                  {hasResult && (
-                    <div
-                      style={{
-                        padding: '7px 18px',
-                        borderTop: '1px solid var(--border)',
-                        display: 'flex',
-                        gap: 14,
-                        fontSize: 11,
-                        color: 'var(--muted)',
-                      }}
-                    >
-                      <span>
-                        <span style={{ color: 'var(--gold)' }}>★</span> Exacto
-                      </span>
-                      <span>
-                        <span style={{ color: 'var(--green)' }}>✓</span>{' '}
-                        Resultado correcto
-                      </span>
-                      <span>
-                        <span style={{ color: 'var(--red)' }}>✗</span> Falló
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </>
-  );
+    </>)}
+  </>);
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 function AdminPanel({ matches, profiles, onRefresh }) {
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState("all");
   const [results, setResults] = useState({});
   const [saving, setSaving] = useState({});
   const [savedMatch, setSavedMatch] = useState({});
@@ -1511,7 +775,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [savingRules, setSavingRules] = useState(false);
   const [rulesSaved, setRulesSaved] = useState(false);
   const [invites, setInvites] = useState([]);
-  const [newCode, setNewCode] = useState('');
+  const [newCode, setNewCode] = useState("");
   const [editMatch, setEditMatch] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -1519,145 +783,63 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
   async function deleteUser(userId) {
     setDeletingUser(userId);
-    await sb.rpc('delete_user', { target_user_id: userId });
+    await sb.rpc("delete_user", { target_user_id: userId });
     setConfirmDelete(null);
     setDeletingUser(null);
     onRefresh();
   }
 
   useEffect(() => {
-    sb.from('scoring_rules')
-      .select('*')
-      .then(({ data }) => {
-        if (data) {
-          setRules(data);
-          const v = {};
-          data.forEach((r) => {
-            v[r.rule_key] = r.rule_value;
-          });
-          setRuleVals(v);
-        }
-      });
-    sb.from('invite_codes')
-      .select('*')
-      .then(({ data }) => {
-        if (data) setInvites(data);
-      });
+    sb.from("scoring_rules").select("*").then(({ data }) => {
+      if (data) { setRules(data); const v={}; data.forEach(r=>{v[r.rule_key]=r.rule_value;}); setRuleVals(v); }
+    });
+    sb.from("invite_codes").select("*").then(({ data }) => { if (data) setInvites(data); });
   }, []);
 
   async function saveResult(match) {
     const r = results[match.id] || {};
-    if (
-      r.home === undefined ||
-      r.away === undefined ||
-      r.home === '' ||
-      r.away === ''
-    )
-      return;
-    setSaving((s) => ({ ...s, [match.id]: true }));
-    const homeScore = parseInt(r.home),
-      awayScore = parseInt(r.away);
-    await sb
-      .from('matches')
-      .update({
-        home_score: homeScore,
-        away_score: awayScore,
-        status: 'finished',
-      })
-      .eq('id', match.id);
-    const { data: preds } = await sb
-      .from('predictions')
-      .select('*')
-      .eq('match_id', match.id);
+    if (r.home===undefined||r.away===undefined||r.home===""||r.away==="") return;
+    setSaving(s=>({...s,[match.id]:true}));
+    const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
+    await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
+    const {data:preds} = await sb.from("predictions").select("*").eq("match_id",match.id);
     if (preds) {
-      const exactPts = ruleVals['exact_score'] || 3,
-        resultPts = ruleVals['correct_result'] || 1;
-      const realResult =
-        homeScore > awayScore
-          ? 'home'
-          : awayScore > homeScore
-          ? 'away'
-          : 'draw';
+      const exactPts=ruleVals["exact_score"]||3, resultPts=ruleVals["correct_result"]||1;
+      const realResult=homeScore>awayScore?"home":awayScore>homeScore?"away":"draw";
       for (const pred of preds) {
-        let pts = 0;
-        if (pred.home_score === homeScore && pred.away_score === awayScore) {
-          pts = exactPts;
-        } else {
-          const pr =
-            pred.home_score > pred.away_score
-              ? 'home'
-              : pred.away_score > pred.home_score
-              ? 'away'
-              : 'draw';
-          if (pr === realResult) pts = resultPts;
-        }
-        await sb.from('predictions').update({ points: pts }).eq('id', pred.id);
+        let pts=0;
+        if (pred.home_score===homeScore&&pred.away_score===awayScore) { pts=exactPts; }
+        else { const pr=pred.home_score>pred.away_score?"home":pred.away_score>pred.home_score?"away":"draw"; if(pr===realResult) pts=resultPts; }
+        await sb.from("predictions").update({points:pts}).eq("id",pred.id);
       }
     }
-    setSavedMatch((s) => ({ ...s, [match.id]: true }));
-    setSaving((s) => ({ ...s, [match.id]: false }));
-    onRefresh();
+    setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
   }
 
   async function saveRules() {
     setSavingRules(true);
-    for (const key of Object.keys(ruleVals)) {
-      await sb
-        .from('scoring_rules')
-        .update({ rule_value: parseInt(ruleVals[key]) })
-        .eq('rule_key', key);
-    }
-    setSavingRules(false);
-    setRulesSaved(true);
-    setTimeout(() => setRulesSaved(false), 2000);
+    for (const key of Object.keys(ruleVals)) { await sb.from("scoring_rules").update({rule_value:parseInt(ruleVals[key])}).eq("rule_key",key); }
+    setSavingRules(false); setRulesSaved(true); setTimeout(()=>setRulesSaved(false),2000);
   }
 
   async function addInvite() {
     if (!newCode.trim()) return;
-    await sb
-      .from('invite_codes')
-      .insert({ code: newCode.trim().toLowerCase(), active: true });
-    setNewCode('');
-    const { data } = await sb.from('invite_codes').select('*');
-    if (data) setInvites(data);
+    await sb.from("invite_codes").insert({code:newCode.trim().toLowerCase(),active:true});
+    setNewCode(""); const {data}=await sb.from("invite_codes").select("*"); if(data) setInvites(data);
   }
 
-  async function toggleInvite(code, active) {
-    await sb.from('invite_codes').update({ active: !active }).eq('code', code);
-    const { data } = await sb.from('invite_codes').select('*');
-    if (data) setInvites(data);
+  async function toggleInvite(code,active) {
+    await sb.from("invite_codes").update({active:!active}).eq("code",code);
+    const {data}=await sb.from("invite_codes").select("*"); if(data) setInvites(data);
   }
 
   async function saveEditMatch() {
-    await sb
-      .from('matches')
-      .update({
-        home: editForm.home,
-        away: editForm.away,
-        home_flag: editForm.home_flag,
-        away_flag: editForm.away_flag,
-        match_date: editForm.match_date,
-        match_time: editForm.match_time,
-        kickoff_at: editForm.kickoff_at,
-      })
-      .eq('id', editMatch.id);
-    setEditMatch(null);
-    onRefresh();
+    await sb.from("matches").update({home:editForm.home,away:editForm.away,home_flag:editForm.home_flag,away_flag:editForm.away_flag,match_date:editForm.match_date,match_time:editForm.match_time,kickoff_at:editForm.kickoff_at}).eq("id",editMatch.id);
+    setEditMatch(null); onRefresh();
   }
 
-  const filtered =
-    filter === 'all'
-      ? matches
-      : filter === 'finished'
-      ? matches.filter((m) => m.status === 'finished')
-      : matches.filter((m) => m.status !== 'finished');
-  const ruleLabels = {
-    exact_score: 'Marcador exacto',
-    correct_result: 'Resultado correcto',
-    group_first: '1ro de grupo',
-    group_second: '2do de grupo',
-    third_place_qualifier: 'Tercero clasifica',
-  };
+  const filtered = filter==="all"?matches:filter==="finished"?matches.filter(m=>m.status==="finished"):matches.filter(m=>m.status!=="finished");
+  const ruleLabels = {exact_score:"Marcador exacto",correct_result:"Resultado correcto",group_first:"1ro de grupo",group_second:"2do de grupo",third_place_qualifier:"Tercero clasifica"};
 
   return (
     <div className="admin-wrap">
@@ -1665,208 +847,51 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         <div className="modal-overlay">
           <div className="modal">
             <h3>✏️ EDITAR PARTIDO</h3>
-            <div className="field">
-              <label>Equipo Local</label>
-              <input
-                value={editForm.home || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, home: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Bandera Local</label>
-              <input
-                value={editForm.home_flag || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, home_flag: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Equipo Visitante</label>
-              <input
-                value={editForm.away || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, away: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Bandera Visitante</label>
-              <input
-                value={editForm.away_flag || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, away_flag: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Fecha</label>
-              <input
-                value={editForm.match_date || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, match_date: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Hora</label>
-              <input
-                value={editForm.match_time || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, match_time: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Kickoff UTC</label>
-              <input
-                value={editForm.kickoff_at || ''}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, kickoff_at: e.target.value }))
-                }
-              />
-            </div>
+            <div className="field"><label>Equipo Local</label><input value={editForm.home||""} onChange={e=>setEditForm(f=>({...f,home:e.target.value}))}/></div>
+            <div className="field"><label>Bandera Local</label><input value={editForm.home_flag||""} onChange={e=>setEditForm(f=>({...f,home_flag:e.target.value}))}/></div>
+            <div className="field"><label>Equipo Visitante</label><input value={editForm.away||""} onChange={e=>setEditForm(f=>({...f,away:e.target.value}))}/></div>
+            <div className="field"><label>Bandera Visitante</label><input value={editForm.away_flag||""} onChange={e=>setEditForm(f=>({...f,away_flag:e.target.value}))}/></div>
+            <div className="field"><label>Fecha</label><input value={editForm.match_date||""} onChange={e=>setEditForm(f=>({...f,match_date:e.target.value}))}/></div>
+            <div className="field"><label>Hora</label><input value={editForm.match_time||""} onChange={e=>setEditForm(f=>({...f,match_time:e.target.value}))}/></div>
+            <div className="field"><label>Kickoff UTC</label><input value={editForm.kickoff_at||""} onChange={e=>setEditForm(f=>({...f,kickoff_at:e.target.value}))}/></div>
             <div className="modal-btns">
-              <button className="btn-cancel" onClick={() => setEditMatch(null)}>
-                Cancelar
-              </button>
-              <button className="btn-confirm" onClick={saveEditMatch}>
-                Guardar
-              </button>
+              <button className="btn-cancel" onClick={()=>setEditMatch(null)}>Cancelar</button>
+              <button className="btn-confirm" onClick={saveEditMatch}>Guardar</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="sec-hdr">
-        <h2>🔧 PANEL ADMIN</h2>
-        <span>Solo visible para administradores</span>
-      </div>
+      <div className="sec-hdr"><h2>🔧 PANEL ADMIN</h2><span>Solo visible para administradores</span></div>
 
       <div className="admin-section">
         <div className="admin-section-hdr">
           <h3>⚽ INGRESAR RESULTADOS</h3>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {matches.filter((m) => m.status === 'finished').length}/
-            {matches.length} completados
-          </div>
+          <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length} completados</div>
         </div>
         <div className="admin-section-body">
           <div className="match-filter">
-            {[
-              ['all', 'Todos'],
-              ['pending', 'Pendientes'],
-              ['finished', 'Finalizados'],
-            ].map(([k, l]) => (
-              <button
-                key={k}
-                className={`filter-btn ${filter === k ? 'active' : ''}`}
-                onClick={() => setFilter(k)}
-              >
-                {l}
-              </button>
+            {[["all","Todos"],["pending","Pendientes"],["finished","Finalizados"]].map(([k,l])=>(
+              <button key={k} className={`filter-btn ${filter===k?"active":""}`} onClick={()=>setFilter(k)}>{l}</button>
             ))}
           </div>
           <div className="admin-matches-list">
-            {filtered.map((m) => {
-              const r = results[m.id] || {
-                home: m.home_score !== null ? String(m.home_score) : '',
-                away: m.away_score !== null ? String(m.away_score) : '',
-              };
-              const finished = m.status === 'finished';
+            {filtered.map(m => {
+              const r=results[m.id]||{home:m.home_score!==null?String(m.home_score):"",away:m.away_score!==null?String(m.away_score):""};
+              const finished=m.status==="finished";
               return (
                 <div key={m.id} className="admin-match-row">
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                    {m.match_date}
-                    <br />
-                    <span style={{ color: 'var(--txt)' }}>
-                      Grupo {m.group_name}
-                    </span>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>{m.match_date}<br/><span style={{color:"var(--txt)"}}>Grupo {m.group_name}</span></div>
+                  <div style={{fontSize:13,fontWeight:500}}>{m.home_flag} {m.home}<br/>{m.away_flag} {m.away}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0"/>
+                    <span style={{color:"var(--muted)",fontFamily:"Bebas Neue",fontSize:16}}>–</span>
+                    <input className="admin-score-input" value={r.away??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],away:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0"/>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>
-                    {m.home_flag} {m.home}
-                    <br />
-                    {m.away_flag} {m.away}
-                  </div>
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-                  >
-                    <input
-                      className="admin-score-input"
-                      value={r.home ?? ''}
-                      onChange={(e) =>
-                        setResults((s) => ({
-                          ...s,
-                          [m.id]: {
-                            ...s[m.id],
-                            home: e.target.value
-                              .replace(/[^0-9]/g, '')
-                              .slice(0, 2),
-                          },
-                        }))
-                      }
-                      placeholder="0"
-                    />
-                    <span
-                      style={{
-                        color: 'var(--muted)',
-                        fontFamily: 'Bebas Neue',
-                        fontSize: 16,
-                      }}
-                    >
-                      –
-                    </span>
-                    <input
-                      className="admin-score-input"
-                      value={r.away ?? ''}
-                      onChange={(e) =>
-                        setResults((s) => ({
-                          ...s,
-                          [m.id]: {
-                            ...s[m.id],
-                            away: e.target.value
-                              .replace(/[^0-9]/g, '')
-                              .slice(0, 2),
-                          },
-                        }))
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    {finished ? (
-                      <span className="result-badge">
-                        ✓ {m.home_score}–{m.away_score}
-                      </span>
-                    ) : savedMatch[m.id] ? (
-                      <span style={{ fontSize: 11, color: 'var(--green)' }}>
-                        ✓
-                      </span>
-                    ) : null}
-                  </div>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <button
-                      className="admin-save-btn"
-                      onClick={() => saveResult(m)}
-                      disabled={saving[m.id]}
-                    >
-                      {saving[m.id]
-                        ? '...'
-                        : finished
-                        ? 'Actualizar'
-                        : 'Guardar'}
-                    </button>
-                    <button
-                      className="admin-edit-btn"
-                      onClick={() => {
-                        setEditMatch(m);
-                        setEditForm({ ...m });
-                      }}
-                    >
-                      ✏️
-                    </button>
+                  <div>{finished?<span className="result-badge">✓ {m.home_score}–{m.away_score}</span>:savedMatch[m.id]?<span style={{fontSize:11,color:"var(--green)"}}>✓</span>:null}</div>
+                  <div style={{display:"flex",gap:5}}>
+                    <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
+                    <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
                   </div>
                 </div>
               );
@@ -1878,28 +903,14 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       <div className="admin-section">
         <div className="admin-section-hdr">
           <h3>⚙️ SISTEMA DE PUNTOS</h3>
-          <button
-            className="btn-small"
-            onClick={saveRules}
-            disabled={savingRules}
-          >
-            {rulesSaved ? '✓ Guardado' : savingRules ? '...' : 'Guardar'}
-          </button>
+          <button className="btn-small" onClick={saveRules} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button>
         </div>
         <div className="admin-section-body">
           <div className="rules-grid">
-            {rules.map((r) => (
+            {rules.map(r=>(
               <div key={r.rule_key} className="rule-card">
-                <span className="rule-label">
-                  {ruleLabels[r.rule_key] || r.rule_key}
-                </span>
-                <input
-                  className="rule-input"
-                  value={ruleVals[r.rule_key] ?? r.rule_value}
-                  onChange={(e) =>
-                    setRuleVals((v) => ({ ...v, [r.rule_key]: e.target.value }))
-                  }
-                />
+                <span className="rule-label">{ruleLabels[r.rule_key]||r.rule_key}</span>
+                <input className="rule-input" value={ruleVals[r.rule_key]??r.rule_value} onChange={e=>setRuleVals(v=>({...v,[r.rule_key]:e.target.value}))}/>
               </div>
             ))}
           </div>
@@ -1907,43 +918,22 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr">
-          <h3>🔗 CÓDIGOS DE INVITACIÓN</h3>
-        </div>
+        <div className="admin-section-hdr"><h3>🔗 CÓDIGOS DE INVITACIÓN</h3></div>
         <div className="admin-section-body">
           <div className="invite-list">
-            {invites.map((inv) => (
+            {invites.map(inv=>(
               <div key={inv.code} className="invite-row">
                 <span className="invite-code">{inv.code}</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span
-                    className={`invite-status ${
-                      inv.active ? 'active' : 'inactive'
-                    }`}
-                  >
-                    {inv.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                  <button
-                    className={`btn-small ${inv.active ? 'red' : ''}`}
-                    onClick={() => toggleInvite(inv.code, inv.active)}
-                  >
-                    {inv.active ? 'Desactivar' : 'Activar'}
-                  </button>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span className={`invite-status ${inv.active?"active":"inactive"}`}>{inv.active?"Activo":"Inactivo"}</span>
+                  <button className={`btn-small ${inv.active?"red":""}`} onClick={()=>toggleInvite(inv.code,inv.active)}>{inv.active?"Desactivar":"Activar"}</button>
                 </div>
               </div>
             ))}
           </div>
           <div className="new-invite-row">
-            <input
-              className="new-invite-input"
-              value={newCode}
-              onChange={(e) => setNewCode(e.target.value)}
-              placeholder="Nuevo código..."
-              onKeyDown={(e) => e.key === 'Enter' && addInvite()}
-            />
-            <button className="btn-small" onClick={addInvite}>
-              Agregar
-            </button>
+            <input className="new-invite-input" value={newCode} onChange={e=>setNewCode(e.target.value)} placeholder="Nuevo código..." onKeyDown={e=>e.key==="Enter"&&addInvite()}/>
+            <button className="btn-small" onClick={addInvite}>Agregar</button>
           </div>
         </div>
       </div>
@@ -1951,68 +941,29 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       <div className="admin-section">
         <div className="admin-section-hdr">
           <h3>👥 GESTIÓN DE USUARIOS</h3>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {profiles.length} participantes
-          </span>
+          <span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span>
         </div>
         <div className="admin-section-body">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {profiles.map((prof) => (
-              <div
-                key={prof.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  background: 'var(--surface)',
-                  borderRadius: 8,
-                  border: '1px solid var(--border)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {profiles.map(prof => (
+              <div key={prof.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <div className="avatar sm">{initials(prof.name)}</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>
-                      {prof.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {new Date(prof.created_at).toLocaleDateString('es', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </div>
+                    <div style={{fontSize:14,fontWeight:500}}>{prof.name}</div>
+                    <div style={{fontSize:11,color:"var(--muted)"}}>{new Date(prof.created_at).toLocaleDateString("es", {day:"2-digit",month:"short",year:"numeric"})}</div>
                   </div>
                 </div>
                 {confirmDelete === prof.id ? (
-                  <div
-                    style={{ display: 'flex', gap: 6, alignItems: 'center' }}
-                  >
-                    <span style={{ fontSize: 12, color: 'var(--red)' }}>
-                      ¿Confirmar?
-                    </span>
-                    <button
-                      className="btn-small"
-                      onClick={() => setConfirmDelete(null)}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      className="btn-small red"
-                      onClick={() => deleteUser(prof.id)}
-                      disabled={deletingUser === prof.id}
-                    >
-                      {deletingUser === prof.id ? '...' : 'Eliminar'}
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:12,color:"var(--red)"}}>¿Confirmar?</span>
+                    <button className="btn-small" onClick={()=>setConfirmDelete(null)}>Cancelar</button>
+                    <button className="btn-small red" onClick={()=>deleteUser(prof.id)} disabled={deletingUser===prof.id}>
+                      {deletingUser===prof.id?"...":"Eliminar"}
                     </button>
                   </div>
                 ) : (
-                  <button
-                    className="btn-small red"
-                    onClick={() => setConfirmDelete(prof.id)}
-                  >
-                    🗑️ Eliminar
-                  </button>
+                  <button className="btn-small red" onClick={()=>setConfirmDelete(prof.id)}>🗑️ Eliminar</button>
                 )}
               </div>
             ))}
@@ -2026,7 +977,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 // ── App Root ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState("home");
   const [booting, setBooting] = useState(true);
   const [matches, setMatches] = useState([]);
   const [myPredictions, setMyPredictions] = useState([]);
@@ -2037,171 +988,64 @@ export default function App() {
   useEffect(() => {
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
       }
       setBooting(false);
     });
-    const {
-      data: { subscription },
-    } = sb.auth.onAuthStateChange(async (_, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange(async (_, session) => {
       if (session?.user) {
-        const { data: profile } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
-      } else {
-        setUser(null);
-        setIsAdmin(false);
-      }
+      } else { setUser(null); setIsAdmin(false); }
     });
     return () => subscription.unsubscribe();
   }, []);
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const [
-      { data: m },
-      { data: myP },
-      { data: allP },
-      { data: prof },
-      { data: adminCheck },
-    ] = await Promise.all([
-      sb.from('matches').select('*').order('kickoff_at'),
-      sb.from('predictions').select('*').eq('user_id', user.id),
-      sb.from('predictions').select('*'),
-      sb.from('profiles').select('*'),
-      sb.from('admins').select('*').eq('user_id', user.id),
+    const [{ data: m }, { data: myP }, { data: allP }, { data: prof }, { data: adminCheck }] = await Promise.all([
+      sb.from("matches").select("*").order("kickoff_at"),
+      sb.from("predictions").select("*").eq("user_id", user.id),
+      sb.from("predictions").select("*"),
+      sb.from("profiles").select("*"),
+      sb.from("admins").select("*").eq("user_id", user.id),
     ]);
-    setMatches(m || []);
-    setMyPredictions(myP || []);
-    setAllPredictions(allP || []);
-    setProfiles(prof || []);
-    setIsAdmin((adminCheck || []).length > 0);
+    setMatches(m||[]); setMyPredictions(myP||[]); setAllPredictions(allP||[]); setProfiles(prof||[]);
+    setIsAdmin((adminCheck||[]).length>0);
   }, [user]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  async function handleLogout() {
-    await sb.auth.signOut();
-    setUser(null);
-  }
+  async function handleLogout() { await sb.auth.signOut(); setUser(null); }
 
-  if (booting)
-    return (
-      <>
-        <style>{css}</style>
-        <div className="spinner">
-          <div className="spin" />
-          <span>Cargando...</span>
+  if (booting) return (<><style>{css}</style><div className="spinner"><div className="spin"/><span>Cargando...</span></div></>);
+  if (!user) return (<><style>{css}</style><AuthScreen onAuth={setUser}/></>);
+
+  return (<><style>{css}</style>
+    <div className="shell">
+      <nav className="nav">
+        <div className="nav-brand">🏆 QUINIELA 2026</div>
+        <div className="nav-tabs">
+          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
+            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
+          ))}
+          {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>setTab("admin")}>🔧 Admin</button>}
         </div>
-      </>
-    );
-  if (!user)
-    return (
-      <>
-        <style>{css}</style>
-        <AuthScreen onAuth={setUser} />
-      </>
-    );
-
-  return (
-    <>
-      <style>{css}</style>
-      <div className="shell">
-        <nav className="nav">
-          <div className="nav-brand">🏆 QUINIELA 2026</div>
-          <div className="nav-tabs">
-            {[
-              ['home', '🏠 Inicio'],
-              ['pre', '📋 Pre-Torneo'],
-              ['matches', '⚽ Partidos'],
-              ['compare', '👁️ Comparar'],
-              ['standings', '📊 Posiciones'],
-            ].map(([k, l]) => (
-              <button
-                key={k}
-                className={`nav-tab ${tab === k ? 'active' : ''}`}
-                onClick={() => setTab(k)}
-              >
-                {l}
-              </button>
-            ))}
-            {isAdmin && (
-              <button
-                className={`nav-tab admin-tab ${
-                  tab === 'admin' ? 'active' : ''
-                }`}
-                onClick={() => setTab('admin')}
-              >
-                🔧 Admin
-              </button>
-            )}
-          </div>
-          <div className="nav-user">
-            <div className="avatar">
-              {initials(user.profile?.name || user.email)}
-            </div>
-            <span style={{ fontSize: 13 }}>
-              {user.profile?.name || user.email}
-            </span>
-            <button className="btn-logout" onClick={handleLogout}>
-              Salir
-            </button>
-          </div>
-        </nav>
-        <main className="main">
-          {tab === 'home' && (
-            <Dashboard
-              user={user}
-              matches={matches}
-              predictions={myPredictions}
-              onGoTab={setTab}
-            />
-          )}
-          {tab === 'pre' && <PreTournament user={user} />}
-          {tab === 'matches' && (
-            <Matches
-              user={user}
-              matches={matches}
-              predictions={myPredictions}
-              allPredictions={allPredictions}
-              profiles={profiles}
-              onSave={loadData}
-            />
-          )}
-          {tab === 'compare' && (
-            <Compare
-              user={user}
-              matches={matches}
-              allPredictions={allPredictions}
-              profiles={profiles}
-            />
-          )}
-          {tab === 'standings' && (
-            <Standings
-              user={user}
-              predictions={allPredictions}
-              profiles={profiles}
-            />
-          )}
-          {tab === 'admin' && isAdmin && (
-            <AdminPanel
-              matches={matches}
-              profiles={profiles}
-              onRefresh={loadData}
-            />
-          )}
-        </main>
-      </div>
-    </>
-  );
+        <div className="nav-user">
+          <div className="avatar">{initials(user.profile?.name||user.email)}</div>
+          <span style={{fontSize:13}}>{user.profile?.name||user.email}</span>
+          <button className="btn-logout" onClick={handleLogout}>Salir</button>
+        </div>
+      </nav>
+      <main className="main">
+        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={myPredictions} onGoTab={setTab}/>}
+        {tab==="pre"       && <PreTournament user={user}/>}
+        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
+        {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles}/>}
+        {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
+      </main>
+    </div>
+  </>);
 }
