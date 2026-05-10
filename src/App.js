@@ -3,7 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZXppb2hhcXVpd252YnpybGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQzNzEsImV4cCI6MjA5Mzk0MDM3MX0.p53LDuRulCzO_ceRjS47jNbirEpfDTk5NYCi9AT92CM";
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: window.sessionStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  }
+});
 
 // ─── World Cup 2026 Groups ────────────────────────────────────────────────────
 const FLAG = (code) => `https://flagcdn.com/24x18/${code}.png`;
@@ -988,10 +995,6 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      // Limpiar URL después de que Supabase procesó el token
-      if (window.location.hash) {
-        setTimeout(() => window.history.replaceState(null, "", window.location.pathname), 100);
-      }
       if (event === "SIGNED_OUT") {
         setUser(null); setIsAdmin(false); setBooting(false); return;
       }
@@ -1007,7 +1010,6 @@ export default function App() {
       setBooting(false);
     });
 
-    // Cargar sesión existente
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
