@@ -799,6 +799,38 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [editForm, setEditForm] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
+  const [adminList, setAdminList] = useState([]);
+  const [savingAdmin, setSavingAdmin] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [savingName, setSavingName] = useState(null);
+
+  useEffect(() => {
+    sb.from("admins").select("*").then(({ data }) => {
+      if (data) setAdminList(data.map(a => a.user_id));
+    });
+  }, []);
+
+  async function toggleAdmin(userId, isCurrentlyAdmin) {
+    setSavingAdmin(userId);
+    if (isCurrentlyAdmin) {
+      await sb.from("admins").delete().eq("user_id", userId);
+    } else {
+      await sb.from("admins").insert({ user_id: userId });
+    }
+    const { data } = await sb.from("admins").select("*");
+    if (data) setAdminList(data.map(a => a.user_id));
+    setSavingAdmin(null);
+  }
+
+  async function saveEditName(userId) {
+    if (!editName.trim()) return;
+    setSavingName(userId);
+    await sb.from("profiles").update({ name: editName.trim() }).eq("id", userId);
+    setSavingName(null);
+    setEditingUser(null);
+    onRefresh();
+  }
 
   async function deleteUser(userId) {
     setDeletingUser(userId);
@@ -964,28 +996,56 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         </div>
         <div className="admin-section-body">
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {profiles.map(prof => (
-              <div key={prof.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div className="avatar sm">{initials(prof.name)}</div>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:500}}>{prof.name}</div>
-                    <div style={{fontSize:11,color:"var(--muted)"}}>{new Date(prof.created_at).toLocaleDateString("es", {day:"2-digit",month:"short",year:"numeric"})}</div>
+            {profiles.map(prof => {
+              const isAdminUser = adminList.includes(prof.id);
+              const isEditing = editingUser === prof.id;
+              return (
+                <div key={prof.id} style={{background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div className="avatar sm">{initials(prof.name)}</div>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:14,fontWeight:500}}>{prof.name}</span>
+                          {isAdminUser && <span style={{fontSize:10,padding:"1px 6px",borderRadius:20,background:"var(--red-dim)",color:"var(--red)"}}>ADMIN</span>}
+                        </div>
+                        <div style={{fontSize:11,color:"var(--muted)"}}>{new Date(prof.created_at).toLocaleDateString("es",{day:"2-digit",month:"short",year:"numeric"})}</div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn-small" onClick={()=>{ setEditingUser(isEditing?null:prof.id); setEditName(prof.name); }}>✏️</button>
+                      <button className={`btn-small ${isAdminUser?"red":""}`} onClick={()=>toggleAdmin(prof.id, isAdminUser)} disabled={savingAdmin===prof.id}>
+                        {savingAdmin===prof.id?"...":(isAdminUser?"− Admin":"+ Admin")}
+                      </button>
+                      <button className="btn-small red" onClick={()=>setConfirmDelete(confirmDelete===prof.id?null:prof.id)}>🗑️</button>
+                    </div>
                   </div>
+                  {isEditing && (
+                    <div style={{padding:"0 14px 12px",display:"flex",gap:8}}>
+                      <input
+                        value={editName}
+                        onChange={e=>setEditName(e.target.value)}
+                        style={{flex:1,padding:"8px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:7,color:"var(--txt)",fontSize:13,outline:"none"}}
+                        placeholder="Nuevo nombre..."
+                      />
+                      <button className="btn-small" onClick={()=>saveEditName(prof.id)} disabled={savingName===prof.id}>
+                        {savingName===prof.id?"...":"Guardar"}
+                      </button>
+                      <button className="btn-small red" onClick={()=>setEditingUser(null)}>×</button>
+                    </div>
+                  )}
+                  {confirmDelete === prof.id && (
+                    <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:12,color:"var(--red)",flex:1}}>¿Eliminar a {prof.name}? Esto no se puede deshacer.</span>
+                      <button className="btn-small" onClick={()=>setConfirmDelete(null)}>Cancelar</button>
+                      <button className="btn-small red" onClick={()=>deleteUser(prof.id)} disabled={deletingUser===prof.id}>
+                        {deletingUser===prof.id?"...":"Confirmar"}
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {confirmDelete === prof.id ? (
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <span style={{fontSize:12,color:"var(--red)"}}>¿Confirmar?</span>
-                    <button className="btn-small" onClick={()=>setConfirmDelete(null)}>Cancelar</button>
-                    <button className="btn-small red" onClick={()=>deleteUser(prof.id)} disabled={deletingUser===prof.id}>
-                      {deletingUser===prof.id?"...":"Eliminar"}
-                    </button>
-                  </div>
-                ) : (
-                  <button className="btn-small red" onClick={()=>setConfirmDelete(prof.id)}>🗑️ Eliminar</button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
