@@ -946,11 +946,6 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     onRefresh();
   }
 
-  const [groupResults, setGroupResults] = useState({});
-  const [savingGroupResults, setSavingGroupResults] = useState(false);
-  const [groupResultsMsg, setGroupResultsMsg] = useState(null);
-  const [calculatingPts, setCalculatingPts] = useState(false);
-
   useEffect(() => {
     sb.from("admins").select("*").then(({ data }) => {
       if (data) setAdminList(data.map(a => a.user_id));
