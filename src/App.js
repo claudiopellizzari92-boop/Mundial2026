@@ -805,11 +805,62 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [editName, setEditName] = useState("");
   const [savingName, setSavingName] = useState(null);
 
-  useEffect(() => {
-    sb.from("admins").select("*").then(({ data }) => {
-      if (data) setAdminList(data.map(a => a.user_id));
-    });
-  }, []);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);
+
+  async function syncScores() {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const res = await fetch("/api/scores");
+      const data = await res.json();
+      if (!data.matches) { setSyncMsg({ type: "err", text: "No se pudieron obtener resultados" }); setSyncing(false); return; }
+
+      const exactPts = ruleVals["exact_score"] || 3;
+      const resultPts = ruleVals["correct_result"] || 1;
+      let updated = 0;
+
+      for (const apiMatch of data.matches) {
+        if (apiMatch.status !== "FINISHED") continue;
+        const homeScore = apiMatch.score?.fullTime?.home;
+        const awayScore = apiMatch.score?.fullTime?.away;
+        if (homeScore === null || awayScore === null) continue;
+
+        const homeName = apiMatch.homeTeam?.name;
+        const awayName = apiMatch.awayTeam?.name;
+
+        const { data: dbMatches } = await sb.from("matches")
+          .select("*")
+          .ilike("home", `%${homeName?.split(" ")[0]}%`)
+          .eq("status", "upcoming");
+
+        if (!dbMatches?.length) continue;
+
+        for (const dbMatch of dbMatches) {
+          await sb.from("matches").update({ home_score: homeScore, away_score: awayScore, status: "finished" }).eq("id", dbMatch.id);
+
+          const { data: preds } = await sb.from("predictions").select("*").eq("match_id", dbMatch.id);
+          if (preds) {
+            const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+            for (const pred of preds) {
+              let pts = 0;
+              if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
+              else {
+                const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+                if (pr === realResult) pts = resultPts;
+              }
+              await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
+            }
+          }
+          updated++;
+        }
+      }
+      setSyncMsg({ type: "ok", text: updated > 0 ? `✅ ${updated} partido${updated !== 1 ? "s" : ""} actualizado${updated !== 1 ? "s" : ""}` : "✅ Todo al día, sin cambios" });
+      onRefresh();
+    } catch (e) {
+      setSyncMsg({ type: "err", text: "Error al sincronizar: " + e.message });
+    }
+    setSyncing(false);
+  }
 
   async function toggleAdmin(userId, isCurrentlyAdmin) {
     setSavingAdmin(userId);
@@ -841,6 +892,9 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   }
 
   useEffect(() => {
+    sb.from("admins").select("*").then(({ data }) => {
+      if (data) setAdminList(data.map(a => a.user_id));
+    });
     sb.from("scoring_rules").select("*").then(({ data }) => {
       if (data) { setRules(data); const v={}; data.forEach(r=>{v[r.rule_key]=r.rule_value;}); setRuleVals(v); }
     });
@@ -917,8 +971,14 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
       <div className="admin-section">
         <div className="admin-section-hdr">
-          <h3>⚽ INGRESAR RESULTADOS</h3>
-          <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length} completados</div>
+          <h3>⚽ RESULTADOS</h3>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {syncMsg && <span style={{fontSize:12,color:syncMsg.type==="ok"?"var(--green)":"var(--red)"}}>{syncMsg.text}</span>}
+            <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>
+              {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar API"}
+            </button>
+            <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length}</div>
+          </div>
         </div>
         <div className="admin-section-body">
           <div className="match-filter">
