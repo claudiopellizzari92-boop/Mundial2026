@@ -1035,7 +1035,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           <div className="rules-grid">
             {rules.map(r=>(
               <div key={r.rule_key} className="rule-card">
-                <span className="rule-label">{ruleLabels[r.rule_key]||r.rule_key}</span>
+                <span className="rule-label">{r.description || ruleLabels[r.rule_key] || r.rule_key}</span>
                 <input className="rule-input" value={ruleVals[r.rule_key]??r.rule_value} onChange={e=>setRuleVals(v=>({...v,[r.rule_key]:e.target.value}))}/>
               </div>
             ))}
