@@ -804,8 +804,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [editingUser, setEditingUser] = useState(null);
   const [editName, setEditName] = useState("");
   const [savingName, setSavingName] = useState(null);
-
   const [showMatches, setShowMatches] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
 
   async function syncScores() {
