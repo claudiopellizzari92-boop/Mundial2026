@@ -170,6 +170,7 @@ input,button,select{font-family:inherit;}
 /* ── Mobile ── */
 .hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;}
 .hamburger span{display:block;width:22px;height:2px;background:var(--txt);border-radius:2px;}
+.desktop-only{display:inline-flex;}
 .mobile-menu{display:none;position:fixed;top:62px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;padding:8px 12px;flex-direction:column;gap:2px;}
 .mobile-menu.open{display:flex;}
 .mobile-nav-tab{padding:11px 14px;border-radius:8px;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;text-align:left;transition:all .2s;}
@@ -180,6 +181,7 @@ input,button,select{font-family:inherit;}
   .nav-tabs{display:none;}
   .nav-brand{font-size:18px;}
   .nav-user span{display:none;}
+  .desktop-only{display:none!important;}
   .hamburger{display:flex;}
   .main{padding:16px 14px;}
   .dash-grid{grid-template-columns:repeat(3,1fr);gap:8px;}
@@ -1477,10 +1479,11 @@ export default function App() {
         <div className="nav-user">
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}}>{user.profile?.name||user.email}</span>
-          <button className="btn-logout" onClick={handleLogout}>Salir</button>
-          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
+          <button className="btn-logout" style={{display:"none"}} onClick={handleLogout}>Salir</button>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)} style={{marginLeft:4}}>
             <span/><span/><span/>
           </button>
+          <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
