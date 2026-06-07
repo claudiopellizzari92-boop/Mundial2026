@@ -33,6 +33,30 @@ const ALL_TEAMS = Object.entries(GROUPS).map(([g, teams]) => teams.map(t => ({ .
 const TOURNAMENT_START = new Date("2026-06-11T19:00:00Z");
 const isPreTournamentLocked = () => new Date() >= TOURNAMENT_START;
 
+// Convierte un kickoff UTC a hora local del usuario
+function localTime(kickoff) {
+  if (!kickoff) return "";
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return new Date(kickoff).toLocaleTimeString("es", {
+    hour: "2-digit", minute: "2-digit", timeZone: tz, hour12: false
+  });
+}
+
+function localDate(kickoff) {
+  if (!kickoff) return "";
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const d = new Date(kickoff);
+  const months = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const local = new Date(d.toLocaleString("en", { timeZone: tz }));
+  return `${months[local.getMonth()]} ${local.getDate()}`;
+}
+
+function localTzName() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const short = new Date().toLocaleTimeString("en", { timeZoneName: "short", timeZone: tz }).split(" ").pop();
+  return short;
+}
+
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -388,13 +412,13 @@ function PreTournament({ user }) {
   const allGroupsComplete = completedGroups === 12;
 
   return (<>
-    <div className="sec-hdr"><h2>PRE-TORNEO</h2><span>Se cierran el 11 Jun · 15:00 ET</span></div>
+    <div className="sec-hdr"><h2>PRE-TORNEO</h2><span>Se cierran el {localDate(TOURNAMENT_START)} · {localTime(TOURNAMENT_START)} ({localTzName()})</span></div>
 
     {locked
       ? <div className="pre-alert locked">🔒 Las predicciones pre-torneo están cerradas. El torneo ya comenzó.</div>
       : allGroupsComplete && thirdsSaved
         ? <div className="pre-alert complete">✅ ¡Todas tus predicciones pre-torneo están completas!</div>
-        : <div className="pre-alert warning">⏰ Completa tus predicciones antes del 11 de junio a las 3:00 PM ET. Grupos completados: {completedGroups}/12 · Terceros: {thirdPreds.length}/8</div>}
+        : <div className="pre-alert warning">⏰ Completa tus predicciones antes del {localDate(TOURNAMENT_START)} a las {localTime(TOURNAMENT_START)} ({localTzName()}). Grupos completados: {completedGroups}/12 · Terceros: {thirdPreds.length}/8</div>}
 
     <div className="pre-tabs">
       <button className={`pre-tab ${subTab==="groups"?"active":""}`} onClick={() => setSubTab("groups")}>🏆 1ro y 2do de Grupo ({completedGroups}/12)</button>
@@ -539,7 +563,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
       {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).slice(0,5).map((m,i,arr) => (
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
           <span style={{fontSize:13,display:"flex",alignItems:"center",gap:6}}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{color:"var(--muted)"}}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
-          <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{m.match_date} · {m.match_time}</span>
+          <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
         </div>
       ))}
       {pending===0 && <div style={{padding:"20px 18px",color:"var(--muted)",fontSize:14}}>¡Todos los partidos disponibles ya tienen predicción! 🎉</div>}
@@ -584,7 +608,7 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
   (profiles||[]).forEach(p => { profileMap[p.id] = p; });
 
   return (<>
-    <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Fase de Grupos</span></div>
+    <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Horarios en {localTzName()}</span></div>
     <div className="matches-grid">
       {matches.map(m => {
         const locked = isLocked(m.kickoff_at, matches);
@@ -600,7 +624,7 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
                   <span className="group-badge">Grupo {m.group_name}</span>
-                  <span className="match-meta">{m.match_date} · {m.match_time}</span>
+                  <span className="match-meta">{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
                 </div>
                 {locked ? (
                   myPred
@@ -741,7 +765,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
                   {hasResult
                     ? <span style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--gold)" }}>{m.home_score} – {m.away_score}</span>
                     : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽ En curso</span>}
-                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{m.match_date} · {m.match_time}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
                 </div>
               </div>
 
