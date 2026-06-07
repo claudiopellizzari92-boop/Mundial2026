@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"; // v16
+import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
@@ -907,15 +907,17 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     setSaving(s=>({...s,[match.id]:true}));
     const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
     await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
-    const {data:preds} = await sb.from("predictions").select("*").eq("match_id",match.id);
+    const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
     if (preds) {
-      const exactPts=ruleVals["exact_score"]||3, resultPts=ruleVals["correct_result"]||1;
-      const realResult=homeScore>awayScore?"home":awayScore>homeScore?"away":"draw";
+      const isKnockout = match.phase && match.phase !== "Grupos";
+      const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 6) : (ruleVals["exact_score_groups"] || 3);
+      const resultPts = isKnockout ? (ruleVals["correct_result_knockout"] || 2) : (ruleVals["correct_result_groups"] || 1);
+      const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
       for (const pred of preds) {
-        let pts=0;
-        if (pred.home_score===homeScore&&pred.away_score===awayScore) { pts=exactPts; }
-        else { const pr=pred.home_score>pred.away_score?"home":pred.away_score>pred.home_score?"away":"draw"; if(pr===realResult) pts=resultPts; }
-        await sb.from("predictions").update({points:pts}).eq("id",pred.id);
+        let pts = 0;
+        if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
+        else { const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw"; if(pr === realResult) pts = resultPts; }
+        await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
       }
     }
     setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
@@ -944,7 +946,15 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   }
 
   const filtered = filter==="all"?matches:filter==="finished"?matches.filter(m=>m.status==="finished"):matches.filter(m=>m.status!=="finished");
-  const ruleLabels = {exact_score:"Marcador exacto",correct_result:"Resultado correcto",group_first:"1ro de grupo",group_second:"2do de grupo",third_place_qualifier:"Tercero clasifica"};
+  const ruleLabels = {
+    exact_score_groups:      "Marcador exacto — Grupos",
+    exact_score_knockout:    "Marcador exacto — Eliminatorias",
+    correct_result_groups:   "Ganador — Grupos",
+    correct_result_knockout: "Ganador — Eliminatorias",
+    group_first:             "1ro de grupo",
+    group_second:            "2do de grupo",
+    third_place_qualifier:   "3er clasificado",
+  };
 
   return (
     <div className="admin-wrap">
