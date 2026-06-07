@@ -1128,6 +1128,47 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   );
 }
 
+// ── Reset Password Screen ─────────────────────────────────────────────────────
+function ResetPasswordScreen({ onDone }) {
+  const [pass, setPass] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleReset() {
+    if (pass.length < 6) { setMsg({ type: "err", text: "La contraseña debe tener al menos 6 caracteres" }); return; }
+    if (pass !== pass2) { setMsg({ type: "err", text: "Las contraseñas no coinciden" }); return; }
+    setLoading(true); setMsg(null);
+    const { error } = await sb.auth.updateUser({ password: pass });
+    if (error) { setMsg({ type: "err", text: error.message }); setLoading(false); return; }
+    setMsg({ type: "ok", text: "✅ Contraseña actualizada correctamente" });
+    setLoading(false);
+    setTimeout(() => onDone(), 1500);
+  }
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <span className="icon">🔑</span>
+          <h1>QUINIELA 2026</h1>
+          <p>Crear nueva contraseña</p>
+        </div>
+        <div className="field">
+          <label>Nueva contraseña</label>
+          <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" onKeyDown={e => e.key === "Enter" && handleReset()} />
+        </div>
+        <div className="field">
+          <label>Confirmar contraseña</label>
+          <input type="password" value={pass2} onChange={e => setPass2(e.target.value)} placeholder="Repite la contraseña" onKeyDown={e => e.key === "Enter" && handleReset()} />
+        </div>
+        <button className="btn-gold" onClick={handleReset} disabled={loading}>{loading ? "GUARDANDO..." : "GUARDAR CONTRASEÑA"}</button>
+        {msg && <p className={msg.type === "err" ? "msg-err" : "msg-ok"}>{msg.text}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ── App Root ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1138,6 +1179,7 @@ export default function App() {
   const [allPredictions, setAllPredictions] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
@@ -1145,7 +1187,7 @@ export default function App() {
         setUser(null); setIsAdmin(false); setBooting(false); return;
       }
       if (event === "PASSWORD_RECOVERY") {
-        setBooting(false); return;
+        setResettingPassword(true); setBooting(false); return;
       }
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
@@ -1185,6 +1227,7 @@ export default function App() {
   async function handleLogout() { await sb.auth.signOut(); setUser(null); }
 
   if (booting) return (<><style>{css}</style><div className="spinner"><div className="spin"/><span>Cargando...</span></div></>);
+  if (resettingPassword) return (<><style>{css}</style><ResetPasswordScreen onDone={() => setResettingPassword(false)}/></>);
   if (!user) return (<><style>{css}</style><AuthScreen onAuth={setUser}/></>);
 
   return (<><style>{css}</style>
