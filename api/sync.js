@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
@@ -75,19 +75,19 @@ export default async function handler(req, res) {
     "GROUP_I":"I","GROUP_J":"J","GROUP_K":"K","GROUP_L":"L",
   };
 
-  function tName(n) { return NAMES_ES[n] || n; }
-  function tFlag(n) { return FLAG(TEAM_FLAGS[n] || ""); }
-  function fmtDate(d) {
+  const tName = (n) => NAMES_ES[n] || n;
+  const tFlag = (n) => FLAG(TEAM_FLAGS[n] || "");
+  const fmtDate = (d) => {
     const dt = new Date(d);
     const m = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     return `${m[dt.getUTCMonth()]} ${dt.getUTCDate()}`;
-  }
-  function fmtTime(d) {
+  };
+  const fmtTime = (d) => {
     const dt = new Date(d);
     const h = ((dt.getUTCHours() - 4 + 24) % 24).toString().padStart(2,"0");
     const mm = dt.getUTCMinutes().toString().padStart(2,"0");
     return `${h}:${mm} ET`;
-  }
+  };
 
   try {
     const apiRes = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
@@ -181,4 +181,4 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message });
   }
-}
+};
