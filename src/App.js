@@ -645,11 +645,21 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
 
 // ── Standings ────────────────────────────────────────────────────────────────
 function Standings({ user, predictions, profiles }) {
+  const [prePreds, setPrePreds] = useState([]);
+
+  useEffect(() => {
+    sb.from("pretournament_predictions").select("*").then(({ data }) => {
+      if (data) setPrePreds(data);
+    });
+  }, []);
+
   const rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
-    const pts = preds.reduce((s,pr) => s+(pr.points||0),0);
-    const exact = preds.filter(pr => pr.points>=3).length;
-    const result = preds.filter(pr => pr.points>0&&pr.points<3).length;
+    const matchPts = preds.reduce((s,pr) => s+(pr.points||0),0);
+    const prePts = prePreds.filter(pr => pr.user_id === p.id).reduce((s,pr) => s+(pr.points||0),0);
+    const pts = matchPts + prePts;
+    const exact = preds.filter(pr => pr.points >= 3).length;
+    const result = preds.filter(pr => pr.points > 0 && pr.points < 3).length;
     return { ...p, pts, exact, result, played: preds.length };
   }).sort((a,b) => b.pts-a.pts||b.exact-a.exact);
 
@@ -807,6 +817,10 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [showMatches, setShowMatches] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
+  const [groupResults, setGroupResults] = useState({});
+  const [savingGroupResults, setSavingGroupResults] = useState(false);
+  const [groupResultsMsg, setGroupResultsMsg] = useState(null);
+  const [calculatingPts, setCalculatingPts] = useState(false);
 
   async function syncScores() {
     setSyncing(true); setSyncMsg(null);
@@ -932,6 +946,11 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     onRefresh();
   }
 
+  const [groupResults, setGroupResults] = useState({});
+  const [savingGroupResults, setSavingGroupResults] = useState(false);
+  const [groupResultsMsg, setGroupResultsMsg] = useState(null);
+  const [calculatingPts, setCalculatingPts] = useState(false);
+
   useEffect(() => {
     sb.from("admins").select("*").then(({ data }) => {
       if (data) setAdminList(data.map(a => a.user_id));
@@ -940,7 +959,87 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       if (data) { setRules(data); const v={}; data.forEach(r=>{v[r.rule_key]=r.rule_value;}); setRuleVals(v); }
     });
     sb.from("invite_codes").select("*").then(({ data }) => { if (data) setInvites(data); });
+    sb.from("group_results").select("*").then(({ data }) => {
+      if (data) {
+        const gr = {};
+        data.forEach(r => {
+          if (!gr[r.group_name]) gr[r.group_name] = {};
+          gr[r.group_name][r.position] = r.team;
+        });
+        setGroupResults(gr);
+      }
+    });
   }, []);
+
+  async function saveGroupResults() {
+    setSavingGroupResults(true); setGroupResultsMsg(null);
+    for (const group of Object.keys(groupResults)) {
+      for (const pos of [1, 2, 3]) {
+        const team = groupResults[group]?.[pos];
+        if (!team) continue;
+        await sb.from("group_results").upsert(
+          { group_name: group, position: pos, team },
+          { onConflict: "group_name,position" }
+        );
+      }
+    }
+    setSavingGroupResults(false);
+    setGroupResultsMsg({ type: "ok", text: "✅ Resultados guardados" });
+    setTimeout(() => setGroupResultsMsg(null), 2000);
+  }
+
+  async function calculatePreTournamentPoints() {
+    setCalculatingPts(true); setGroupResultsMsg(null);
+    const { data: preds } = await sb.from("pretournament_predictions").select("*");
+    const { data: results } = await sb.from("group_results").select("*");
+    const { data: rules2 } = await sb.from("scoring_rules").select("*");
+
+    const rMap = {};
+    (rules2||[]).forEach(r => { rMap[r.rule_key] = r.rule_value; });
+    const pts1st = rMap["group_first"] || 2;
+    const pts2nd = rMap["group_second"] || 2;
+    const pts3rd = rMap["third_place_qualifier"] || 2;
+
+    const resultMap = {};
+    (results||[]).forEach(r => {
+      if (!resultMap[r.group_name]) resultMap[r.group_name] = {};
+      resultMap[r.group_name][r.position] = r.team;
+    });
+
+    // Group predictions by user
+    const userPreds = {};
+    (preds||[]).forEach(p => {
+      if (!userPreds[p.user_id]) userPreds[p.user_id] = [];
+      userPreds[p.user_id].push(p);
+    });
+
+    let totalUpdated = 0;
+    for (const userId of Object.keys(userPreds)) {
+      let totalPts = 0;
+      for (const pred of userPreds[userId]) {
+        let pts = 0;
+        if (pred.prediction_type === "group_standing") {
+          const real = resultMap[pred.group_name]?.[pred.position];
+          if (real && real === pred.team) {
+            pts = pred.position === 1 ? pts1st : pts2nd;
+          }
+        } else if (pred.prediction_type === "third_place") {
+          // Check if this team is in any group's 3rd place results
+          const isClassified = Object.values(resultMap).some(g => g[3] === pred.team);
+          if (isClassified) pts = pts3rd;
+        }
+        if (pts > 0) {
+          await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id);
+          totalPts += pts;
+        }
+      }
+      totalUpdated++;
+    }
+
+    setCalculatingPts(false);
+    setGroupResultsMsg({ type: "ok", text: `✅ Puntos calculados para ${totalUpdated} usuarios` });
+    setTimeout(() => setGroupResultsMsg(null), 3000);
+  }
 
   async function saveResult(match) {
     const r = results[match.id] || {};
@@ -1065,6 +1164,43 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           </div>
         </div>
         )}
+      </div>
+
+      <div className="admin-section">
+        <div className="admin-section-hdr">
+          <h3>🏆 CLASIFICADOS DE GRUPOS</h3>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {groupResultsMsg && <span style={{fontSize:12,color:groupResultsMsg.type==="ok"?"var(--green)":"var(--red)"}}>{groupResultsMsg.text}</span>}
+            <button className="btn-small" onClick={saveGroupResults} disabled={savingGroupResults}>{savingGroupResults?"...":"Guardar"}</button>
+            <button className="btn-small" onClick={calculatePreTournamentPoints} disabled={calculatingPts} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>{calculatingPts?"Calculando...":"🧮 Calcular puntos"}</button>
+          </div>
+        </div>
+        <div className="admin-section-body">
+          <p style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Ingresa quién quedó 1ro, 2do y 3ro de cada grupo. Luego click en "Calcular puntos" para asignar puntos a todos los usuarios.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+            {["A","B","C","D","E","F","G","H","I","J","K","L"].map(group => {
+              const teams = GROUPS[group] || [];
+              return (
+                <div key={group} style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:12}}>
+                  <div style={{fontFamily:"Bebas Neue",fontSize:16,color:"var(--gold)",marginBottom:8}}>GRUPO {group}</div>
+                  {[1,2,3].map(pos => (
+                    <div key={pos} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                      <span style={{fontFamily:"Bebas Neue",fontSize:14,color:pos===1?"var(--gold)":pos===2?"#b0bcd0":"#cd7f32",width:16}}>{pos}°</span>
+                      <select
+                        value={groupResults[group]?.[pos] || ""}
+                        onChange={e => setGroupResults(r => ({...r,[group]:{...r[group],[pos]:e.target.value}}))}
+                        style={{flex:1,padding:"5px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:6,color:"var(--txt)",fontSize:12,outline:"none"}}
+                      >
+                        <option value="">— Seleccionar —</option>
+                        {teams.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="admin-section">
