@@ -811,53 +811,16 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   async function syncScores() {
     setSyncing(true); setSyncMsg(null);
     try {
-      const res = await fetch("/api/scores");
+      const res = await fetch("/api/sync");
       const data = await res.json();
-      if (!data.matches) { setSyncMsg({ type: "err", text: "No se pudieron obtener resultados" }); setSyncing(false); return; }
-
-      const exactPts = ruleVals["exact_score"] || 3;
-      const resultPts = ruleVals["correct_result"] || 1;
-      let updated = 0;
-
-      for (const apiMatch of data.matches) {
-        if (apiMatch.status !== "FINISHED") continue;
-        const homeScore = apiMatch.score?.fullTime?.home;
-        const awayScore = apiMatch.score?.fullTime?.away;
-        if (homeScore === null || awayScore === null) continue;
-
-        const homeName = apiMatch.homeTeam?.name;
-        const awayName = apiMatch.awayTeam?.name;
-
-        const { data: dbMatches } = await sb.from("matches")
-          .select("*")
-          .ilike("home", `%${homeName?.split(" ")[0]}%`)
-          .eq("status", "upcoming");
-
-        if (!dbMatches?.length) continue;
-
-        for (const dbMatch of dbMatches) {
-          await sb.from("matches").update({ home_score: homeScore, away_score: awayScore, status: "finished" }).eq("id", dbMatch.id);
-
-          const { data: preds } = await sb.from("predictions").select("*").eq("match_id", dbMatch.id);
-          if (preds) {
-            const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
-            for (const pred of preds) {
-              let pts = 0;
-              if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
-              else {
-                const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-                if (pr === realResult) pts = resultPts;
-              }
-              await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
-            }
-          }
-          updated++;
-        }
-      }
-      setSyncMsg({ type: "ok", text: updated > 0 ? `✅ ${updated} partido${updated !== 1 ? "s" : ""} actualizado${updated !== 1 ? "s" : ""}` : "✅ Todo al día, sin cambios" });
+      if (!data.ok) { setSyncMsg({ type: "err", text: "Error al sincronizar" }); setSyncing(false); return; }
+      const msg = data.updated > 0 || data.created > 0
+        ? `✅ ${data.updated} actualizado${data.updated !== 1 ? "s" : ""}, ${data.created} nuevo${data.created !== 1 ? "s" : ""}`
+        : "✅ Todo al día, sin cambios";
+      setSyncMsg({ type: "ok", text: msg });
       onRefresh();
     } catch (e) {
-      setSyncMsg({ type: "err", text: "Error al sincronizar: " + e.message });
+      setSyncMsg({ type: "err", text: "Error: " + e.message });
     }
     setSyncing(false);
   }
