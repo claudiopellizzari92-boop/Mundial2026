@@ -167,6 +167,41 @@ input,button,select{font-family:inherit;}
 .spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* ── Mobile ── */
+.hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;}
+.hamburger span{display:block;width:22px;height:2px;background:var(--txt);border-radius:2px;}
+.mobile-menu{display:none;position:fixed;top:62px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;padding:8px 12px;flex-direction:column;gap:2px;}
+.mobile-menu.open{display:flex;}
+.mobile-nav-tab{padding:11px 14px;border-radius:8px;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;text-align:left;transition:all .2s;}
+.mobile-nav-tab.active{background:var(--gold-dim);color:var(--gold);}
+.mobile-nav-tab.admin-tab{color:var(--red);}
+.mobile-nav-tab.admin-tab.active{background:var(--red-dim);color:var(--red);}
+@media(max-width:768px){
+  .nav-tabs{display:none;}
+  .nav-brand{font-size:18px;}
+  .nav-user span{display:none;}
+  .hamburger{display:flex;}
+  .main{padding:16px 14px;}
+  .dash-grid{grid-template-columns:repeat(3,1fr);gap:8px;}
+  .stat-card{padding:14px 10px;}
+  .stat-value{font-size:30px;}
+  .stat-label{font-size:10px;}
+  .match-card{padding:12px 10px;gap:8px;}
+  .team-name{font-size:12px;}
+  .score-input{width:36px;height:36px;font-size:19px;}
+  .score-display{font-size:20px;}
+  .groups-grid{grid-template-columns:1fr;}
+  .thirds-grid{grid-template-columns:repeat(2,1fr);}
+  .standings-table th,.standings-table td{padding:8px 8px;font-size:12px;}
+  .pts-big{font-size:20px;}
+  .rules-grid{grid-template-columns:1fr;}
+  .admin-match-row{grid-template-columns:55px 1fr auto auto auto;gap:6px;font-size:12px;}
+  .sec-hdr h2{font-size:22px;}
+  .banner{padding:16px 14px;}
+  .banner h3{font-size:17px;}
+  .banner p{font-size:12px;}
+}
+
 /* ── Pre-tournament ── */
 .pre-alert{padding:14px 18px;border-radius:var(--r);margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:13px;}
 .pre-alert.warning{background:rgba(245,183,49,.1);border:1px solid rgba(245,183,49,.3);color:var(--gold);}
@@ -1376,6 +1411,9 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function goTab(t) { setTab(t); setMenuOpen(false); }
 
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
@@ -1432,18 +1470,31 @@ export default function App() {
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
           {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
-            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
+            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
           ))}
-          {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>setTab("admin")}>🔧 Admin</button>}
+          {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}}>{user.profile?.name||user.email}</span>
           <button className="btn-logout" onClick={handleLogout}>Salir</button>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
+            <span/><span/><span/>
+          </button>
         </div>
       </nav>
+      <div className={`mobile-menu ${menuOpen?"open":""}`}>
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
+          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
+        ))}
+        {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
+        <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
+          <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
+          <button className="btn-logout" onClick={handleLogout}>Salir</button>
+        </div>
+      </div>
       <main className="main">
-        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={myPredictions} onGoTab={setTab}/>}
+        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={myPredictions} onGoTab={goTab}/>}
         {tab==="pre"       && <PreTournament user={user}/>}
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
