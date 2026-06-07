@@ -811,11 +811,89 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   async function syncScores() {
     setSyncing(true); setSyncMsg(null);
     try {
-      const res = await fetch("/api/sync");
-      const data = await res.json();
-      if (!data.ok) { setSyncMsg({ type: "err", text: "Error al sincronizar" }); setSyncing(false); return; }
-      const msg = data.updated > 0 || data.created > 0
-        ? `✅ ${data.updated} actualizado${data.updated !== 1 ? "s" : ""}, ${data.created} nuevo${data.created !== 1 ? "s" : ""}`
+      const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
+        headers: { "X-Auth-Token": "7b202a7eafec421fbfe1b5eb2d3749bb" }
+      });
+      const apiData = await res.json();
+      if (!apiData.matches) { setSyncMsg({ type: "err", text: "No se pudo conectar con la API" }); setSyncing(false); return; }
+
+      const NAMES_ES = {
+        "Mexico":"México","South Africa":"Sudáfrica","South Korea":"Corea del Sur","Czechia":"Chequia",
+        "Canada":"Canadá","Bosnia and Herzegovina":"Bosnia","Qatar":"Qatar","Switzerland":"Suiza",
+        "Brazil":"Brasil","Morocco":"Marruecos","Haiti":"Haití","Scotland":"Escocia",
+        "USA":"USA","United States":"USA","Paraguay":"Paraguay","Australia":"Australia","Turkey":"Türkiye","Türkiye":"Türkiye",
+        "Germany":"Alemania","Curaçao":"Curazao","Ivory Coast":"Costa de Marfil","Ecuador":"Ecuador",
+        "Netherlands":"Países Bajos","Japan":"Japón","Sweden":"Suecia","Tunisia":"Túnez",
+        "Belgium":"Bélgica","Egypt":"Egipto","Iran":"Irán","New Zealand":"Nueva Zelanda",
+        "Spain":"España","Cape Verde":"Cabo Verde","Saudi Arabia":"Arabia Saudita","Uruguay":"Uruguay",
+        "France":"Francia","Senegal":"Senegal","Iraq":"Irak","Norway":"Noruega",
+        "Argentina":"Argentina","Algeria":"Argelia","Austria":"Austria","Jordan":"Jordania",
+        "Portugal":"Portugal","DR Congo":"Congo DR","Uzbekistan":"Uzbekistán","Colombia":"Colombia",
+        "England":"Inglaterra","Croatia":"Croacia","Ghana":"Ghana","Panama":"Panamá",
+      };
+      const FLAGS = {
+        "Mexico":"mx","South Africa":"za","South Korea":"kr","Czechia":"cz","Canada":"ca",
+        "Bosnia and Herzegovina":"ba","Qatar":"qa","Switzerland":"ch","Brazil":"br","Morocco":"ma",
+        "Haiti":"ht","Scotland":"gb-sct","USA":"us","United States":"us","Paraguay":"py",
+        "Australia":"au","Turkey":"tr","Türkiye":"tr","Germany":"de","Curaçao":"cw",
+        "Ivory Coast":"ci","Ecuador":"ec","Netherlands":"nl","Japan":"jp","Sweden":"se",
+        "Tunisia":"tn","Belgium":"be","Egypt":"eg","Iran":"ir","New Zealand":"nz",
+        "Spain":"es","Cape Verde":"cv","Saudi Arabia":"sa","Uruguay":"uy","France":"fr",
+        "Senegal":"sn","Iraq":"iq","Norway":"no","Argentina":"ar","Algeria":"dz",
+        "Austria":"at","Jordan":"jo","Portugal":"pt","DR Congo":"cd","Uzbekistan":"uz",
+        "Colombia":"co","England":"gb-eng","Croatia":"hr","Ghana":"gh","Panama":"pa",
+      };
+      const PHASE_MAP = {"GROUP_STAGE":"Grupos","LAST_32":"Octavos","LAST_16":"Cuartos","QUARTER_FINALS":"Cuartos","SEMI_FINALS":"Semifinal","THIRD_PLACE":"3er Lugar","FINAL":"Final"};
+      const tName = n => NAMES_ES[n] || n;
+      const tFlag = n => FLAGS[n] ? `https://flagcdn.com/24x18/${FLAGS[n]}.png` : "";
+
+      const { data: dbMatches } = await sb.from("matches").select("*");
+      const { data: rules } = await sb.from("scoring_rules").select("*");
+      const ruleMap = {};
+      (rules||[]).forEach(r => { ruleMap[r.rule_key] = r.rule_value; });
+
+      let updated = 0, created = 0;
+
+      for (const m of apiData.matches) {
+        if (m.status !== "FINISHED") continue;
+        const homeName = m.homeTeam?.name;
+        const awayName = m.awayTeam?.name;
+        if (!homeName || !awayName) continue;
+        const homeScore = m.score?.fullTime?.home;
+        const awayScore = m.score?.fullTime?.away;
+        if (homeScore === null || homeScore === undefined) continue;
+        const phase = PHASE_MAP[m.stage] || "Grupos";
+
+        const existing = (dbMatches||[]).find(db =>
+          db.home === tName(homeName) && db.away === tName(awayName)
+        );
+        if (!existing || existing.status === "finished") continue;
+
+        await sb.from("matches").update({
+          home_score: homeScore, away_score: awayScore, status: "finished",
+          home_flag: tFlag(homeName), away_flag: tFlag(awayName),
+        }).eq("id", existing.id);
+
+        const isKnockout = phase !== "Grupos";
+        const exactPts = isKnockout ? (ruleMap["exact_score_knockout"]||6) : (ruleMap["exact_score_groups"]||3);
+        const resultPts = isKnockout ? (ruleMap["correct_result_knockout"]||2) : (ruleMap["correct_result_groups"]||1);
+        const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+
+        const { data: preds } = await sb.from("predictions").select("*").eq("match_id", existing.id);
+        for (const pred of (preds||[])) {
+          let pts = 0;
+          if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
+          else {
+            const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+            if (pr === realResult) pts = resultPts;
+          }
+          await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
+        }
+        updated++;
+      }
+
+      const msg = updated > 0 || created > 0
+        ? `✅ ${updated} partido${updated !== 1 ? "s" : ""} actualizado${updated !== 1 ? "s" : ""}`
         : "✅ Todo al día, sin cambios";
       setSyncMsg({ type: "ok", text: msg });
       onRefresh();
