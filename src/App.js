@@ -805,7 +805,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [editName, setEditName] = useState("");
   const [savingName, setSavingName] = useState(null);
 
-  const [syncing, setSyncing] = useState(false);
+  const [showMatches, setShowMatches] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
 
   async function syncScores() {
@@ -977,9 +977,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>
               {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar API"}
             </button>
+            <button className="btn-small" onClick={()=>setShowMatches(s=>!s)}>
+              {showMatches ? "▲ Contraer" : "▼ Ver partidos"}
+            </button>
             <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length}</div>
           </div>
         </div>
+        {showMatches && (
         <div className="admin-section-body">
           <div className="match-filter">
             {[["all","Todos"],["pending","Pendientes"],["finished","Finalizados"]].map(([k,l])=>(
@@ -1009,6 +1013,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             })}
           </div>
         </div>
+        )}
       </div>
 
       <div className="admin-section">
