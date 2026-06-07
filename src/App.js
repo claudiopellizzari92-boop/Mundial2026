@@ -1171,7 +1171,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           </div>
         </div>
         <div className="admin-section-body">
-          <p style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Ingresa quién quedó 1ro, 2do y 3ro de cada grupo. Luego click en "Calcular puntos" para asignar puntos a todos los usuarios.</p>
+          <p style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Ingresa quién quedó 1ro y 2do de cada grupo. Para los <strong style={{color:"var(--gold)"}}>3eros clasificados</strong>: ingresa <strong style={{color:"var(--gold)"}}>solo los 8 mejores terceros</strong> que clasificaron a octavos — deja vacío los 4 que no clasificaron.</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
             {["A","B","C","D","E","F","G","H","I","J","K","L"].map(group => {
               const teams = GROUPS[group] || [];
