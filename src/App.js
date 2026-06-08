@@ -2160,26 +2160,33 @@ export default function App() {
     else if (perm === "denied") setNotifStatus("denied");
   }, []);
 
+  const [notifDebug, setNotifDebug] = useState("");
+
   async function enableNotifications() {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) { setNotifDebug("SW no soportado"); return; }
     setNotifStatus("requesting");
+    setNotifDebug("Cargando Firebase...");
     try {
-      // Load Firebase via script tags to avoid Webpack bundling issues
       await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
       await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
+      setNotifDebug("Firebase cargado. Iniciando...");
 
       const firebaseApp = window.firebase.apps.length === 0
         ? window.firebase.initializeApp(FIREBASE_CONFIG)
         : window.firebase.apps[0];
       const messaging = window.firebase.messaging();
+      setNotifDebug("Esperando SW...");
 
       const swReg = await navigator.serviceWorker.ready;
+      setNotifDebug("SW listo. Obteniendo token...");
+
       const token = await messaging.getToken({
         vapidKey: FCM_VAPID_KEY,
         serviceWorkerRegistration: swReg,
       });
 
-      if (!token) { setNotifStatus("denied"); return; }
+      if (!token) { setNotifStatus("denied"); setNotifDebug("Token vacío"); return; }
+      setNotifDebug("Token: " + token.slice(0,20) + "...");
 
       await sb.from("push_subscriptions").upsert({
         user_id: user.id,
@@ -2190,8 +2197,10 @@ export default function App() {
       }, { onConflict: "user_id,endpoint" });
 
       setNotifStatus("granted");
+      setNotifDebug("✅ Guardado OK");
     } catch (e) {
       console.warn("FCM error:", e);
+      setNotifDebug("Error: " + e.message);
       setNotifStatus("denied");
     }
   }
@@ -2335,6 +2344,7 @@ export default function App() {
             )}
             <button className="btn-logout" onClick={handleLogout}>Salir</button>
           </div>
+          {notifDebug ? <div style={{fontSize:11,color:"var(--muted)",padding:"4px 0 4px 14px",wordBreak:"break-all"}}>{notifDebug}</div> : null}
         </div>
       </div>
       <main className="main">
