@@ -751,6 +751,48 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
 function Compare({ user, matches, allPredictions, profiles }) {
   const [now, setNow] = useState(new Date());
   const [expanded, setExpanded] = useState({});
+  const [reactions, setReactions] = useState({});
+  const [emojiPicker, setEmojiPicker] = useState(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    sb.from("reactions").select("*").then(({ data }) => {
+      if (!data) return;
+      const r = {};
+      data.forEach(rx => {
+        if (!r[rx.match_id]) r[rx.match_id] = [];
+        r[rx.match_id].push(rx);
+      });
+      setReactions(r);
+    });
+  }, []);
+
+  async function setReaction(matchId, emoji) {
+    const existing = (reactions[matchId] || []).find(r => r.user_id === user.id);
+    if (existing) {
+      if (existing.emoji === emoji) {
+        await sb.from("reactions").delete().eq("id", existing.id);
+        setReactions(r => ({ ...r, [matchId]: (r[matchId] || []).filter(rx => rx.id !== existing.id) }));
+      } else {
+        await sb.from("reactions").update({ emoji }).eq("id", existing.id);
+        setReactions(r => ({ ...r, [matchId]: (r[matchId] || []).map(rx => rx.id === existing.id ? { ...rx, emoji } : rx) }));
+      }
+    } else {
+      const { data } = await sb.from("reactions").insert({ user_id: user.id, match_id: matchId, emoji }).select().single();
+      if (data) setReactions(r => ({ ...r, [matchId]: [...(r[matchId] || []), data] }));
+    }
+    setEmojiPicker(null);
+  }
+
+  function getReactionCounts(matchId) {
+    const counts = {};
+    (reactions[matchId] || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+    return counts;
+  }
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
