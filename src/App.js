@@ -3,6 +3,25 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZXppb2hhcXVpd252YnpybGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQzNzEsImV4cCI6MjA5Mzk0MDM3MX0.p53LDuRulCzO_ceRjS47jNbirEpfDTk5NYCi9AT92CM";
+const VAPID_PUBLIC_KEY = "BHsrAIbF6dj1XaNm29ZubpGb-Bc4rsCJTsxKFP1xf6rzJ11do0H4fKg6OrxcBlmy2NCkj3Z5XJzpmAb1p7mPJQI";
+const EDGE_FUNCTION_URL = "https://bheziohaquiwnvbzrlio.supabase.co/functions/v1/send-push";
+
+async function sendPushNotification(type, userIds, notification) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ type, user_ids: userIds, notification }),
+    });
+  } catch (e) {
+    console.warn("Push notification failed:", e);
+  }
+}
+
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: window.sessionStorage,
@@ -1681,6 +1700,24 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       }
     }
     setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
+    // Notificar a todos: resultado cargado + puntos ganados por usuario
+    sendPushNotification("all", null, {
+      title: "⚽ Resultado cargado",
+      body: `${match.home} ${homeScore}–${awayScore} ${match.away}`,
+      tag: `result-${match.id}`,
+      url: "/",
+    });
+    if (preds) {
+      const winners = preds.filter(p => p.points > 0);
+      for (const pred of winners) {
+        sendPushNotification("users", [pred.user_id], {
+          title: "🎉 ¡Ganaste puntos!",
+          body: `${match.home} vs ${match.away} — +${pred.points} pts`,
+          tag: `points-${match.id}-${pred.user_id}`,
+          url: "/",
+        });
+      }
+    }
   }
 
   async function saveRules() {
@@ -1984,8 +2021,45 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
 
   function goTab(t) { setTab(t); setMenuOpen(false); }
+
+  // Register service worker and check notification permission
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setNotifStatus("unsupported"); return;
+    }
+    navigator.serviceWorker.register("/sw.js").catch(console.warn);
+    const perm = Notification.permission;
+    if (perm === "granted") setNotifStatus("granted");
+    else if (perm === "denied") setNotifStatus("denied");
+  }, []);
+
+  async function enableNotifications() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    setNotifStatus("requesting");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { setNotifStatus("denied"); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: VAPID_PUBLIC_KEY,
+      });
+      const json = sub.toJSON();
+      await sb.from("push_subscriptions").upsert({
+        user_id: user.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+      }, { onConflict: "user_id,endpoint" });
+      setNotifStatus("granted");
+    } catch (e) {
+      console.warn("Push subscription error:", e);
+      setNotifStatus("denied");
+    }
+  }
 
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
@@ -2050,6 +2124,19 @@ export default function App() {
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
+          {notifStatus !== "unsupported" && notifStatus !== "granted" && (
+            <button
+              className="desktop-only"
+              onClick={enableNotifications}
+              disabled={notifStatus === "requesting" || notifStatus === "denied"}
+              style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}
+            >
+              {notifStatus === "requesting" ? "..." : notifStatus === "denied" ? "🔕 Bloqueado" : "🔔 Activar"}
+            </button>
+          )}
+          {notifStatus === "granted" && (
+            <span className="desktop-only" style={{fontSize:12,color:"var(--green)"}}>🔔</span>
+          )}
           <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
             <span/><span/><span/>
           </button>
@@ -2062,7 +2149,21 @@ export default function App() {
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
           <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
-          <button className="btn-logout" onClick={handleLogout}>Salir</button>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {notifStatus !== "unsupported" && notifStatus !== "granted" && (
+              <button
+                onClick={enableNotifications}
+                disabled={notifStatus === "requesting" || notifStatus === "denied"}
+                style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}
+              >
+                {notifStatus === "requesting" ? "..." : notifStatus === "denied" ? "🔕 Bloqueado" : "🔔 Activar avisos"}
+              </button>
+            )}
+            {notifStatus === "granted" && (
+              <span style={{fontSize:12,color:"var(--green)"}}>🔔 Activado</span>
+            )}
+            <button className="btn-logout" onClick={handleLogout}>Salir</button>
+          </div>
         </div>
       </div>
       <main className="main">
