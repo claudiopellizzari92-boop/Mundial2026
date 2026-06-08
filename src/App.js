@@ -1477,12 +1477,11 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
-          <div className="avatar">{initials(user.profile?.name||user.email)}</div>
-          <span style={{fontSize:13}}>{user.profile?.name||user.email}</span>
-          <button className="btn-logout" style={{display:"none"}} onClick={handleLogout}>Salir</button>
-          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)} style={{marginLeft:4}}>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
             <span/><span/><span/>
           </button>
+          <div className="avatar">{initials(user.profile?.name||user.email)}</div>
+          <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
         </div>
       </nav>
