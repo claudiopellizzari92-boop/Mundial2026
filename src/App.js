@@ -2205,6 +2205,22 @@ export default function App() {
     });
   }
 
+  async function disableNotifications() {
+    try {
+      // Remove FCM token from Supabase
+      await sb.from("push_subscriptions").delete().eq("user_id", user.id);
+      // Unregister service worker
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.pushManager.getSubscription().then(sub => sub && sub.unsubscribe());
+      }
+      setNotifStatus("idle");
+    } catch (e) {
+      console.warn("Disable notifications error:", e);
+      setNotifStatus("idle");
+    }
+  }
+
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT") {
@@ -2279,7 +2295,13 @@ export default function App() {
             </button>
           )}
           {notifStatus === "granted" && (
-            <span className="desktop-only" style={{fontSize:12,color:"var(--green)"}}>🔔</span>
+            <button
+              className="desktop-only"
+              onClick={disableNotifications}
+              style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}
+            >
+              🔔 Activado
+            </button>
           )}
           <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
             <span/><span/><span/>
@@ -2304,7 +2326,12 @@ export default function App() {
               </button>
             )}
             {notifStatus === "granted" && (
-              <span style={{fontSize:12,color:"var(--green)"}}>🔔 Activado</span>
+              <button
+                onClick={disableNotifications}
+                style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}
+              >
+                🔔 Activado
+              </button>
             )}
             <button className="btn-logout" onClick={handleLogout}>Salir</button>
           </div>
