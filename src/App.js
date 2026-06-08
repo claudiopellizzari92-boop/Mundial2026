@@ -609,7 +609,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
 }
 
 // ── Matches ──────────────────────────────────────────────────────────────────
-function Matches({ user, matches, predictions, allPredictions, profiles, onSave }) {
+function Matches({ user, matches, predictions, onSave }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
@@ -641,9 +641,6 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
     onSave();
   }
 
-  const profileMap = {};
-  (profiles||[]).forEach(p => { profileMap[p.id] = p; });
-
   return (<>
     <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Horarios en {localTzName()}</span></div>
     <div className="matches-grid">
@@ -653,7 +650,6 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
         const wasSaved = saved[m.id];
-        const othersReveal = locked ? (allPredictions||[]).filter(p => p.match_id === m.id) : [];
         return (
           <div key={m.id}>
             <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`}>
@@ -682,21 +678,6 @@ function Matches({ user, matches, predictions, allPredictions, profiles, onSave 
               </div>
               <div className="team away"><img className="team-flag" src={m.away_flag} alt={m.away}/><span className="team-name">{m.away}</span></div>
             </div>
-            {locked && othersReveal.length > 0 && (
-              <div className="reveal-card">
-                <div className="reveal-title">🔓 Predicciones de todos</div>
-                {othersReveal.map(op => {
-                  const prof = profileMap[op.user_id];
-                  return (
-                    <div className="reveal-row" key={op.id}>
-                      <div className="reveal-user"><div className="avatar sm">{initials(prof?.name||"?")}</div><span>{prof?.name||"Jugador"}</span>{op.user_id===user.id&&<span className="me-badge">TÚ</span>}</div>
-                      <span className="reveal-score">{op.home_score} – {op.away_score}</span>
-                      {op.points>0&&<span className="reveal-pts">+{op.points} pts</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         );
       })}
@@ -749,6 +730,7 @@ function Standings({ user, predictions, profiles }) {
 // ── Compare View ─────────────────────────────────────────────────────────────
 function Compare({ user, matches, allPredictions, profiles }) {
   const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState({});
   const profileMap = {};
   (profiles || []).forEach(p => { profileMap[p.id] = p; });
   const dates = [...new Set(matches.map(m => m.match_date))];
@@ -756,6 +738,8 @@ function Compare({ user, matches, allPredictions, profiles }) {
   const visibleMatches = filter === "all"
     ? matches.filter(m => isLocked(m.kickoff_at, matches))
     : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at, matches));
+
+  function toggleExpand(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
   function resultIcon(pred, match) {
     if (match.home_score === null || match.away_score === null) return null;
@@ -786,66 +770,76 @@ function Compare({ user, matches, allPredictions, profiles }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {visibleMatches.map(m => {
           const matchPreds = allPredictions.filter(p => p.match_id === m.id);
           const hasResult = m.home_score !== null && m.away_score !== null;
+          const isOpen = expanded[m.id];
+          const predCount = matchPreds.filter(p => p !== undefined).length;
           return (
             <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
-              {/* Match header */}
-              <div style={{ padding: "13px 18px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              {/* Match header — clickable */}
+              <div
+                onClick={() => toggleExpand(m.id)}
+                style={{ padding: "13px 18px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span className="group-badge">Grupo {m.group_name}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, display:"flex", alignItems:"center", gap:6 }}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
+                  <span style={{ fontSize: 13, fontWeight: 500, display:"flex", alignItems:"center", gap:5 }}>
+                    <img src={m.home_flag} alt={m.home} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.home}
+                    <span style={{ color: "var(--muted)" }}>vs</span>
+                    {m.away}<img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>
+                  </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {hasResult
-                    ? <span style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--gold)" }}>{m.home_score} – {m.away_score}</span>
+                    ? <span style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)" }}>{m.home_score} – {m.away_score}</span>
                     : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽ En curso</span>}
-                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{predCount} pred.</span>
+                  <span style={{ color: "var(--muted)", fontSize: 14 }}>{isOpen ? "▲" : "▼"}</span>
                 </div>
               </div>
 
-              {/* Predictions per user */}
-              {matchPreds.length === 0
-                ? <div style={{ padding: "14px 18px", color: "var(--muted)", fontSize: 13 }}>Nadie predijo este partido</div>
-                : profiles.map((prof, idx) => {
-                    const pred = matchPreds.find(p => p.user_id === prof.id);
-                    const isMe = prof.id === user.id;
-                    return (
-                      <div key={prof.id} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "10px 18px",
-                        borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none",
-                        background: isMe ? "rgba(245,183,49,.04)" : "transparent"
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div className="avatar sm">{initials(prof.name)}</div>
-                          <span style={{ fontSize: 13 }}>{prof.name}</span>
-                          {isMe && <span className="me-badge">TÚ</span>}
+              {/* Predictions — collapsible */}
+              {isOpen && (<>
+                {matchPreds.length === 0
+                  ? <div style={{ padding: "14px 18px", color: "var(--muted)", fontSize: 13 }}>Nadie predijo este partido</div>
+                  : profiles.map((prof, idx) => {
+                      const pred = matchPreds.find(p => p.user_id === prof.id);
+                      const isMe = prof.id === user.id;
+                      return (
+                        <div key={prof.id} style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 18px",
+                          borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none",
+                          background: isMe ? "rgba(245,183,49,.04)" : "transparent"
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div className="avatar sm">{initials(prof.name)}</div>
+                            <span style={{ fontSize: 13 }}>{prof.name}</span>
+                            {isMe && <span className="me-badge">TÚ</span>}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            {pred ? (<>
+                              {resultIcon(pred, m)}
+                              <span style={{ fontFamily: "Bebas Neue", fontSize: 20 }}>{pred.home_score} – {pred.away_score}</span>
+                              {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points} pts</span>}
+                            </>) : (
+                              <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin predicción</span>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          {pred ? (<>
-                            {resultIcon(pred, m)}
-                            <span style={{ fontFamily: "Bebas Neue", fontSize: 20 }}>{pred.home_score} – {pred.away_score}</span>
-                            {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points} pts</span>}
-                          </>) : (
-                            <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin predicción</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-              }
-
-              {/* Legend */}
-              {hasResult && (
-                <div style={{ padding: "7px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 14, fontSize: 11, color: "var(--muted)" }}>
-                  <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
-                  <span><span style={{ color: "var(--green)" }}>✓</span> Resultado correcto</span>
-                  <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
-                </div>
-              )}
+                      );
+                    })
+                }
+                {hasResult && (
+                  <div style={{ padding: "7px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 14, fontSize: 11, color: "var(--muted)" }}>
+                    <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
+                    <span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span>
+                    <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
+                  </div>
+                )}
+              </>)}
             </div>
           );
         })}
@@ -1498,7 +1492,7 @@ export default function App() {
       <main className="main">
         {tab==="home"      && <Dashboard user={user} matches={matches} predictions={myPredictions} onGoTab={goTab}/>}
         {tab==="pre"       && <PreTournament user={user}/>}
-        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
+        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles}/>}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
