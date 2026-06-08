@@ -1693,3 +1693,30 @@ export default function App() {
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={h
+andleLogout}>Salir</button>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
+            <span/><span/><span/>
+          </button>
+        </div>
+      </nav>
+      <div className={`mobile-menu ${menuOpen?"open":""}`}>
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
+          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
+        ))}
+        {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
+        <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
+          <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
+          <button className="btn-logout" onClick={handleLogout}>Salir</button>
+        </div>
+      </div>
+      <main className="main">
+        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab}/>}
+        {tab==="pre"       && <PreTournament user={user}/>}
+        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
+        {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
+        {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
+      </main>
+    </div>
+  </>);
+        }
