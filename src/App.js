@@ -712,12 +712,20 @@ function Matches({ user, matches, predictions, onSave }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
+  const [wildcards, setWildcards] = useState([]);
+  const [savingWildcard, setSavingWildcard] = useState({});
+  const [maxWildcards, setMaxWildcards] = useState(4);
 
   useEffect(() => {
     const init = {};
     predictions.forEach(p => { init[p.match_id] = { home: String(p.home_score), away: String(p.away_score) }; });
     setScores(init);
   }, [predictions]);
+
+  useEffect(() => {
+    sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => { if (data) setWildcards(data); });
+    sb.from("scoring_rules").select("*").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data) setMaxWildcards(data.rule_value); });
+  }, [user.id]);
 
   function setScore(matchId, side, val) {
     const v = val.replace(/[^0-9]/g,"").slice(0,2);
@@ -740,8 +748,34 @@ function Matches({ user, matches, predictions, onSave }) {
     onSave();
   }
 
+  async function toggleWildcard(match) {
+    const hasWildcard = wildcards.find(w => w.match_id === match.id);
+    setSavingWildcard(s => ({ ...s, [match.id]: true }));
+    if (hasWildcard) {
+      await sb.from("wildcards").delete().eq("id", hasWildcard.id);
+      setWildcards(w => w.filter(x => x.match_id !== match.id));
+    } else {
+      if (wildcards.length >= maxWildcards) { setSavingWildcard(s => ({ ...s, [match.id]: false })); return; }
+      const { data } = await sb.from("wildcards").insert({ user_id: user.id, match_id: match.id }).select().single();
+      if (data) setWildcards(w => [...w, data]);
+    }
+    setSavingWildcard(s => ({ ...s, [match.id]: false }));
+  }
+
+  const usedWildcards = wildcards.length;
+  const remaining = maxWildcards - usedWildcards;
+
   return (<>
-    <div className="sec-hdr"><h2>MIS PREDICCIONES</h2><span>Horarios en {localTzName()}</span></div>
+    <div className="sec-hdr" style={{justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+        <h2>MIS PREDICCIONES</h2><span>Horarios en {localTzName()}</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:6,background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 12px"}}>
+        <span style={{fontSize:18}}>🃏</span>
+        <span style={{fontFamily:"Bebas Neue",fontSize:18,color:remaining>0?"var(--gold)":"var(--red)"}}>{remaining}</span>
+        <span style={{fontSize:11,color:"var(--muted)"}}>comodines</span>
+      </div>
+    </div>
     <div className="matches-grid">
       {matches.map(m => {
         const locked = isLocked(m.kickoff_at, matches);
@@ -749,14 +783,17 @@ function Matches({ user, matches, predictions, onSave }) {
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
         const wasSaved = saved[m.id];
+        const hasWildcard = !!wildcards.find(w => w.match_id === m.id);
+        const canAddWildcard = !locked && myPred && (hasWildcard || remaining > 0);
         return (
           <div key={m.id}>
-            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`}>
+            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor:hasWildcard?"var(--gold)":undefined,borderWidth:hasWildcard?2:undefined}}>
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
                   <span className="group-badge">Grupo {m.group_name}</span>
                   <span className="match-meta">{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
+                  {hasWildcard && <span style={{fontSize:14}}>🃏</span>}
                 </div>
                 {locked ? (
                   myPred
@@ -774,6 +811,22 @@ function Matches({ user, matches, predictions, onSave }) {
                   : hasScore
                     ? <button className="save-btn" onClick={()=>save(m)} disabled={saving[m.id]}>{saving[m.id]?"...":wasSaved?"✓ GUARDADO":myPred?"ACTUALIZAR":"GUARDAR"}</button>
                     : myPred ? <span className="saved-tag">✓ Guardado</span> : null}
+                {!locked && myPred && (
+                  <button
+                    onClick={()=>toggleWildcard(m)}
+                    disabled={savingWildcard[m.id] || (!hasWildcard && remaining === 0)}
+                    style={{
+                      fontSize:11,padding:"3px 10px",borderRadius:20,border:"1px solid",
+                      borderColor:hasWildcard?"var(--gold)":"var(--border)",
+                      background:hasWildcard?"var(--gold-dim)":"none",
+                      color:hasWildcard?"var(--gold)":remaining===0?"var(--muted)":"var(--muted)",
+                      cursor:(!hasWildcard&&remaining===0)?"not-allowed":"pointer",
+                      opacity:(!hasWildcard&&remaining===0)?0.5:1,
+                    }}
+                  >
+                    {savingWildcard[m.id]?"...":(hasWildcard?"🃏 Comodín activo — cancelar":"🃏 Usar comodín (-1pt)")}
+                  </button>
+                )}
               </div>
               <div className="team away"><img className="team-flag" src={m.away_flag} alt={m.away}/><span className="team-name">{m.away}</span></div>
             </div>
@@ -1550,12 +1603,29 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
 
         const { data: preds } = await sb.from("predictions").select("*").eq("match_id", existing.id);
+        const { data: mWildcards } = await sb.from("wildcards").select("*").eq("match_id", existing.id);
+        const wcUserIds = new Set((mWildcards||[]).map(w => w.user_id));
+        const wcExact = ruleMap["wildcard_exact"] || 8;
+        const wcGoals = ruleMap["wildcard_goals"] || 5;
+        const wcWinner = ruleMap["wildcard_winner"] || 2;
+        const wcCost = ruleMap["wildcard_cost"] || 1;
+        const realGoals = homeScore + awayScore;
         for (const pred of (preds||[])) {
+          const hasWc = wcUserIds.has(pred.user_id);
           let pts = 0;
-          if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
-          else {
+          if (hasWc) {
+            const predGoals = pred.home_score + pred.away_score;
             const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-            if (pr === realResult) pts = resultPts;
+            if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = wcExact - wcCost; }
+            else if (predGoals === realGoals && pr === realResult) { pts = wcGoals - wcCost; }
+            else if (pr === realResult) { pts = wcWinner - wcCost; }
+            else { pts = -wcCost; }
+          } else {
+            if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
+            else {
+              const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+              if (pr === realResult) pts = resultPts;
+            }
           }
           await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
         }
@@ -1695,15 +1765,32 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
     await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
     const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
+    const { data: matchWildcards } = await sb.from("wildcards").select("*").eq("match_id", match.id);
+    const wildcardUserIds = new Set((matchWildcards||[]).map(w => w.user_id));
     if (preds) {
       const isKnockout = match.phase && match.phase !== "Grupos";
       const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 6) : (ruleVals["exact_score_groups"] || 3);
       const resultPts = isKnockout ? (ruleVals["correct_result_knockout"] || 2) : (ruleVals["correct_result_groups"] || 1);
       const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+      const realGoals = homeScore + awayScore;
+      const wcExact = ruleVals["wildcard_exact"] || 8;
+      const wcGoals = ruleVals["wildcard_goals"] || 5;
+      const wcWinner = ruleVals["wildcard_winner"] || 2;
+      const wcCost = ruleVals["wildcard_cost"] || 1;
       for (const pred of preds) {
+        const hasWildcard = wildcardUserIds.has(pred.user_id);
         let pts = 0;
-        if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
-        else { const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw"; if(pr === realResult) pts = resultPts; }
+        if (hasWildcard) {
+          const predGoals = pred.home_score + pred.away_score;
+          const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+          if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = wcExact - wcCost; }
+          else if (predGoals === realGoals && pr === realResult) { pts = wcGoals - wcCost; }
+          else if (pr === realResult) { pts = wcWinner - wcCost; }
+          else { pts = -wcCost; }
+        } else {
+          if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
+          else { const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw"; if(pr === realResult) pts = resultPts; }
+        }
         await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
       }
     }
