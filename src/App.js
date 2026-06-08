@@ -168,8 +168,8 @@ input,button,select{font-family:inherit;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* ── Mobile ── */
-.hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;}
-.hamburger span{display:block;width:22px;height:2px;background:var(--txt);border-radius:2px;}
+.hamburger{display:none;flex-direction:column;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:8px 10px;}
+.hamburger span{display:block;width:22px;height:2px;background:var(--gold);border-radius:2px;}
 .desktop-only{display:inline-flex;}
 .mobile-menu{display:none;position:fixed;top:62px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;padding:8px 12px;flex-direction:column;gap:2px;}
 .mobile-menu.open{display:flex;}
