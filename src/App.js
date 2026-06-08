@@ -686,14 +686,23 @@ function Matches({ user, matches, predictions, onSave }) {
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, profiles }) {
+function Standings({ user, predictions, profiles, onRefresh }) {
   const [prePreds, setPrePreds] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    sb.from("pretournament_predictions").select("*").then(({ data }) => {
-      if (data) setPrePreds(data);
-    });
-  }, []);
+  async function loadPrePreds() {
+    const { data } = await sb.from("pretournament_predictions").select("*");
+    if (data) setPrePreds(data);
+  }
+
+  useEffect(() => { loadPrePreds(); }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadPrePreds();
+    onRefresh();
+    setRefreshing(false);
+  }
 
   const rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
@@ -706,7 +715,15 @@ function Standings({ user, predictions, profiles }) {
   }).sort((a,b) => b.pts-a.pts||b.exact-a.exact);
 
   return (<>
-    <div className="sec-hdr"><h2>TABLA DE POSICIONES</h2><span>{profiles.length} participantes</span></div>
+    <div className="sec-hdr" style={{justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+        <h2>TABLA DE POSICIONES</h2>
+        <span>{profiles.length} participantes</span>
+      </div>
+      <button className="btn-small" onClick={handleRefresh} disabled={refreshing} style={{fontSize:11}}>
+        {refreshing ? "..." : "🔄 Actualizar"}
+      </button>
+    </div>
     <div className="standings-wrap">
       <table className="standings-table">
         <thead><tr><th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
@@ -1220,12 +1237,12 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       <div className="sec-hdr"><h2>🔧 PANEL ADMIN</h2><span>Solo visible para administradores</span></div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr">
+        <div className="admin-section-hdr" style={{flexWrap:"wrap",gap:8}}>
           <h3>⚽ RESULTADOS</h3>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {syncMsg && <span style={{fontSize:12,color:syncMsg.type==="ok"?"var(--green)":"var(--red)"}}>{syncMsg.text}</span>}
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            {syncMsg && <span style={{fontSize:12,color:syncMsg.type==="ok"?"var(--green)":"var(--red)",width:"100%"}}>{syncMsg.text}</span>}
             <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>
-              {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar API"}
+              {syncing ? "⏳ Sync..." : "🔄 Sincronizar"}
             </button>
             <button className="btn-small" onClick={()=>setShowMatches(s=>!s)}>
               {showMatches ? "▲ Contraer" : "▼ Ver partidos"}
@@ -1544,7 +1561,7 @@ export default function App() {
         {tab==="pre"       && <PreTournament user={user}/>}
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData}/>}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
