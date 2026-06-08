@@ -181,6 +181,7 @@ input,button,select{font-family:inherit;}
   .nav-tabs{display:none;}
   .nav-brand{font-size:18px;}
   .nav-user span{display:none;}
+  .nav-user .avatar{display:none;}
   .desktop-only{display:none!important;}
   .hamburger{display:flex;}
   .main{padding:16px 14px;}
