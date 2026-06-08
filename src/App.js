@@ -317,6 +317,9 @@ input,button,select{font-family:inherit;}
 .admin-group-card h4{font-family:'Bebas Neue';font-size:16px;margin-bottom:10px;color:var(--gold);}
 .admin-group-select-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .admin-pos-badge{font-family:'Bebas Neue';font-size:14px;width:20px;flex-shrink:0;color:var(--muted);}
+.reaction-wrap{display:inline-block;}
+.reaction-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--txt);white-space:nowrap;z-index:10;pointer-events:none;}
+.reaction-wrap:hover .reaction-tooltip{display:block;}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -1470,10 +1473,16 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {Object.entries(getReactionCounts(m.id)).map(([emoji, count]) => {
                         const mine = (reactions[m.id] || []).find(r => r.user_id === user.id && r.emoji === emoji);
+                        const reactors = (reactions[m.id] || []).filter(r => r.emoji === emoji).map(r => profileMap[r.user_id]?.name || "?");
                         return (
-                          <button key={emoji} onClick={() => setReaction(m.id, emoji)} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: mine ? "var(--gold)" : "var(--border)", background: mine ? "var(--gold-dim)" : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}>
-                            {emoji} <span style={{ fontSize: 12, color: "var(--muted)" }}>{count}</span>
-                          </button>
+                          <div key={emoji} style={{ position: "relative" }} className="reaction-wrap">
+                            <button onClick={() => setReaction(m.id, emoji)} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: mine ? "var(--gold)" : "var(--border)", background: mine ? "var(--gold-dim)" : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}>
+                              {emoji} <span style={{ fontSize: 12, color: "var(--muted)" }}>{count}</span>
+                            </button>
+                            <div className="reaction-tooltip">
+                              {reactors.join(", ")}
+                            </div>
+                          </div>
                         );
                       })}
                       {emojiPicker === m.id ? (
