@@ -1750,6 +1750,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     setEditMatch(null); onRefresh();
   }
 
+  async function resetMatch(match) {
+    if (!window.confirm("Resetear " + match.home + " vs " + match.away + "? Se borrarán el resultado y los puntos.")) return;
+    await sb.from("matches").update({ home_score: null, away_score: null, status: "pending" }).eq("id", match.id);
+    await sb.from("predictions").update({ points: null }).eq("match_id", match.id);
+    onRefresh();
+  }
+
   const filtered = filter==="all"?matches:filter==="finished"?matches.filter(m=>m.status==="finished"):matches.filter(m=>m.status!=="finished");
   const ruleLabels = {
     exact_score_groups:      "Marcador exacto — Grupos",
@@ -1828,6 +1835,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                   <div style={{display:"flex",gap:5}}>
                     <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
                     <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
+                    {finished && <button className="admin-edit-btn" onClick={()=>resetMatch(m)} style={{color:"var(--red)",borderColor:"var(--red)"}}>↺</button>}
                   </div>
                 </div>
               );
