@@ -731,6 +731,13 @@ function Standings({ user, predictions, profiles }) {
 function Compare({ user, matches, allPredictions, profiles }) {
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState({});
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const profileMap = {};
   (profiles || []).forEach(p => { profileMap[p.id] = p; });
   const dates = [...new Set(matches.map(m => m.match_date))];
@@ -739,7 +746,33 @@ function Compare({ user, matches, allPredictions, profiles }) {
     ? matches.filter(m => isLocked(m.kickoff_at, matches))
     : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at, matches));
 
+  const upcomingMatches = matches.filter(m => !isLocked(m.kickoff_at, matches));
+
   function toggleExpand(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+
+  function timeUntilReveal(kickoff) {
+    const matchDate = new Date(kickoff).toISOString().slice(0, 10);
+    const sameDayMatches = matches.filter(m => new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate);
+    const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
+    const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
+    const diff = deadline - now;
+    if (diff <= 0) return null;
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    if (days > 0) return `${days}d ${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+    return `${mins}m ${secs}s`;
+  }
+
+  // Group upcoming matches by day
+  const upcomingByDay = {};
+  upcomingMatches.forEach(m => {
+    const d = m.match_date;
+    if (!upcomingByDay[d]) upcomingByDay[d] = [];
+    upcomingByDay[d].push(m);
+  });
 
   function resultIcon(pred, match) {
     if (match.home_score === null || match.away_score === null) return null;
@@ -754,11 +787,44 @@ function Compare({ user, matches, allPredictions, profiles }) {
   return (<>
     <div className="sec-hdr"><h2>👁️ COMPARAR</h2><span>Predicciones reveladas al pitazo inicial</span></div>
 
-    {visibleMatches.length === 0 && (
+    {visibleMatches.length === 0 && upcomingMatches.length === 0 && (
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "50px 20px", textAlign: "center", color: "var(--muted)" }}>
-        <div style={{ fontSize: 44, marginBottom: 14 }}>🔒</div>
-        <div style={{ fontSize: 15, marginBottom: 6, color: "var(--txt)" }}>Aún no hay partidos iniciados</div>
-        <div style={{ fontSize: 13 }}>Las predicciones se revelan automáticamente al inicio de cada partido</div>
+        <div style={{ fontSize: 44, marginBottom: 14 }}>🏆</div>
+        <div style={{ fontSize: 15, color: "var(--txt)" }}>No hay partidos disponibles</div>
+      </div>
+    )}
+
+    {visibleMatches.length === 0 && upcomingMatches.length > 0 && (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {Object.entries(upcomingByDay).slice(0, 5).map(([day, dayMatches]) => {
+          const countdown = timeUntilReveal(dayMatches[0].kickoff_at);
+          return (
+            <div key={day} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{day}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 10, color: "var(--muted)" }}>Se revelan en</span>
+                  <span style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--gold)", letterSpacing: 1 }}>{countdown || "¡Pronto!"}</span>
+                </div>
+              </div>
+              {dayMatches.map((m, i) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: i < dayMatches.length - 1 ? "1px solid var(--border)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                    <img src={m.home_flag} alt={m.home} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
+                    {m.home}
+                    <span style={{ color: "var(--muted)" }}>vs</span>
+                    {m.away}
+                    <img src={m.away_flag} alt={m.away} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
+                  </div>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{localTime(m.kickoff_at)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        <p style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
+          🔒 Las predicciones se revelan 24h antes del primer partido de cada día
+        </p>
       </div>
     )}
 
