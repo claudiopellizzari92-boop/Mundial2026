@@ -628,7 +628,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
       <div className="stat-card"><span className="stat-label">Pendientes</span><span className="stat-value" style={{color:pending>0?"var(--red)":"var(--green)"}}>{pending}</span><span className="stat-sub">{pending>0?"¡A predecir!":"Todo listo ✓"}</span></div>
     </div>
 
-    {played.length > 0 && (
+    {(
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
         <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1,marginBottom:14}}>📊 TUS ESTADÍSTICAS</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
@@ -657,18 +657,18 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
           <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Tus puntos vs promedio del grupo</div>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{flex:1,background:"var(--border)",borderRadius:20,height:8,overflow:"hidden"}}>
-              <div style={{height:"100%",borderRadius:20,background:"var(--gold)",width:`${Math.min(100, avgPts > 0 ? totalPts/Math.max(totalPts,avgPts)*100 : 100)}%`,transition:"width .5s"}}/>
+              <div style={{height:"100%",borderRadius:20,background:"var(--gold)",width:`${Math.min(100, avgPts > 0 ? totalPts/Math.max(totalPts,avgPts)*100 : (totalPts > 0 ? 100 : 0))}%`,transition:"width .5s"}}/>
             </div>
             <span style={{fontFamily:"Bebas Neue",fontSize:16,color:"var(--gold)",minWidth:60}}>{totalPts} pts</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginTop:6}}>
             <div style={{flex:1,background:"var(--border)",borderRadius:20,height:8,overflow:"hidden"}}>
-              <div style={{height:"100%",borderRadius:20,background:"var(--muted)",width:`${Math.min(100, totalPts > 0 ? avgPts/Math.max(totalPts,avgPts)*100 : 100)}%`,transition:"width .5s"}}/>
+              <div style={{height:"100%",borderRadius:20,background:"var(--muted)",width:`${Math.min(100, totalPts > 0 ? avgPts/Math.max(totalPts,avgPts)*100 : (avgPts > 0 ? 100 : 0))}%`,transition:"width .5s"}}/>
             </div>
             <span style={{fontSize:13,color:"var(--muted)",minWidth:60}}>{avgPts} avg</span>
           </div>
           <div style={{fontSize:11,color:totalPts>=avgPts?"var(--green)":"var(--red)",marginTop:6}}>
-            {totalPts >= avgPts ? `▲ ${totalPts - avgPts} pts por encima del promedio` : `▼ ${avgPts - totalPts} pts por debajo del promedio`}
+            {totalPts === 0 && avgPts === 0 ? "Sin partidos jugados aún" : totalPts >= avgPts ? `▲ ${totalPts - avgPts} pts por encima del promedio` : `▼ ${avgPts - totalPts} pts por debajo del promedio`}
           </div>
         </div>
       </div>
@@ -1692,5 +1692,4 @@ export default function App() {
         <div className="nav-user">
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
-          <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
-          <button className="hamburger" onClick={()=>
+          <button className="btn-logout desktop-only" onClick={h
