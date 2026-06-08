@@ -729,9 +729,8 @@ function Standings({ user, predictions, profiles }) {
 
 // ── Compare View ─────────────────────────────────────────────────────────────
 function Compare({ user, matches, allPredictions, profiles }) {
-  const [filter, setFilter] = useState("all");
-  const [expanded, setExpanded] = useState({});
   const [now, setNow] = useState(new Date());
+  const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -740,13 +739,23 @@ function Compare({ user, matches, allPredictions, profiles }) {
 
   const profileMap = {};
   (profiles || []).forEach(p => { profileMap[p.id] = p; });
-  const dates = [...new Set(matches.map(m => m.match_date))];
-  const lockedDates = dates.filter(d => matches.filter(m => m.match_date === d).some(m => isLocked(m.kickoff_at, matches)));
-  const visibleMatches = filter === "all"
-    ? matches.filter(m => isLocked(m.kickoff_at, matches))
-    : matches.filter(m => m.match_date === filter && isLocked(m.kickoff_at, matches));
 
-  const upcomingMatches = matches.filter(m => !isLocked(m.kickoff_at, matches));
+  // Group ALL matches by day
+  const byDay = {};
+  matches.forEach(m => {
+    const d = m.match_date;
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(m);
+  });
+
+  const allDays = Object.keys(byDay);
+  const firstLockedDay = allDays.find(d => byDay[d].some(m => isLocked(m.kickoff_at, matches)));
+  const [activeDay, setActiveDay] = useState(null);
+
+  useEffect(() => {
+    if (!activeDay && firstLockedDay) setActiveDay(firstLockedDay);
+    else if (!activeDay && allDays.length > 0) setActiveDay(allDays[0]);
+  }, [matches]);
 
   function toggleExpand(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
@@ -766,14 +775,6 @@ function Compare({ user, matches, allPredictions, profiles }) {
     return `${mins}m ${secs}s`;
   }
 
-  // Group upcoming matches by day
-  const upcomingByDay = {};
-  upcomingMatches.forEach(m => {
-    const d = m.match_date;
-    if (!upcomingByDay[d]) upcomingByDay[d] = [];
-    upcomingByDay[d].push(m);
-  });
-
   function resultIcon(pred, match) {
     if (match.home_score === null || match.away_score === null) return null;
     if (pred.home_score === match.home_score && pred.away_score === match.away_score)
@@ -784,132 +785,115 @@ function Compare({ user, matches, allPredictions, profiles }) {
     return <span style={{ color: "var(--red)", fontSize: 13 }}>✗</span>;
   }
 
+  const dayMatches = activeDay ? (byDay[activeDay] || []) : [];
+  const dayIsLocked = dayMatches.some(m => isLocked(m.kickoff_at, matches));
+  const countdown = dayMatches.length > 0 ? timeUntilReveal(dayMatches[0].kickoff_at) : null;
+
   return (<>
-    <div className="sec-hdr"><h2>👁️ COMPARAR</h2><span>Predicciones reveladas al pitazo inicial</span></div>
+    <div className="sec-hdr"><h2>👁️ COMPARAR</h2></div>
 
-    {visibleMatches.length === 0 && upcomingMatches.length === 0 && (
-      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "50px 20px", textAlign: "center", color: "var(--muted)" }}>
-        <div style={{ fontSize: 44, marginBottom: 14 }}>🏆</div>
-        <div style={{ fontSize: 15, color: "var(--txt)" }}>No hay partidos disponibles</div>
-      </div>
-    )}
+    {/* Day tabs */}
+    <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
+      {allDays.map(d => {
+        const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches));
+        return (
+          <button
+            key={d}
+            onClick={() => setActiveDay(d)}
+            style={{
+              padding: "6px 12px", borderRadius: 20, border: "1px solid",
+              borderColor: activeDay === d ? "var(--gold)" : "var(--border)",
+              background: activeDay === d ? "var(--gold-dim)" : "none",
+              color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)",
+              fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+            }}
+          >
+            {locked ? "✓ " : "🔒 "}{d}
+          </button>
+        );
+      })}
+    </div>
 
-    {visibleMatches.length === 0 && upcomingMatches.length > 0 && (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {Object.entries(upcomingByDay).slice(0, 5).map(([day, dayMatches]) => {
-          const countdown = timeUntilReveal(dayMatches[0].kickoff_at);
-          return (
-            <div key={day} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
-              <div style={{ padding: "10px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{day}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10, color: "var(--muted)" }}>Se revelan en</span>
-                  <span style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--gold)", letterSpacing: 1 }}>{countdown || "¡Pronto!"}</span>
-                </div>
+    {/* Day content */}
+    {activeDay && (<>
+      {!dayIsLocked ? (
+        // Upcoming day — show countdown
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ padding: "14px 18px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>🔒 Predicciones se revelan en</span>
+            <span style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", letterSpacing: 1 }}>{countdown || "¡Pronto!"}</span>
+          </div>
+          {dayMatches.map((m, i) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 18px", borderBottom: i < dayMatches.length - 1 ? "1px solid var(--border)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                <img src={m.home_flag} alt={m.home} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
+                {m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}
+                <img src={m.away_flag} alt={m.away} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
               </div>
-              {dayMatches.map((m, i) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: i < dayMatches.length - 1 ? "1px solid var(--border)" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                    <img src={m.home_flag} alt={m.home} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
-                    {m.home}
-                    <span style={{ color: "var(--muted)" }}>vs</span>
-                    {m.away}
-                    <img src={m.away_flag} alt={m.away} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
-                  </div>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{localTime(m.kickoff_at)}</span>
-                </div>
-              ))}
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{localTime(m.kickoff_at)}</span>
             </div>
-          );
-        })}
-        <p style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
-          🔒 Las predicciones se revelan 24h antes del primer partido de cada día
-        </p>
-      </div>
-    )}
-
-    {visibleMatches.length > 0 && (<>
-      <div className="match-filter" style={{ marginBottom: 20 }}>
-        <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>Todos</button>
-        {lockedDates.map(d => (
-          <button key={d} className={`filter-btn ${filter === d ? "active" : ""}`} onClick={() => setFilter(d)}>{d}</button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {visibleMatches.map(m => {
-          const matchPreds = allPredictions.filter(p => p.match_id === m.id);
-          const hasResult = m.home_score !== null && m.away_score !== null;
-          const isOpen = expanded[m.id];
-          const predCount = matchPreds.filter(p => p !== undefined).length;
-          return (
-            <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
-              {/* Match header — clickable */}
-              <div
-                onClick={() => toggleExpand(m.id)}
-                style={{ padding: "13px 18px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="group-badge">Grupo {m.group_name}</span>
-                  <span style={{ fontSize: 13, fontWeight: 500, display:"flex", alignItems:"center", gap:5 }}>
-                    <img src={m.home_flag} alt={m.home} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.home}
-                    <span style={{ color: "var(--muted)" }}>vs</span>
-                    {m.away}<img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>
-                  </span>
+          ))}
+        </div>
+      ) : (
+        // Past/locked day — show predictions
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {dayMatches.map(m => {
+            const matchPreds = allPredictions.filter(p => p.match_id === m.id);
+            const hasResult = m.home_score !== null && m.away_score !== null;
+            const isOpen = expanded[m.id];
+            return (
+              <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+                <div onClick={() => toggleExpand(m.id)} style={{ padding: "12px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="group-badge">Grupo {m.group_name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+                      <img src={m.home_flag} alt={m.home} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
+                      {m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}
+                      <img src={m.away_flag} alt={m.away} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {hasResult
+                      ? <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)" }}>{m.home_score}–{m.away_score}</span>
+                      : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽</span>}
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{matchPreds.length} pred.</span>
+                    <span style={{ color: "var(--muted)", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {hasResult
-                    ? <span style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)" }}>{m.home_score} – {m.away_score}</span>
-                    : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽ En curso</span>}
-                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{predCount} pred.</span>
-                  <span style={{ color: "var(--muted)", fontSize: 14 }}>{isOpen ? "▲" : "▼"}</span>
-                </div>
-              </div>
-
-              {/* Predictions — collapsible */}
-              {isOpen && (<>
-                {matchPreds.length === 0
-                  ? <div style={{ padding: "14px 18px", color: "var(--muted)", fontSize: 13 }}>Nadie predijo este partido</div>
-                  : profiles.map((prof, idx) => {
-                      const pred = matchPreds.find(p => p.user_id === prof.id);
-                      const isMe = prof.id === user.id;
-                      return (
-                        <div key={prof.id} style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "10px 18px",
-                          borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none",
-                          background: isMe ? "rgba(245,183,49,.04)" : "transparent"
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div className="avatar sm">{initials(prof.name)}</div>
-                            <span style={{ fontSize: 13 }}>{prof.name}</span>
-                            {isMe && <span className="me-badge">TÚ</span>}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            {pred ? (<>
-                              {resultIcon(pred, m)}
-                              <span style={{ fontFamily: "Bebas Neue", fontSize: 20 }}>{pred.home_score} – {pred.away_score}</span>
-                              {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points} pts</span>}
-                            </>) : (
-                              <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin predicción</span>
-                            )}
-                          </div>
+                {isOpen && (<>
+                  {profiles.map((prof, idx) => {
+                    const pred = matchPreds.find(p => p.user_id === prof.id);
+                    const isMe = prof.id === user.id;
+                    return (
+                      <div key={prof.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px", borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div className="avatar sm">{initials(prof.name)}</div>
+                          <span style={{ fontSize: 13 }}>{prof.name}</span>
+                          {isMe && <span className="me-badge">TÚ</span>}
                         </div>
-                      );
-                    })
-                }
-                {hasResult && (
-                  <div style={{ padding: "7px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 14, fontSize: 11, color: "var(--muted)" }}>
-                    <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
-                    <span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span>
-                    <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
-                  </div>
-                )}
-              </>)}
-            </div>
-          );
-        })}
-      </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {pred ? (<>
+                            {resultIcon(pred, m)}
+                            <span style={{ fontFamily: "Bebas Neue", fontSize: 18 }}>{pred.home_score}–{pred.away_score}</span>
+                            {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points}</span>}
+                          </>) : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin pred.</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {hasResult && (
+                    <div style={{ padding: "6px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}>
+                      <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
+                      <span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span>
+                      <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
+                    </div>
+                  )}
+                </>)}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>)}
   </>);
 }
