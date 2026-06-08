@@ -2048,15 +2048,17 @@ export default function App() {
     if (!("serviceWorker" in navigator)) return;
     setNotifStatus("requesting");
     try {
-      // Dynamically load Firebase
-      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-      const { getMessaging, getToken } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js");
+      // Load Firebase via script tags to avoid Webpack bundling issues
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
-      const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApps()[0];
-      const messaging = getMessaging(app);
+      const firebaseApp = window.firebase.apps.length === 0
+        ? window.firebase.initializeApp(FIREBASE_CONFIG)
+        : window.firebase.apps[0];
+      const messaging = window.firebase.messaging();
 
       const swReg = await navigator.serviceWorker.ready;
-      const token = await getToken(messaging, {
+      const token = await messaging.getToken({
         vapidKey: FCM_VAPID_KEY,
         serviceWorkerRegistration: swReg,
       });
@@ -2076,6 +2078,15 @@ export default function App() {
       console.warn("FCM error:", e);
       setNotifStatus("denied");
     }
+  }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
   }
 
   useEffect(() => {
