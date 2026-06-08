@@ -715,6 +715,7 @@ function Matches({ user, matches, predictions, onSave }) {
   const [wildcards, setWildcards] = useState([]);
   const [savingWildcard, setSavingWildcard] = useState({});
   const [maxWildcards, setMaxWildcards] = useState(4);
+  const [wildcardCost, setWildcardCost] = useState(1);
 
   useEffect(() => {
     const init = {};
@@ -724,7 +725,14 @@ function Matches({ user, matches, predictions, onSave }) {
 
   useEffect(() => {
     sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => { if (data) setWildcards(data); });
-    sb.from("scoring_rules").select("*").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data) setMaxWildcards(data.rule_value); });
+    sb.from("scoring_rules").select("*").then(({ data }) => {
+      if (data) {
+        const maxW = data.find(r => r.rule_key === "max_wildcards");
+        const costW = data.find(r => r.rule_key === "wildcard_cost");
+        if (maxW) setMaxWildcards(maxW.rule_value);
+        if (costW) setWildcardCost(costW.rule_value);
+      }
+    });
   }, [user.id]);
 
   function setScore(matchId, side, val) {
@@ -752,18 +760,24 @@ function Matches({ user, matches, predictions, onSave }) {
     const hasWildcard = wildcards.find(w => w.match_id === match.id);
     setSavingWildcard(s => ({ ...s, [match.id]: true }));
     if (hasWildcard) {
+      // Cancel wildcard — refund the cost point
       await sb.from("wildcards").delete().eq("id", hasWildcard.id);
       setWildcards(w => w.filter(x => x.match_id !== match.id));
     } else {
-      if (wildcards.length >= maxWildcards) { setSavingWildcard(s => ({ ...s, [match.id]: false })); return; }
-      const { data } = await sb.from("wildcards").insert({ user_id: user.id, match_id: match.id }).select().single();
-      if (data) setWildcards(w => [...w, data]);
+      // Buy wildcard — check limit
+      if (wildcards.length >= maxWildcards) {
+        setSavingWildcard(s => ({ ...s, [match.id]: false }));
+        return;
+      }
+      await sb.from("wildcards").insert({ user_id: user.id, match_id: match.id });
+      const { data } = await sb.from("wildcards").select("*").eq("user_id", user.id);
+      if (data) setWildcards(data);
     }
     setSavingWildcard(s => ({ ...s, [match.id]: false }));
   }
 
   const usedWildcards = wildcards.length;
-  const remaining = maxWildcards - usedWildcards;
+  const remainingWildcards = maxWildcards - usedWildcards;
 
   return (<>
     <div className="sec-hdr" style={{justifyContent:"space-between"}}>
@@ -772,9 +786,12 @@ function Matches({ user, matches, predictions, onSave }) {
       </div>
       <div style={{display:"flex",alignItems:"center",gap:6,background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 12px"}}>
         <span style={{fontSize:18}}>🃏</span>
-        <span style={{fontFamily:"Bebas Neue",fontSize:18,color:remaining>0?"var(--gold)":"var(--red)"}}>{remaining}</span>
-        <span style={{fontSize:11,color:"var(--muted)"}}>comodines</span>
+        <span style={{fontFamily:"Bebas Neue",fontSize:18,color:remainingWildcards>0?"var(--gold)":"var(--red)"}}>{remainingWildcards}</span>
+        <span style={{fontSize:11,color:"var(--muted)"}}>restantes</span>
       </div>
+    </div>
+    <div style={{background:"rgba(245,183,49,.08)",border:"1px solid rgba(245,183,49,.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"var(--muted)"}}>
+      🃏 <strong style={{color:"var(--gold)"}}>Comodín:</strong> Cuesta {wildcardCost} pt. Exacto <strong style={{color:"var(--gold)"}}>+8</strong> · Goles <strong style={{color:"var(--gold)"}}>+5</strong> · Ganador <strong style={{color:"var(--gold)"}}>+2</strong> · Falla <strong style={{color:"var(--red)"}}>0</strong>
     </div>
     <div className="matches-grid">
       {matches.map(m => {
@@ -784,10 +801,10 @@ function Matches({ user, matches, predictions, onSave }) {
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
         const wasSaved = saved[m.id];
         const hasWildcard = !!wildcards.find(w => w.match_id === m.id);
-        const canAddWildcard = !locked && myPred && (hasWildcard || remaining > 0);
+        const canBuyWildcard = !locked && myPred && !hasWildcard && remainingWildcards > 0;
         return (
           <div key={m.id}>
-            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor:hasWildcard?"var(--gold)":undefined,borderWidth:hasWildcard?2:undefined}}>
+            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor: hasWildcard ? "var(--gold)" : undefined, borderWidth: hasWildcard ? 2 : undefined}}>
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
@@ -813,18 +830,18 @@ function Matches({ user, matches, predictions, onSave }) {
                     : myPred ? <span className="saved-tag">✓ Guardado</span> : null}
                 {!locked && myPred && (
                   <button
-                    onClick={()=>toggleWildcard(m)}
-                    disabled={savingWildcard[m.id] || (!hasWildcard && remaining === 0)}
+                    onClick={() => toggleWildcard(m)}
+                    disabled={savingWildcard[m.id] || (!hasWildcard && remainingWildcards === 0)}
                     style={{
-                      fontSize:11,padding:"3px 10px",borderRadius:20,border:"1px solid",
-                      borderColor:hasWildcard?"var(--gold)":"var(--border)",
-                      background:hasWildcard?"var(--gold-dim)":"none",
-                      color:hasWildcard?"var(--gold)":remaining===0?"var(--muted)":"var(--muted)",
-                      cursor:(!hasWildcard&&remaining===0)?"not-allowed":"pointer",
-                      opacity:(!hasWildcard&&remaining===0)?0.5:1,
+                      padding:"3px 10px", borderRadius:20, border:"1px solid",
+                      borderColor: hasWildcard ? "var(--gold)" : remainingWildcards===0 ? "var(--border)" : "rgba(245,183,49,.4)",
+                      background: hasWildcard ? "var(--gold-dim)" : "none",
+                      color: hasWildcard ? "var(--gold)" : remainingWildcards===0 ? "var(--muted)" : "rgba(245,183,49,.7)",
+                      fontSize:11, cursor: remainingWildcards===0&&!hasWildcard ? "not-allowed" : "pointer",
+                      opacity: remainingWildcards===0&&!hasWildcard ? 0.5 : 1
                     }}
                   >
-                    {savingWildcard[m.id]?"...":(hasWildcard?"🃏 Comodín activo — cancelar":"🃏 Usar comodín (-1pt)")}
+                    {savingWildcard[m.id] ? "..." : hasWildcard ? "🃏 Comodín activo · Cancelar" : "🃏 Usar comodín (-" + wildcardCost + "pt)"}
                   </button>
                 )}
               </div>
@@ -1603,29 +1620,12 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
 
         const { data: preds } = await sb.from("predictions").select("*").eq("match_id", existing.id);
-        const { data: mWildcards } = await sb.from("wildcards").select("*").eq("match_id", existing.id);
-        const wcUserIds = new Set((mWildcards||[]).map(w => w.user_id));
-        const wcExact = ruleMap["wildcard_exact"] || 8;
-        const wcGoals = ruleMap["wildcard_goals"] || 5;
-        const wcWinner = ruleMap["wildcard_winner"] || 2;
-        const wcCost = ruleMap["wildcard_cost"] || 1;
-        const realGoals = homeScore + awayScore;
         for (const pred of (preds||[])) {
-          const hasWc = wcUserIds.has(pred.user_id);
           let pts = 0;
-          if (hasWc) {
-            const predGoals = pred.home_score + pred.away_score;
+          if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
+          else {
             const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-            if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = wcExact - wcCost; }
-            else if (predGoals === realGoals && pr === realResult) { pts = wcGoals - wcCost; }
-            else if (pr === realResult) { pts = wcWinner - wcCost; }
-            else { pts = -wcCost; }
-          } else {
-            if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
-            else {
-              const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-              if (pr === realResult) pts = resultPts;
-            }
+            if (pr === realResult) pts = resultPts;
           }
           await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
         }
@@ -1769,27 +1769,31 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     const wildcardUserIds = new Set((matchWildcards||[]).map(w => w.user_id));
     if (preds) {
       const isKnockout = match.phase && match.phase !== "Grupos";
-      const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 6) : (ruleVals["exact_score_groups"] || 3);
-      const resultPts = isKnockout ? (ruleVals["correct_result_knockout"] || 2) : (ruleVals["correct_result_groups"] || 1);
-      const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
-      const realGoals = homeScore + awayScore;
+      const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 3) : (ruleVals["exact_score_groups"] || 3);
+      const resultPts = isKnockout ? (ruleVals["correct_result_knockout"] || 1) : (ruleVals["correct_result_groups"] || 1);
+      const goalsPts = isKnockout ? (ruleVals["correct_goals_knockout"] || 2) : (ruleVals["correct_goals_groups"] || 1);
       const wcExact = ruleVals["wildcard_exact"] || 8;
       const wcGoals = ruleVals["wildcard_goals"] || 5;
       const wcWinner = ruleVals["wildcard_winner"] || 2;
       const wcCost = ruleVals["wildcard_cost"] || 1;
+      const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+      const realTotalGoals = homeScore + awayScore;
       for (const pred of preds) {
         const hasWildcard = wildcardUserIds.has(pred.user_id);
         let pts = 0;
+        const isExact = pred.home_score === homeScore && pred.away_score === awayScore;
+        const predResult = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+        const isCorrectResult = predResult === realResult;
+        const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
         if (hasWildcard) {
-          const predGoals = pred.home_score + pred.away_score;
-          const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-          if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = wcExact - wcCost; }
-          else if (predGoals === realGoals && pr === realResult) { pts = wcGoals - wcCost; }
-          else if (pr === realResult) { pts = wcWinner - wcCost; }
-          else { pts = -wcCost; }
+          if (isExact) pts = wcExact;
+          else if (isCorrectGoals) pts = wcGoals;
+          else if (isCorrectResult) pts = wcWinner;
+          else pts = -wcCost;
         } else {
-          if (pred.home_score === homeScore && pred.away_score === awayScore) { pts = exactPts; }
-          else { const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw"; if(pr === realResult) pts = resultPts; }
+          if (isExact) pts = exactPts;
+          else if (isCorrectGoals) pts = goalsPts;
+          else if (isCorrectResult) pts = resultPts;
         }
         await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
       }
@@ -1850,9 +1854,16 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     exact_score_knockout:    "Marcador exacto — Eliminatorias",
     correct_result_groups:   "Ganador — Grupos",
     correct_result_knockout: "Ganador — Eliminatorias",
+    correct_goals_groups:    "Goles totales correctos — Grupos",
+    correct_goals_knockout:  "Goles totales correctos — Eliminatorias",
     group_first:             "1ro de grupo",
     group_second:            "2do de grupo",
     third_place_qualifier:   "3er clasificado",
+    max_wildcards:           "Máximo de comodines por torneo",
+    wildcard_cost:           "Costo del comodín (pts)",
+    wildcard_exact:          "Comodín: marcador exacto",
+    wildcard_goals:          "Comodín: goles totales correctos",
+    wildcard_winner:         "Comodín: ganador correcto",
   };
 
   return (
