@@ -574,6 +574,43 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
   const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).length;
   const locked = isPreTournamentLocked();
+
+  // Stats
+  const played = myPreds.filter(p => p.points !== null && p.points !== undefined);
+  const exact = played.filter(p => p.points >= 3);
+  const correct = played.filter(p => p.points === 1 || p.points === 2);
+  const wrong = played.filter(p => p.points === 0);
+  const pctExact = played.length > 0 ? Math.round(exact.length / played.length * 100) : 0;
+  const pctCorrect = played.length > 0 ? Math.round(correct.length / played.length * 100) : 0;
+
+  // All users avg
+  const allUserIds = [...new Set(predictions.map(p => p.user_id))];
+  const avgPts = allUserIds.length > 0
+    ? Math.round(allUserIds.reduce((s, uid) => {
+        return s + predictions.filter(p => p.user_id === uid).reduce((ss, p) => ss + (p.points || 0), 0);
+      }, 0) / allUserIds.length)
+    : 0;
+
+  // Racha actual (partidos jugados en orden cronológico)
+  const finishedPreds = played
+    .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
+    .filter(p => p.match)
+    .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
+
+  let racha = 0;
+  for (let i = finishedPreds.length - 1; i >= 0; i--) {
+    if (finishedPreds[i].points > 0) racha++;
+    else break;
+  }
+
+  // Mejor jornada (día con más puntos)
+  const ptsByDay = {};
+  finishedPreds.forEach(p => {
+    const d = p.match.match_date;
+    ptsByDay[d] = (ptsByDay[d] || 0) + (p.points || 0);
+  });
+  const bestDay = Object.entries(ptsByDay).sort((a, b) => b[1] - a[1])[0];
+
   return (<>
     <div className="banner">
       <h3>BIENVENIDO, {user.profile?.name?.toUpperCase() || "JUGADOR"} 👋</h3>
@@ -584,11 +621,59 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
           : <>¡Todo al día! Sigue de cerca la tabla de posiciones.</>}
       </p>
     </div>
+
     <div className="dash-grid">
-      <div className="stat-card"><span className="stat-label">Tus puntos</span><span className="stat-value">{totalPts}</span><span className="stat-sub">Total acumulado</span></div>
+      <div className="stat-card"><span className="stat-label">Tus puntos</span><span className="stat-value">{totalPts}</span><span className="stat-sub">Promedio del grupo: {avgPts}</span></div>
       <div className="stat-card"><span className="stat-label">Predicciones</span><span className="stat-value">{myPreds.length}</span><span className="stat-sub">de {matches.length} partidos</span></div>
       <div className="stat-card"><span className="stat-label">Pendientes</span><span className="stat-value" style={{color:pending>0?"var(--red)":"var(--green)"}}>{pending}</span><span className="stat-sub">{pending>0?"¡A predecir!":"Todo listo ✓"}</span></div>
     </div>
+
+    {played.length > 0 && (
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
+        <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1,marginBottom:14}}>📊 TUS ESTADÍSTICAS</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
+          <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Exactos</div>
+            <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{exact.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctExact}%)</span></div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
+          </div>
+          <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Ganador correcto</div>
+            <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--green)"}}>{correct.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctCorrect}%)</span></div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
+          </div>
+          <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Racha actual</div>
+            <div style={{fontFamily:"Bebas Neue",fontSize:28,color:racha>0?"var(--green)":"var(--muted)"}}>{racha} <span style={{fontSize:14,color:"var(--muted)"}}>partido{racha!==1?"s":""}</span></div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>{racha>0?"✓ consecutivos acertados":"Sin racha activa"}</div>
+          </div>
+          <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Mejor jornada</div>
+            <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{bestDay ? bestDay[1] : 0} <span style={{fontSize:14,color:"var(--muted)"}}>pts</span></div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>{bestDay ? bestDay[0] : "—"}</div>
+          </div>
+        </div>
+        <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Tus puntos vs promedio del grupo</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{flex:1,background:"var(--border)",borderRadius:20,height:8,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:20,background:"var(--gold)",width:`${Math.min(100, avgPts > 0 ? totalPts/Math.max(totalPts,avgPts)*100 : 100)}%`,transition:"width .5s"}}/>
+            </div>
+            <span style={{fontFamily:"Bebas Neue",fontSize:16,color:"var(--gold)",minWidth:60}}>{totalPts} pts</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginTop:6}}>
+            <div style={{flex:1,background:"var(--border)",borderRadius:20,height:8,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:20,background:"var(--muted)",width:`${Math.min(100, totalPts > 0 ? avgPts/Math.max(totalPts,avgPts)*100 : 100)}%`,transition:"width .5s"}}/>
+            </div>
+            <span style={{fontSize:13,color:"var(--muted)",minWidth:60}}>{avgPts} avg</span>
+          </div>
+          <div style={{fontSize:11,color:totalPts>=avgPts?"var(--green)":"var(--red)",marginTop:6}}>
+            {totalPts >= avgPts ? `▲ ${totalPts - avgPts} pts por encima del promedio` : `▼ ${avgPts - totalPts} pts por debajo del promedio`}
+          </div>
+        </div>
+      </div>
+    )}
+
     {!locked && (
       <div style={{background:"var(--card)",border:"1px solid rgba(245,183,49,.3)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div><div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>📋 PREDICCIONES PRE-TORNEO</div><div style={{fontSize:13,color:"var(--muted)",marginTop:3}}>1ro y 2do de grupo + 8 terceros clasificados</div></div>
@@ -1608,29 +1693,4 @@ export default function App() {
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
-          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
-            <span/><span/><span/>
-          </button>
-        </div>
-      </nav>
-      <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
-          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
-        ))}
-        {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
-        <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
-          <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
-          <button className="btn-logout" onClick={handleLogout}>Salir</button>
-        </div>
-      </div>
-      <main className="main">
-        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={myPredictions} onGoTab={goTab}/>}
-        {tab==="pre"       && <PreTournament user={user}/>}
-        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
-        {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
-        {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
-      </main>
-    </div>
-  </>);
-}
+          <button className="hamburger" onClick={()=>
