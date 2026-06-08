@@ -774,6 +774,17 @@ function Matches({ user, matches, predictions, onSave }) {
 function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [historyUser, setHistoryUser] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
+  const [loadingSnaps, setLoadingSnaps] = useState(false);
+
+  async function openHistory(prof) {
+    setHistoryUser(prof);
+    setLoadingSnaps(true);
+    const { data } = await sb.from("ranking_snapshots").select("*").order("snapshot_date");
+    setSnapshots(data||[]);
+    setLoadingSnaps(false);
+  }
 
   async function loadPrePreds() {
     const { data } = await sb.from("pretournament_predictions").select("*");
@@ -812,12 +823,82 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
         </button>
       )}
     </div>
+    {historyUser && (() => {
+      const userSnaps = snapshots.filter(s => s.user_id === historyUser.id).sort((a,b)=>a.snapshot_date.localeCompare(b.snapshot_date));
+      const allDates = [...new Set(snapshots.map(s=>s.snapshot_date))].sort();
+      const daysFirst = snapshots.filter(s=>s.position===1&&s.user_id===historyUser.id).length;
+      const totalDays = allDates.length;
+      const maxPts = userSnaps.length>0?Math.max(...userSnaps.map(s=>s.points)):0;
+      const chartW = 320; const chartH = 120; const pad = 20;
+      const pts = userSnaps.map(s=>s.points);
+      const maxP = Math.max(...pts,1);
+      const points = userSnaps.map((s,i)=>{
+        const x = pad + (i/(Math.max(userSnaps.length-1,1)))*(chartW-pad*2);
+        const y = chartH - pad - (s.points/maxP)*(chartH-pad*2);
+        return [x,y];
+      });
+      const pathD = points.map((p,i)=>(i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+      return (
+        <div className="modal-overlay" onClick={()=>setHistoryUser(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:380}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div className="avatar">{initials(historyUser.name)}</div>
+                <div><div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1}}>{historyUser.name}</div>
+                <div style={{fontSize:12,color:"var(--muted)"}}>{historyUser.pts} pts actuales</div></div>
+              </div>
+              <button onClick={()=>setHistoryUser(null)} style={{background:"none",border:"none",color:"var(--muted)",fontSize:20,cursor:"pointer"}}>✕</button>
+            </div>
+            {loadingSnaps ? <div style={{textAlign:"center",padding:20,color:"var(--muted)"}}>Cargando...</div> : userSnaps.length===0 ? (
+              <div style={{textAlign:"center",padding:20,color:"var(--muted)",fontSize:13}}>Sin snapshots aún. El admin debe tomar el primer 📸 snapshot.</div>
+            ) : (<>
+              <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
+                <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Evolución de puntos</div>
+                <svg viewBox={"0 0 "+chartW+" "+chartH} style={{width:"100%",height:chartH}}>
+                  <path d={pathD} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round"/>
+                  {points.map((p,i)=>(
+                    <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="var(--gold)"/>
+                  ))}
+                  {userSnaps.map((s,i)=>(
+                    <text key={i} x={points[i][0]} y={chartH-2} textAnchor="middle" fontSize="9" fill="var(--muted)">{s.snapshot_date.slice(5)}</text>
+                  ))}
+                </svg>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Días en 1er lugar</div>
+                  <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{daysFirst}</div>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>de {totalDays} snapshots</div>
+                </div>
+                <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Mejor posición</div>
+                  <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>#{userSnaps.length>0?Math.min(...userSnaps.map(s=>s.position)):"-"}</div>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>histórico</div>
+                </div>
+              </div>
+              <div style={{marginTop:12,background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
+                <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Historial de posiciones</div>
+                {userSnaps.slice().reverse().slice(0,5).map(s=>(
+                  <div key={s.snapshot_date} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid var(--border)"}}>
+                    <span style={{fontSize:12,color:"var(--muted)"}}>{s.snapshot_date}</span>
+                    <div style={{display:"flex",gap:12}}>
+                      <span style={{fontFamily:"Bebas Neue",fontSize:15,color:s.position===1?"var(--gold)":"var(--txt)"}}>#{s.position}</span>
+                      <span style={{fontSize:12,color:"var(--muted)"}}>{s.points} pts</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>)}
+          </div>
+        </div>
+      );
+    })()}
     <div className="standings-wrap">
       <table className="standings-table">
         <thead><tr><th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
         <tbody>
           {rows.map((row,i) => (
-            <tr key={row.id}>
+            <tr key={row.id} onClick={()=>openHistory(row)} style={{cursor:"pointer"}}>
               <td><span className={`rank-num rank-${i+1}`}>{i+1}</span></td>
               <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id===user.id&&<span className="me-badge">TÚ</span>}</div></td>
               <td className="c"><span className="pts-big">{row.pts}</span></td>
@@ -1095,6 +1176,27 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [savingGroupResults, setSavingGroupResults] = useState(false);
   const [groupResultsMsg, setGroupResultsMsg] = useState(null);
   const [calculatingPts, setCalculatingPts] = useState(false);
+  const [takingSnapshot, setTakingSnapshot] = useState(false);
+
+  async function takeSnapshot() {
+    setTakingSnapshot(true);
+    const today = new Date().toISOString().slice(0,10);
+    const { data: preds } = await sb.from("predictions").select("*");
+    const { data: prePreds } = await sb.from("pretournament_predictions").select("*");
+    const { data: profs } = await sb.from("profiles").select("*");
+    const rows = (profs||[]).map(p => {
+      const matchPts = (preds||[]).filter(pr => pr.user_id===p.id).reduce((s,pr)=>s+(pr.points||0),0);
+      const prePts = (prePreds||[]).filter(pr => pr.user_id===p.id).reduce((s,pr)=>s+(pr.points||0),0);
+      return { user_id: p.id, points: matchPts+prePts };
+    }).sort((a,b)=>b.points-a.points);
+    for (let i=0; i<rows.length; i++) {
+      await sb.from("ranking_snapshots").upsert(
+        { snapshot_date: today, user_id: rows[i].user_id, points: rows[i].points, position: i+1 },
+        { onConflict: "snapshot_date,user_id" }
+      );
+    }
+    setTakingSnapshot(false);
+  }
 
   async function syncScores() {
     setSyncing(true); setSyncMsg(null);
@@ -1386,7 +1488,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         </div>
       )}
 
-      <div className="sec-hdr"><h2>🔧 PANEL ADMIN</h2><span>Solo visible para administradores</span></div>
+      <div className="sec-hdr" style={{justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"baseline",gap:12}}><h2>🔧 PANEL ADMIN</h2><span>Solo visible para administradores</span></div><button className="btn-small" onClick={takeSnapshot} disabled={takingSnapshot} style={{background:"var(--blue)",borderColor:"var(--blue)",color:"#fff"}}>{takingSnapshot?"...":"📸 Snapshot"}</button></div>
 
       <div className="admin-section">
         <div className="admin-section-hdr" style={{flexWrap:"wrap",gap:8}}>
