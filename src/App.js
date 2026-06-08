@@ -1926,6 +1926,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             {filtered.map(m => {
               const r=results[m.id]||{home:m.home_score!==null?String(m.home_score):"",away:m.away_score!==null?String(m.away_score):""};
               const finished=m.status==="finished";
+              const kickoffPassed = new Date(m.kickoff_at) <= new Date();
               return (
                 <div key={m.id} className="admin-match-row">
                   <div style={{fontSize:11,color:"var(--muted)"}}>{m.match_date}<br/><span style={{color:"var(--txt)"}}>Grupo {m.group_name}</span></div>
@@ -1934,13 +1935,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                     <span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.away}</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0"/>
+                    <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
                     <span style={{color:"var(--muted)",fontFamily:"Bebas Neue",fontSize:16}}>–</span>
-                    <input className="admin-score-input" value={r.away??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],away:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0"/>
+                    <input className="admin-score-input" value={r.away??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],away:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
                   </div>
-                  <div>{finished?<span className="result-badge">✓ {m.home_score}–{m.away_score}</span>:savedMatch[m.id]?<span style={{fontSize:11,color:"var(--green)"}}>✓</span>:null}</div>
+                  <div>{finished?<span className="result-badge">✓ {m.home_score}–{m.away_score}</span>:savedMatch[m.id]?<span style={{fontSize:11,color:"var(--green)"}}>✓</span>:!kickoffPassed?<span style={{fontSize:10,color:"var(--muted)"}}>⏳ No iniciado</span>:null}</div>
                   <div style={{display:"flex",gap:5}}>
-                    <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
+                    <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]||!kickoffPassed}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
                     <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
                     {finished && <button className="admin-edit-btn" onClick={()=>resetMatch(m)} style={{color:"var(--red)",borderColor:"var(--red)"}}>↺</button>}
                   </div>
