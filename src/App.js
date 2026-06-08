@@ -1692,8 +1692,7 @@ export default function App() {
         <div className="nav-user">
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
-          <button className="btn-logout desktop-only" onClick={h
-andleLogout}>Salir</button>
+          <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
           <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
             <span/><span/><span/>
           </button>
@@ -1719,4 +1718,4 @@ andleLogout}>Salir</button>
       </main>
     </div>
   </>);
-        }
+}
