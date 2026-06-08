@@ -1,0 +1,17 @@
+{
+  "name": "Quiniela Mundial 2026",
+  "short_name": "Quiniela 2026",
+  "description": "Predicciones Copa del Mundo 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#f5b731",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
