@@ -776,15 +776,15 @@ function Compare({ user, matches, allPredictions, profiles }) {
     if (existing) {
       if (existing.emoji === emoji) {
         await sb.from("reactions").delete().eq("id", existing.id);
-        setReactions(r => ({ ...r, [matchId]: (r[matchId] || []).filter(rx => rx.id !== existing.id) }));
       } else {
         await sb.from("reactions").update({ emoji }).eq("id", existing.id);
-        setReactions(r => ({ ...r, [matchId]: (r[matchId] || []).map(rx => rx.id === existing.id ? { ...rx, emoji } : rx) }));
       }
     } else {
-      const { data } = await sb.from("reactions").insert({ user_id: user.id, match_id: matchId, emoji }).select().single();
-      if (data) setReactions(r => ({ ...r, [matchId]: [...(r[matchId] || []), data] }));
+      await sb.from("reactions").insert({ user_id: user.id, match_id: matchId, emoji });
     }
+    // Reload all reactions for this match
+    const { data } = await sb.from("reactions").select("*").eq("match_id", matchId);
+    setReactions(r => ({ ...r, [matchId]: data || [] }));
     setEmojiPicker(null);
   }
 
