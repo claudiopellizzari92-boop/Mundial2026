@@ -168,8 +168,8 @@ input,button,select{font-family:inherit;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* ── Mobile ── */
-.hamburger{display:none;flex-direction:column;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:8px 10px;}
-.hamburger span{display:block;width:22px;height:2px;background:var(--gold);border-radius:2px;}
+.hamburger{display:none;flex-direction:column;gap:5px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;cursor:pointer;padding:9px 11px;}
+.hamburger span{display:block;width:22px;height:2.5px;background:var(--gold);border-radius:2px;}
 .desktop-only{display:inline-flex;}
 .mobile-menu{display:none;position:fixed;top:62px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;padding:8px 12px;flex-direction:column;gap:2px;}
 .mobile-menu.open{display:flex;}
@@ -181,7 +181,6 @@ input,button,select{font-family:inherit;}
   .nav-tabs{display:none;}
   .nav-brand{font-size:18px;}
   .nav-user span{display:none;}
-  .nav-user .avatar{display:none;}
   .desktop-only{display:none!important;}
   .hamburger{display:flex;}
   .main{padding:16px 14px;}
@@ -1478,12 +1477,12 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
-          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
-            <span/><span/><span/>
-          </button>
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
+            <span/><span/><span/>
+          </button>
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
