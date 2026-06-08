@@ -686,7 +686,7 @@ function Matches({ user, matches, predictions, onSave }) {
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, profiles, onRefresh }) {
+function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -748,9 +748,11 @@ function Standings({ user, predictions, profiles, onRefresh }) {
         <h2>TABLA DE POSICIONES</h2>
         <span>{profiles.length} participantes</span>
       </div>
-      <button className="btn-small" onClick={handleRefresh} disabled={refreshing} style={{fontSize:11}}>
-        {refreshing ? "..." : "🔄 Actualizar"}
-      </button>
+      {isAdmin && (
+        <button className="btn-small" onClick={handleRefresh} disabled={refreshing} style={{fontSize:11}}>
+          {refreshing ? "..." : "🔄 Actualizar"}
+        </button>
+      )}
     </div>
     <div className="standings-wrap">
       <table className="standings-table">
@@ -1589,7 +1591,7 @@ export default function App() {
         {tab==="pre"       && <PreTournament user={user}/>}
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
