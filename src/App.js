@@ -699,6 +699,34 @@ function Standings({ user, predictions, profiles, onRefresh }) {
 
   async function handleRefresh() {
     setRefreshing(true);
+
+    // Recalcular puntos de todos los partidos finalizados
+    const { data: finishedMatches } = await sb.from("matches").select("*").eq("status", "finished").not("home_score", "is", null);
+    const { data: rules } = await sb.from("scoring_rules").select("*");
+    const ruleMap = {};
+    (rules||[]).forEach(r => { ruleMap[r.rule_key] = r.rule_value; });
+
+    for (const match of (finishedMatches || [])) {
+      const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
+      const isKnockout = match.phase && match.phase !== "Grupos";
+      const exactPts = isKnockout ? (ruleMap["exact_score_knockout"]||6) : (ruleMap["exact_score_groups"]||3);
+      const resultPts = isKnockout ? (ruleMap["correct_result_knockout"]||2) : (ruleMap["correct_result_groups"]||1);
+      const realResult = match.home_score > match.away_score ? "home" : match.away_score > match.home_score ? "away" : "draw";
+
+      for (const pred of (preds || [])) {
+        let pts = 0;
+        if (pred.home_score === match.home_score && pred.away_score === match.away_score) {
+          pts = exactPts;
+        } else {
+          const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+          if (pr === realResult) pts = resultPts;
+        }
+        if (pred.points !== pts) {
+          await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
+        }
+      }
+    }
+
     await loadPrePreds();
     onRefresh();
     setRefreshing(false);
