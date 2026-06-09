@@ -1559,6 +1559,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
   const [historyUser, setHistoryUser] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [loadingSnaps, setLoadingSnaps] = useState(false);
+  const [userAchievements, setUserAchievements] = useState({});
   const [h2hUser, setH2hUser] = useState(null);
   const [showH2hPicker, setShowH2hPicker] = useState(false);
   const [h2hMatchData, setH2hMatchData] = useState([]);
@@ -1575,8 +1576,18 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     setH2hUser(null);
     setShowH2hPicker(false);
     setLoadingSnaps(true);
-    const { data } = await sb.from("ranking_snapshots").select("*").order("snapshot_date");
-    setSnapshots(data || []);
+    const [{ data: snaps }, { data: achData }] = await Promise.all([
+      sb.from("ranking_snapshots").select("*").order("snapshot_date"),
+      sb.from("achievements").select("*"),
+    ]);
+    setSnapshots(snaps || []);
+    // Group achievements by user
+    const byUser = {};
+    (achData || []).forEach(a => {
+      if (!byUser[a.user_id]) byUser[a.user_id] = new Set();
+      byUser[a.user_id].add(a.achievement_key);
+    });
+    setUserAchievements(byUser);
     setLoadingSnaps(false);
   }
 
@@ -1674,8 +1685,11 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div className="avatar">{initials(uA.name)}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, textAlign: "center" }}>{uA.name}</div>
+              <div className={`avatar ${championAvatarClass(uA)}`}>{initials(uA.name)}</div>
+              <div style={{ textAlign: "center" }}>
+                <ChampionName profile={uA} name={uA.name} style={{ fontSize: 12, fontWeight: 600 }} />
+                <TitleBadges profile={uA} size={12} />
+              </div>
               <div style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--gold)" }}>{uA.pts} pts</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
@@ -1684,8 +1698,11 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
               <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: winsB > winsA ? "var(--gold)" : winsA > winsB ? "var(--muted)" : "var(--txt)" }}>{winsB}</div>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div className="avatar" style={{ background: "linear-gradient(135deg,#4a9eff,#1a6fd4)" }}>{initials(uB.name)}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, textAlign: "center" }}>{uB.name}</div>
+              <div className={`avatar ${championAvatarClass(uB)}`} style={{ background: "linear-gradient(135deg,#4a9eff,#1a6fd4)" }}>{initials(uB.name)}</div>
+              <div style={{ textAlign: "center" }}>
+                <ChampionName profile={uB} name={uB.name} style={{ fontSize: 12, fontWeight: 600 }} />
+                <TitleBadges profile={uB} size={12} />
+              </div>
               <div style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--blue)" }}>{uB.pts} pts</div>
             </div>
           </div>
@@ -1760,17 +1777,73 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     });
     const pathD = points.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
     const others = profiles.filter(p => p.id !== prof.id);
+    const profTitles = prof.titles || [];
+    const profAchievements = userAchievements[prof.id] || new Set();
+    const unlockedAchs = ACHIEVEMENTS.filter(a => profAchievements.has(a.key));
 
     return (
       <div className="modal-overlay" onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }}>
         <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
+          {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className="avatar">{initials(prof.name)}</div>
-              <div><div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", letterSpacing: 1 }}>{prof.name}</div><div style={{ fontSize: 12, color: "var(--muted)" }}>{prof.pts} pts actuales</div></div>
+              <div className={`avatar ${championAvatarClass(prof)}`}>{initials(prof.name)}</div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <ChampionName profile={prof} name={prof.name} style={{ fontFamily: "Bebas Neue", fontSize: 20, letterSpacing: 1 }} />
+                  <TitleBadges profile={prof} size={16} />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{prof.pts} pts actuales</div>
+              </div>
             </div>
             <button onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
           </div>
+
+          {/* Títulos anteriores */}
+          {profTitles.length > 0 && (
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, border: "1px solid rgba(245,183,49,.2)" }}>
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Títulos anteriores</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {profTitles.map((t, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span>{t.position === 1 ? "👑" : "🥈"}</span>
+                    <span style={{ color: t.position === 1 ? "var(--gold)" : "#b0bcd0", fontWeight: 600 }}>{t.position === 1 ? "Campeón" : "Subcampeón"}</span>
+                    <span style={{ color: "var(--muted)" }}>· {t.tournament}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Logros desbloqueados */}
+          {unlockedAchs.length > 0 && (
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>
+                🏅 Logros ({unlockedAchs.length}/{ACHIEVEMENTS.length})
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {unlockedAchs.map(a => {
+                  const tier = TIER_COLORS[a.tier];
+                  const isEquipped = prof.equipped_badge === a.key;
+                  return (
+                    <div key={a.key} title={a.name + " — " + a.desc} style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "3px 8px", borderRadius: 20,
+                      background: tier.bg, border: `1px solid ${tier.border}`,
+                      fontSize: 12, color: tier.color,
+                      boxShadow: isEquipped ? `0 0 8px ${tier.border}` : "none",
+                    }}>
+                      <span>{a.icon}</span>
+                      <span style={{ fontSize: 10 }}>{a.name}</span>
+                      {isEquipped && <span style={{ fontSize: 9 }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Comparar */}
           {others.length > 0 && (
             <div style={{ marginBottom: 14 }}>
               {!showH2hPicker ? (
@@ -1781,8 +1854,9 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {others.map(o => (
                       <button key={o.id} onClick={() => openH2h(o)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", color: "var(--txt)", fontSize: 13 }}>
-                        <div className="avatar sm">{initials(o.name)}</div>
-                        <span>{o.name}</span>
+                        <div className={`avatar sm ${championAvatarClass(o)}`}>{initials(o.name)}</div>
+                        <ChampionName profile={o} name={o.name} />
+                        <TitleBadges profile={o} size={12} />
                         <span style={{ marginLeft: "auto", fontFamily: "Bebas Neue", fontSize: 14, color: "var(--muted)" }}>{calcPts(o.id)} pts</span>
                       </button>
                     ))}
@@ -1792,6 +1866,8 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
               )}
             </div>
           )}
+
+          {/* Snapshots */}
           {loadingSnaps ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>Cargando...</div>
           ) : userSnaps.length === 0 ? (
@@ -2054,7 +2130,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
 }
 
 // ── Titles Admin ─────────────────────────────────────────────────────────────
-const TOURNAMENTS = ["Qatar 2022", "Copa América 2024", "Euro 2024", "Champions 2024", "Primer Campeón"];
+const TOURNAMENTS = ["Qatar 2022", "Copa América & Euro 2024", "Champions 2024", "Mundial de Clubes 2025", "Primer Campeón"];
 
 function TitlesAdmin({ profiles, onRefresh }) {
   const [selectedUser, setSelectedUser] = useState("");
