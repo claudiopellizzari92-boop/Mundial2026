@@ -809,7 +809,7 @@ function Matches({ user, matches, predictions, onSave }) {
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                  <span className="group-badge">Grupo {m.group_name}</span>
+                  <span className="group-badge">{m.group_name ? `Grupo ${m.group_name}` : m.phase}</span>
                   <span className="match-meta">{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
                   {hasWildcard && <span style={{fontSize:14}}>🃏</span>}
                 </div>
@@ -1287,7 +1287,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
               <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
                 <div onClick={() => toggleExpand(m.id)} style={{ padding: "12px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="group-badge">Grupo {m.group_name}</span>
+                    <span className="group-badge">{m.group_name ? `Grupo ${m.group_name}` : m.phase}</span>
                     <span style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
                       <img src={m.home_flag} alt={m.home} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />{m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}<img src={m.away_flag} alt={m.away} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
                     </span>
