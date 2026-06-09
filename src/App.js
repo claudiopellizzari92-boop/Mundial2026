@@ -478,6 +478,10 @@ function DebtorOverlay({ profile, onDismiss }) {
 function DebtorVideoPopup({ profile, videoIndex, onClose }) {
   const [canClose, setCanClose] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [playing, setPlaying] = useState(false);
+  const videoRef = React.useRef(null);
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
   const days = profile.debt_since
     ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
     : 0;
@@ -485,15 +489,30 @@ function DebtorVideoPopup({ profile, videoIndex, onClose }) {
     .replace("{days}", days)
     .replace("{amount}", profile.debt_amount || "?");
 
-  useEffect(() => {
+  // Arrancar countdown cuando empieza a reproducir
+  function startCountdown() {
+    setPlaying(true);
     const interval = setInterval(() => {
       setCountdown(c => {
         if (c <= 1) { setCanClose(true); clearInterval(interval); return 0; }
         return c - 1;
       });
     }, 1000);
-    return () => clearInterval(interval);
+  }
+
+  useEffect(() => {
+    if (!isMobile) {
+      // Desktop: arrancar automático y countdown
+      startCountdown();
+    }
   }, []);
+
+  function handlePlay() {
+    if (videoRef.current) {
+      videoRef.current.play();
+      startCountdown();
+    }
+  }
 
   return (
     <div style={{
@@ -510,12 +529,31 @@ function DebtorVideoPopup({ profile, videoIndex, onClose }) {
       }}>{msg}</div>
 
       {/* Video */}
-      <div style={{ width: "100%", maxWidth: 400, borderRadius: 12, overflow: "hidden", border: "2px solid var(--red)", marginBottom: 16 }}>
+      <div style={{ width: "100%", maxWidth: 400, borderRadius: 12, overflow: "hidden", border: "2px solid var(--red)", marginBottom: 16, position: "relative" }}>
         <video
+          ref={videoRef}
           src={DEBTOR_VIDEOS[videoIndex % DEBTOR_VIDEOS.length]}
-          autoPlay playsInline
+          autoPlay={!isMobile}
+          playsInline
           style={{ width: "100%", display: "block" }}
         />
+        {/* Botón play manual en móvil */}
+        {isMobile && !playing && (
+          <div
+            onClick={handlePlay}
+            style={{
+              position: "absolute", inset: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,.5)", cursor: "pointer",
+            }}
+          >
+            <div style={{
+              width: 60, height: 60, borderRadius: "50%",
+              background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 24, boxShadow: "0 0 20px rgba(255,77,109,.6)",
+            }}>▶️</div>
+          </div>
+        )}
       </div>
 
       {/* Contador / botón cerrar */}
@@ -533,8 +571,10 @@ function DebtorVideoPopup({ profile, videoIndex, onClose }) {
           border: "1px solid rgba(255,77,109,.3)", borderRadius: 10,
           color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
         }}>
-          <div style={{ width: 16, height: 16, border: "2px solid var(--red)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
-          Podés cerrar en {countdown}s...
+          {playing
+            ? <><div style={{ width: 16, height: 16, border: "2px solid var(--red)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Podés cerrar en {countdown}s...</>
+            : <span>👆 Tocá el video para reproducir</span>
+          }
         </div>
       )}
     </div>
