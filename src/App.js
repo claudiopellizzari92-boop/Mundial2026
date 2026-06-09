@@ -518,7 +518,7 @@ function PreTournament({ user }) {
                       <option value="">— Seleccionar —</option>
                       {teams.map(t => (
                         <option key={t.name} value={t.name} disabled={Object.values(preds).includes(t.name) && preds[pos] !== t.name}>
-                          {t.flag} {t.name}
+                          {t.name}
                         </option>
                       ))}
                     </select>
