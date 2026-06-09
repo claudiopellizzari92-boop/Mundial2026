@@ -193,6 +193,19 @@ input,button,select{font-family:inherit;}
 .spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes slideUp{from{opacity:0;transform:translate(-50%,20px);}to{opacity:1;transform:translate(-50%,0);}}
+@keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
+@keyframes popIn{0%{transform:scale(.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+.light-mode{
+  --bg:#f0f2f7;--surface:#ffffff;--card:#ffffff;--card2:#f5f7fc;
+  --border:#dde2ee;--border2:#c8cfdf;
+  --gold:#d4920a;--gold2:#b87c08;--gold-dim:rgba(212,146,10,.1);
+  --green:#16a85a;--green-dim:rgba(22,168,90,.1);
+  --red:#e03050;--red-dim:rgba(224,48,80,.1);
+  --blue:#2478e8;--muted:#8892a4;--txt:#1a2035;
+}
+.theme-toggle{padding:6px 10px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:14px;cursor:pointer;transition:all .2s;}
+.theme-toggle:hover{border-color:var(--gold);color:var(--gold);}
+.confetti-piece{position:fixed;width:8px;height:8px;top:-10px;z-index:9999;pointer-events:none;animation:confettiFall linear forwards;border-radius:2px;}
 
 /* ── Mobile ── */
 .hamburger{display:none;flex-direction:column;gap:5px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;cursor:pointer;padding:9px 11px;}
@@ -334,6 +347,66 @@ function isLocked(kickoff, allMatches) {
   const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
   const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
   return new Date() >= deadline;
+}
+
+// ── Confetti ──────────────────────────────────────────────────────────────────
+function Confetti({ onDone }) {
+  const colors = ["#f5b731","#2adf7a","#4a9eff","#ff4d6d","#fff","#e09820"];
+  const pieces = Array.from({ length: 60 }, (_, i) => ({
+    id: i, color: colors[i % colors.length],
+    left: Math.random() * 100, delay: Math.random() * 1.5,
+    duration: 2 + Math.random() * 2, size: 6 + Math.random() * 8,
+    shape: Math.random() > 0.5 ? "50%" : "2px",
+  }));
+  useEffect(() => { const t = setTimeout(onDone, 4000); return () => clearTimeout(t); }, []);
+  return (<>{pieces.map(p => (
+    <div key={p.id} className="confetti-piece" style={{
+      left: `${p.left}%`, background: p.color,
+      width: p.size, height: p.size, borderRadius: p.shape,
+      animationDuration: `${p.duration}s`, animationDelay: `${p.delay}s`,
+    }}/>
+  ))}</>);
+}
+
+// ── Countdown animado ─────────────────────────────────────────────────────────
+function MatchCountdown({ kickoff, matches: allMatches }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  const [urgent, setUrgent] = useState(false);
+
+  useEffect(() => {
+    function calc() {
+      const matchDate = new Date(kickoff).toISOString().slice(0, 10);
+      const sameDayMatches = (allMatches || []).filter(m =>
+        new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate
+      );
+      const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
+      const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
+      const diff = deadline - new Date();
+      if (diff <= 0) { setTimeLeft(null); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setUrgent(diff < 30 * 60 * 1000);
+      if (h > 0) setTimeLeft(`${h}h ${m}m`);
+      else if (m > 0) setTimeLeft(`${m}m ${s}s`);
+      else setTimeLeft(`${s}s`);
+    }
+    calc();
+    const t = setInterval(calc, 1000);
+    return () => clearInterval(t);
+  }, [kickoff]);
+
+  if (!timeLeft) return null;
+  return (
+    <span style={{
+      fontSize: 10, padding: "1px 7px", borderRadius: 20,
+      background: urgent ? "var(--red-dim)" : "var(--gold-dim)",
+      color: urgent ? "var(--red)" : "var(--gold)",
+      border: `1px solid ${urgent ? "rgba(255,77,109,.3)" : "rgba(245,183,49,.3)"}`,
+      fontFamily: "Bebas Neue", letterSpacing: .5,
+      animation: urgent ? "popIn .3s ease" : "none",
+    }}>⏱ {timeLeft}</span>
+  );
 }
 
 // ── Achievements System ───────────────────────────────────────────────────────
@@ -677,6 +750,163 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
           {expanded ? "▲ Ver menos" : `▼ Ver todos (${filtered.length - 6} más)`}
         </button>
       )}
+    </div>
+  );
+}
+
+// ── Deep Stats (equipo favorito, mapa de calor, pred vs realidad) ─────────────
+function StatsDeep({ user, matches, predictions }) {
+  const myPreds = predictions.filter(p => p.user_id === user.id);
+  const finished = myPreds
+    .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
+    .filter(p => p.match && p.match.status === "finished" && p.points !== null);
+
+  // ── Equipo favorito ──────────────────────────────────────────────────────
+  const teamStats = {};
+  finished.forEach(p => {
+    const m = p.match;
+    [m.home, m.away].forEach((team, idx) => {
+      if (!teamStats[team]) teamStats[team] = { correct: 0, total: 0, flag: idx === 0 ? m.home_flag : m.away_flag };
+      teamStats[team].total++;
+      if (p.points > 0) teamStats[team].correct++;
+    });
+  });
+  const bestTeam = Object.entries(teamStats)
+    .filter(([, s]) => s.total >= 2)
+    .map(([name, s]) => ({ name, ...s, pct: Math.round(s.correct / s.total * 100) }))
+    .sort((a, b) => b.pct - a.pct || b.total - a.total)[0];
+
+  // ── Mapa de calor por grupo ──────────────────────────────────────────────
+  const groupStats = {};
+  finished.forEach(p => {
+    const g = p.match.group_name;
+    if (!g) return;
+    if (!groupStats[g]) groupStats[g] = { correct: 0, total: 0 };
+    groupStats[g].total++;
+    if (p.points > 0) groupStats[g].correct++;
+  });
+  const maxGroupPct = Math.max(...Object.values(groupStats).map(s => s.total > 0 ? s.correct / s.total : 0), 0.01);
+
+  // ── Pred vs Realidad (últimos 10) ────────────────────────────────────────
+  const lastTen = finished.slice(-10);
+
+  if (finished.length === 0) return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
+      <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>📊 ANÁLISIS DETALLADO</div>
+      <div style={{ fontSize: 13, color: "var(--muted)" }}>Disponible cuando haya partidos finalizados con tus predicciones.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
+      <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>📊 ANÁLISIS DETALLADO</div>
+
+      {/* Equipo favorito */}
+      {bestTeam && (
+        <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>⭐ Tu equipo favorito</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src={bestTeam.flag} alt={bestTeam.name} style={{ width: 32, height: 24, objectFit: "cover", borderRadius: 3 }} />
+            <div>
+              <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)" }}>{bestTeam.name}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>Acertás el <strong style={{ color: "var(--green)" }}>{bestTeam.pct}%</strong> de sus partidos ({bestTeam.correct}/{bestTeam.total})</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mapa de calor por grupo */}
+      {Object.keys(groupStats).length > 0 && (
+        <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>🌡️ Mapa de calor por grupo</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+            {Object.entries(groupStats).sort().map(([g, s]) => {
+              const pct = s.total > 0 ? s.correct / s.total : 0;
+              const intensity = pct / maxGroupPct;
+              const bg = `rgba(${Math.round(245 - intensity * 200)},${Math.round(80 + intensity * 143)},${Math.round(49 + intensity * 24)},${0.2 + intensity * 0.6})`;
+              return (
+                <div key={g} style={{ background: bg, borderRadius: 8, padding: "8px 6px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--txt)" }}>G{g}</div>
+                  <div style={{ fontSize: 10, color: "var(--txt)", opacity: .8 }}>{s.correct}/{s.total}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--txt)" }}>{Math.round(pct * 100)}%</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "rgba(245,80,49,.3)", width: 14, height: 14, borderRadius: 3 }} />
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>Bajo</span>
+            <div style={{ background: "rgba(45,223,73,.8)", width: 14, height: 14, borderRadius: 3 }} />
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>Alto</span>
+          </div>
+        </div>
+      )}
+
+      {/* Predicción vs Realidad */}
+      {lastTen.length > 0 && (
+        <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>🎯 Predicción vs Realidad (últimos {lastTen.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {lastTen.map((p, i) => {
+              const m = p.match;
+              const isExact = p.home_score === m.home_score && p.away_score === m.away_score;
+              const predResult = p.home_score > p.away_score ? "H" : p.away_score > p.home_score ? "A" : "D";
+              const realResult = m.home_score > m.away_score ? "H" : m.away_score > m.home_score ? "A" : "D";
+              const isCorrect = predResult === realResult;
+              const color = isExact ? "var(--gold)" : isCorrect ? "var(--green)" : "var(--red)";
+              return (
+                <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 1fr", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: i < lastTen.length - 1 ? "1px solid var(--border)" : "none" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.home}</div>
+                  <div style={{ fontFamily: "Bebas Neue", fontSize: 15, color: "var(--muted)", textAlign: "center" }}>{p.home_score}–{p.away_score}</div>
+                  <div style={{ fontSize: 14, textAlign: "center" }}>{isExact ? "⭐" : isCorrect ? "✅" : "❌"}</div>
+                  <div style={{ fontFamily: "Bebas Neue", fontSize: 15, color, textAlign: "center" }}>{m.home_score}–{m.away_score}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.away}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 12, marginTop: 10, fontSize: 11, color: "var(--muted)", justifyContent: "center" }}>
+            <span>⭐ Exacto</span><span>✅ Correcto</span><span>❌ Falló</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Hall of Fame ───────────────────────────────────────────────────────────────
+function HallOfFame({ profiles, predictions, snapshots, allAchievements }) {
+  const rows = profiles.map(p => {
+    const preds = predictions.filter(pr => pr.user_id === p.id);
+    const pts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
+    const exact = preds.filter(pr => pr.points >= 3).length;
+    const userSnaps = (snapshots || []).filter(s => s.user_id === p.id);
+    const daysFirst = userSnaps.filter(s => s.position === 1).length;
+    return { ...p, pts, exact, daysFirst };
+  }).sort((a, b) => b.pts - a.pts);
+
+  const categories = [
+    { label: "🏆 Más puntos", key: "pts", winner: [...rows].sort((a,b) => b.pts - a.pts)[0] },
+    { label: "⭐ Más exactos", key: "exact", winner: [...rows].sort((a,b) => b.exact - a.exact)[0] },
+    { label: "👑 Días en 1°", key: "daysFirst", winner: [...rows].sort((a,b) => b.daysFirst - a.daysFirst)[0] },
+  ];
+
+  return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
+      <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>🌟 HALL OF FAME</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {categories.map(cat => cat.winner && (
+          <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontFamily: "Bebas Neue", fontSize: 14, color: "var(--gold)", minWidth: 110 }}>{cat.label}</div>
+            <div className="avatar sm">{initials(cat.winner.name)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.winner.name}</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>{cat.winner[cat.key]} {cat.key === "pts" ? "pts" : cat.key === "exact" ? "exactos" : "días"}</div>
+            </div>
+            {cat.winner.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === cat.winner.equipped_badge); return a ? <span style={{ fontSize: 20 }}>{a.icon}</span> : null; })()}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1066,6 +1296,9 @@ function Matches({ user, matches, predictions, onSave }) {
   const [savingWildcard, setSavingWildcard] = useState({});
   const [maxWildcards, setMaxWildcards] = useState(4);
   const [wildcardCost, setWildcardCost] = useState(1);
+  const [history, setHistory] = useState({});
+  const [showHistory, setShowHistory] = useState({});
+  const [polls, setPolls] = useState({});
 
   useEffect(() => {
     const init = {};
@@ -1083,6 +1316,31 @@ function Matches({ user, matches, predictions, onSave }) {
         if (costW) setWildcardCost(costW.rule_value);
       }
     });
+    // Cargar historial de cambios
+    sb.from("prediction_history").select("*").eq("user_id", user.id).order("changed_at", { ascending: false })
+      .then(({ data }) => {
+        if (!data) return;
+        const h = {};
+        data.forEach(r => {
+          if (!h[r.match_id]) h[r.match_id] = [];
+          h[r.match_id].push(r);
+        });
+        setHistory(h);
+      });
+    // Cargar encuestas (todas las predicciones para calcular % de ganador)
+    sb.from("predictions").select("match_id, home_score, away_score")
+      .then(({ data }) => {
+        if (!data) return;
+        const p = {};
+        data.forEach(pr => {
+          if (!p[pr.match_id]) p[pr.match_id] = { home: 0, away: 0, draw: 0, total: 0 };
+          p[pr.match_id].total++;
+          if (pr.home_score > pr.away_score) p[pr.match_id].home++;
+          else if (pr.away_score > pr.home_score) p[pr.match_id].away++;
+          else p[pr.match_id].draw++;
+        });
+        setPolls(p);
+      });
   }, [user.id]);
 
   function setScore(matchId, side, val) {
@@ -1096,10 +1354,17 @@ function Matches({ user, matches, predictions, onSave }) {
     if (sc.home===undefined||sc.away===undefined||sc.home===""||sc.away==="") return;
     setSaving(s => ({ ...s, [match.id]: true }));
     const existing = predictions.find(p => p.match_id === match.id);
+    const homeScore = parseInt(sc.home);
+    const awayScore = parseInt(sc.away);
     if (existing) {
-      await sb.from("predictions").update({ home_score: parseInt(sc.home), away_score: parseInt(sc.away), updated_at: new Date().toISOString() }).eq("id", existing.id);
+      // Guardar historial antes de actualizar
+      await sb.from("prediction_history").insert({
+        prediction_id: existing.id, user_id: user.id, match_id: match.id,
+        home_score: existing.home_score, away_score: existing.away_score,
+      });
+      await sb.from("predictions").update({ home_score: homeScore, away_score: awayScore, updated_at: new Date().toISOString() }).eq("id", existing.id);
     } else {
-      await sb.from("predictions").insert({ user_id: user.id, match_id: match.id, home_score: parseInt(sc.home), away_score: parseInt(sc.away) });
+      await sb.from("predictions").insert({ user_id: user.id, match_id: match.id, home_score: homeScore, away_score: awayScore });
     }
     setSaved(s => ({ ...s, [match.id]: true }));
     setSaving(s => ({ ...s, [match.id]: false }));
@@ -1155,10 +1420,11 @@ function Matches({ user, matches, predictions, onSave }) {
             <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor: hasWildcard ? "var(--gold)" : undefined, borderWidth: hasWildcard ? 2 : undefined}}>
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
-                <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
                   <span className="group-badge">{m.group_name ? `Grupo ${m.group_name}` : m.phase}</span>
                   <span className="match-meta">{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
                   {hasWildcard && <span style={{fontSize:14}}>🃏</span>}
+                  {!locked && <MatchCountdown kickoff={m.kickoff_at} matches={matches} />}
                 </div>
                 {locked ? (
                   myPred
@@ -1191,6 +1457,46 @@ function Matches({ user, matches, predictions, onSave }) {
                   >
                     {savingWildcard[m.id] ? "..." : hasWildcard ? "🃏 Comodín activo · Cancelar" : "🃏 Usar comodín (-" + wildcardCost + "pt)"}
                   </button>
+                )}
+                {/* Encuesta: % de quién gana según predicciones */}
+                {polls[m.id] && polls[m.id].total >= 2 && (
+                  <div style={{width:"100%",marginTop:4}}>
+                    {(() => {
+                      const p = polls[m.id];
+                      const homePct = Math.round(p.home/p.total*100);
+                      const drawPct = Math.round(p.draw/p.total*100);
+                      const awayPct = 100 - homePct - drawPct;
+                      return (
+                        <div style={{fontSize:9,color:"var(--muted)",display:"flex",gap:2,alignItems:"center"}}>
+                          <span style={{color:"var(--txt)",minWidth:24,textAlign:"right"}}>{homePct}%</span>
+                          <div style={{flex:1,height:4,background:"var(--border)",borderRadius:20,overflow:"hidden",display:"flex"}}>
+                            <div style={{width:`${homePct}%`,background:"var(--blue)",transition:"width .5s"}}/>
+                            <div style={{width:`${drawPct}%`,background:"var(--muted)",transition:"width .5s"}}/>
+                            <div style={{width:`${awayPct}%`,background:"var(--red)",transition:"width .5s"}}/>
+                          </div>
+                          <span style={{color:"var(--txt)",minWidth:24}}>{awayPct}%</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+                {/* Historial de cambios */}
+                {history[m.id] && history[m.id].length > 0 && (
+                  <div style={{width:"100%",marginTop:2}}>
+                    <button onClick={() => setShowHistory(s => ({...s,[m.id]:!s[m.id]}))} style={{background:"none",border:"none",color:"var(--muted)",fontSize:10,cursor:"pointer",padding:0}}>
+                      {showHistory[m.id] ? "▲" : "▼"} {history[m.id].length} cambio{history[m.id].length!==1?"s":""}
+                    </button>
+                    {showHistory[m.id] && (
+                      <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
+                        {history[m.id].slice(0,5).map((h,i) => (
+                          <div key={i} style={{fontSize:10,color:"var(--muted)",display:"flex",gap:6,alignItems:"center"}}>
+                            <span style={{fontFamily:"Bebas Neue",fontSize:12,color:"var(--border2)"}}>{h.home_score}–{h.away_score}</span>
+                            <span>{new Date(h.changed_at).toLocaleDateString("es",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="team away"><img className="team-flag" src={m.away_flag} alt={m.away}/><span className="team-name">{m.away}</span></div>
@@ -2249,6 +2555,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifDebug, setNotifDebug] = useState("");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [lastRank, setLastRank] = useState(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
   const [equippedBadge, setEquippedBadge] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -2258,6 +2567,24 @@ export default function App() {
   const [prePreds, setPrePreds] = useState([]);
 
   function goTab(t) { setTab(t); setMenuOpen(false); }
+
+  function toggleTheme() {
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }
+
+  // Confetti cuando subís en la tabla
+  useEffect(() => {
+    if (!profiles.length || !allPredictions.length) return;
+    const myPts = allPredictions.filter(p => p.user_id === user?.id).reduce((s,p) => s+(p.points||0),0);
+    const rank = profiles.map(p => ({
+      id: p.id,
+      pts: allPredictions.filter(pr => pr.user_id === p.id).reduce((s,pr) => s+(pr.points||0),0)
+    })).sort((a,b) => b.pts-a.pts).findIndex(p => p.id === user?.id) + 1;
+    if (lastRank !== null && rank < lastRank && rank > 0) setShowConfetti(true);
+    if (rank > 0) setLastRank(rank);
+  }, [allPredictions]);
 
   // ── FIX iOS: Register SW + guard Notification API ──────────────────────────
   useEffect(() => {
@@ -2467,11 +2794,12 @@ export default function App() {
   if (!user) return (<><style>{css}</style><AuthScreen onAuth={setUser}/></>);
 
   return (<><style>{css}</style>
-    <div className="shell">
+    <div className={`shell${darkMode ? "" : " light-mode"}`}>
+      {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -2479,6 +2807,7 @@ export default function App() {
         <div className="nav-user">
           <div className="avatar">{initials(user.profile?.name||user.email)}</div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
+          <button className="theme-toggle desktop-only" onClick={toggleTheme} title={darkMode ? "Modo claro" : "Modo oscuro"}>{darkMode ? "☀️" : "🌙"}</button>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
           {notifStatus !== "unsupported" && notifStatus !== "granted" && (
             <button className="desktop-only" onClick={enableNotifications} disabled={notifStatus === "requesting" || notifStatus === "denied"} style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}>
@@ -2492,7 +2821,7 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -2519,6 +2848,7 @@ export default function App() {
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
+        {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
