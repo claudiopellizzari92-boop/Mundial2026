@@ -1323,7 +1323,10 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).slice(0,5).map((m,i,arr) => (
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
           <span style={{fontSize:13,display:"flex",alignItems:"center",gap:6}}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{color:"var(--muted)"}}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
-          <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap",marginLeft:8}}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:8}}>
+            <MatchCountdown kickoff={m.kickoff_at} matches={matches} />
+            <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap"}}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
+          </div>
         </div>
       ))}
       {pending===0 && <div style={{padding:"20px 18px",color:"var(--muted)",fontSize:14}}>¡Todos los partidos disponibles ya tienen predicción! 🎉</div>}
