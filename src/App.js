@@ -194,6 +194,13 @@ input,button,select{font-family:inherit;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes slideUp{from{opacity:0;transform:translate(-50%,20px);}to{opacity:1;transform:translate(-50%,0);}}
 @keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
+@keyframes championGlow{0%,100%{text-shadow:0 0 8px rgba(245,183,49,.9),0 0 20px rgba(245,183,49,.5),0 0 40px rgba(245,183,49,.3);}50%{text-shadow:0 0 16px rgba(245,183,49,1),0 0 40px rgba(245,183,49,.8),0 0 80px rgba(245,183,49,.5);}}
+@keyframes silverGlow{0%,100%{text-shadow:0 0 8px rgba(192,192,192,.9),0 0 20px rgba(192,192,192,.5),0 0 40px rgba(192,192,192,.3);}50%{text-shadow:0 0 16px rgba(220,220,220,1),0 0 40px rgba(192,192,192,.8),0 0 80px rgba(192,192,192,.4);}}
+@keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
+.champion-name{background:linear-gradient(90deg,#f5b731,#ffe066,#f5b731,#e09820,#f5b731);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2.5s linear infinite,championGlow 2s ease-in-out infinite;font-weight:700;}
+.silver-name{background:linear-gradient(90deg,#b0bcd0,#e8edf5,#b0bcd0,#8899aa,#b0bcd0);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2.5s linear infinite,silverGlow 2s ease-in-out infinite;font-weight:700;}
+.champion-avatar{box-shadow:0 0 0 2px #f5b731,0 0 12px rgba(245,183,49,.6);}
+.silver-avatar{box-shadow:0 0 0 2px #b0bcd0,0 0 12px rgba(176,188,208,.6);}
 @keyframes popIn{0%{transform:scale(.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
 .light-mode{
   --bg:#f0f2f7;--surface:#ffffff;--card:#ffffff;--card2:#f5f7fc;
@@ -337,6 +344,43 @@ input,button,select{font-family:inherit;}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+// ── Title helpers ─────────────────────────────────────────────────────────────
+function getTitleInfo(profile) {
+  const titles = profile?.titles || [];
+  const wins = titles.filter(t => t.position === 1).length;
+  const silvers = titles.filter(t => t.position === 2).length;
+  return { wins, silvers, titles };
+}
+
+function TitleBadges({ profile, size = 14 }) {
+  const { wins, silvers } = getTitleInfo(profile);
+  if (!wins && !silvers) return null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+      {Array.from({ length: Math.min(wins, 4) }).map((_, i) => (
+        <span key={"w"+i} style={{ fontSize: size, filter: "drop-shadow(0 0 4px rgba(245,183,49,.8))" }}>👑</span>
+      ))}
+      {Array.from({ length: Math.min(silvers, 4) }).map((_, i) => (
+        <span key={"s"+i} style={{ fontSize: size, filter: "drop-shadow(0 0 4px rgba(176,188,208,.8))" }}>🥈</span>
+      ))}
+    </span>
+  );
+}
+
+function ChampionName({ profile, name, style = {} }) {
+  const { wins, silvers } = getTitleInfo(profile);
+  if (wins > 0) return <span className="champion-name" style={style}>{name}</span>;
+  if (silvers > 0) return <span className="silver-name" style={style}>{name}</span>;
+  return <span style={style}>{name}</span>;
+}
+
+function championAvatarClass(profile) {
+  const { wins, silvers } = getTitleInfo(profile);
+  if (wins > 0) return "champion-avatar";
+  if (silvers > 0) return "silver-avatar";
+  return "";
+}
 
 function isLocked(kickoff, allMatches) {
   const matchDate = new Date(kickoff).toISOString().slice(0, 10);
@@ -1794,7 +1838,15 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
               <td><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id === user.id && <span className="me-badge">TÚ</span>}{row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}</div></td>
+              <td>
+                <div className="user-cell">
+                  <div className={`avatar sm ${championAvatarClass(row)}`}>{initials(row.name)}</div>
+                  <ChampionName profile={row} name={row.name} />
+                  <TitleBadges profile={row} size={13} />
+                  {row.id === user.id && <span className="me-badge">TÚ</span>}
+                  {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
+                </div>
+              </td>
               <td className="c"><span className="pts-big">{row.pts}</span></td>
               <td className="c"><span className="pill">{row.exact}</span></td>
               <td className="c"><span className="pill">{row.result}</span></td>
@@ -1957,7 +2009,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     const isMe = prof.id === user.id;
                     return (
                       <div key={prof.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px", borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div className="avatar sm">{initials(prof.name)}</div><span style={{ fontSize: 13 }}>{prof.name}</span>{isMe && <span className="me-badge">TÚ</span>}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div className={`avatar sm ${championAvatarClass(prof)}`}>{initials(prof.name)}</div><ChampionName profile={prof} name={prof.name} style={{fontSize:13}}/><TitleBadges profile={prof} size={12}/>{isMe && <span className="me-badge">TÚ</span>}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           {pred ? (<>{resultIcon(pred, m)}<span style={{ fontFamily: "Bebas Neue", fontSize: 18 }}>{pred.home_score}–{pred.away_score}</span>{pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points}</span>}</>) : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin pred.</span>}
                         </div>
@@ -1999,6 +2051,107 @@ function Compare({ user, matches, allPredictions, profiles }) {
       )}
     </>)}
   </>);
+}
+
+// ── Titles Admin ─────────────────────────────────────────────────────────────
+const TOURNAMENTS = ["Qatar 2022", "Copa América 2024", "Euro 2024", "Champions 2024", "Primer Campeón"];
+
+function TitlesAdmin({ profiles, onRefresh }) {
+  const [selectedUser, setSelectedUser] = useState("");
+  const [tournament, setTournament] = useState(TOURNAMENTS[0]);
+  const [position, setPosition] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function addTitle() {
+    if (!selectedUser) return;
+    setSaving(true); setMsg(null);
+    const prof = profiles.find(p => p.id === selectedUser);
+    const current = prof?.titles || [];
+    const updated = [...current, { tournament, position: parseInt(position) }];
+    await sb.from("profiles").update({ titles: updated }).eq("id", selectedUser);
+    setMsg({ type: "ok", text: `✅ Título agregado a ${prof.name}` });
+    setSaving(false);
+    onRefresh();
+    setTimeout(() => setMsg(null), 3000);
+  }
+
+  async function removeTitle(userId, index) {
+    const prof = profiles.find(p => p.id === userId);
+    const updated = (prof?.titles || []).filter((_, i) => i !== index);
+    await sb.from("profiles").update({ titles: updated }).eq("id", userId);
+    onRefresh();
+  }
+
+  const titledProfiles = profiles.filter(p => p.titles?.length > 0);
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-hdr"><h3>🏆 TÍTULOS ANTERIORES</h3></div>
+      <div className="admin-section-body">
+        {/* Agregar título */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, marginBottom: 16, alignItems: "end" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>JUGADOR</div>
+            <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}>
+              <option value="">— Seleccionar —</option>
+              {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>TORNEO</div>
+            <select value={tournament} onChange={e => setTournament(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}>
+              {TOURNAMENTS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>POSICIÓN</div>
+            <select value={position} onChange={e => setPosition(e.target.value)}
+              style={{ padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}>
+              <option value={1}>👑 1ro</option>
+              <option value={2}>🥈 2do</option>
+            </select>
+          </div>
+          <button className="btn-small" onClick={addTitle} disabled={saving || !selectedUser}
+            style={{ background: "var(--gold-dim)", borderColor: "var(--gold)", color: "var(--gold)" }}>
+            {saving ? "..." : "+ Agregar"}
+          </button>
+        </div>
+        {msg && <div style={{ fontSize: 12, color: "var(--green)", marginBottom: 12 }}>{msg.text}</div>}
+
+        {/* Lista de títulos actuales */}
+        {titledProfiles.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>Ningún jugador tiene títulos asignados aún.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {titledProfiles.map(prof => (
+              <div key={prof.id} style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div className={`avatar sm ${championAvatarClass(prof)}`}>{initials(prof.name)}</div>
+                  <ChampionName profile={prof} name={prof.name} style={{ fontSize: 14, fontWeight: 600 }} />
+                  <TitleBadges profile={prof} size={14} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {(prof.titles || []).map((t, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "var(--card)", borderRadius: 6 }}>
+                      <span style={{ fontSize: 12 }}>
+                        {t.position === 1 ? "👑" : "🥈"} <span style={{ color: t.position === 1 ? "var(--gold)" : "#b0bcd0" }}>{t.position === 1 ? "Campeón" : "Subcampeón"}</span>
+                        <span style={{ color: "var(--muted)", marginLeft: 6 }}>{t.tournament}</span>
+                      </span>
+                      <button onClick={() => removeTitle(prof.id, i)}
+                        style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer", padding: "2px 6px" }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
@@ -2506,6 +2659,10 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           </div>
         </div>
       </div>
+
+      {/* ── Títulos ── */}
+      <TitlesAdmin profiles={profiles} onRefresh={onRefresh} />
+
     </div>
   );
 }
