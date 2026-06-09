@@ -591,19 +591,22 @@ function AchievementToast({ achievement, onClose }) {
 // Sección de logros para el Dashboard
 function AchievementsSection({ userId, achievements: unlocked, equippedBadge, onEquip }) {
   const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(false);
   const filtered = filter === "all" ? ACHIEVEMENTS
     : filter === "unlocked" ? ACHIEVEMENTS.filter(a => unlocked.has(a.key))
     : ACHIEVEMENTS.filter(a => !unlocked.has(a.key));
+  const visible = expanded ? filtered : filtered.slice(0, 6);
 
   return (
-    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "16px", marginBottom: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1 }}>
-          🏆 LOGROS ({unlocked.size}/{ACHIEVEMENTS.length})
+          🏆 LOGROS <span style={{ fontSize: 13, color: "var(--muted)", fontFamily: "DM Sans" }}>({unlocked.size}/{ACHIEVEMENTS.length})</span>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
-          {[["all","Todos"],["unlocked","Obtenidos"],["locked","Bloqueados"]].map(([k,l]) => (
-            <button key={k} onClick={() => setFilter(k)} style={{
+          {[["all","Todos"],["unlocked","✓"],["locked","🔒"]].map(([k,l]) => (
+            <button key={k} onClick={() => { setFilter(k); setExpanded(false); }} style={{
               padding: "3px 10px", borderRadius: 20, border: "1px solid",
               borderColor: filter === k ? "var(--gold)" : "var(--border)",
               background: filter === k ? "var(--gold-dim)" : "none",
@@ -615,52 +618,65 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
       </div>
 
       {/* Progreso */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", marginBottom: 5 }}>
-          <span>Progreso total</span>
-          <span>{Math.round(unlocked.size / ACHIEVEMENTS.length * 100)}%</span>
-        </div>
-        <div style={{ background: "var(--border)", borderRadius: 20, height: 6, overflow: "hidden" }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ background: "var(--border)", borderRadius: 20, height: 5, overflow: "hidden" }}>
           <div style={{ height: "100%", borderRadius: 20, background: "linear-gradient(90deg,var(--gold),var(--gold2))", width: `${unlocked.size / ACHIEVEMENTS.length * 100}%`, transition: "width .5s" }} />
+        </div>
+        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+          {Math.round(unlocked.size / ACHIEVEMENTS.length * 100)}% completado
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
-        {filtered.map(a => {
+      {/* Lista de logros — una columna, fila horizontal compacta */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {visible.map(a => {
           const isUnlocked = unlocked.has(a.key);
           const isEquipped = equippedBadge === a.key;
           const tier = TIER_COLORS[a.tier];
           return (
             <div key={a.key} style={{
+              display: "flex", alignItems: "center", gap: 10,
               background: isUnlocked ? tier.bg : "var(--surface)",
               border: `1px solid ${isUnlocked ? tier.border : "var(--border)"}`,
               borderRadius: 10, padding: "10px 12px",
-              opacity: isUnlocked ? 1 : 0.45,
-              display: "flex", alignItems: "center", gap: 10, position: "relative",
+              opacity: isUnlocked ? 1 : 0.4,
             }}>
-              <span style={{ fontSize: 26, filter: isUnlocked ? "none" : "grayscale(1)" }}>{a.icon}</span>
+              {/* Ícono */}
+              <span style={{ fontSize: 22, flexShrink: 0, filter: isUnlocked ? "none" : "grayscale(1)" }}>{a.icon}</span>
+              {/* Texto */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isUnlocked ? tier.color : "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
-                <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.4 }}>{a.desc}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isUnlocked ? tier.color : "var(--muted)" }}>{a.name}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.3 }}>{a.desc}</div>
               </div>
-              {isUnlocked && (
+              {/* Acción */}
+              {isUnlocked ? (
                 <button onClick={() => onEquip(isEquipped ? null : a.key)} style={{
-                  padding: "3px 8px", borderRadius: 20, border: "1px solid",
+                  padding: "5px 12px", borderRadius: 20, border: "1px solid",
                   borderColor: isEquipped ? tier.color : "var(--border)",
                   background: isEquipped ? tier.bg : "none",
                   color: isEquipped ? tier.color : "var(--muted)",
-                  fontSize: 10, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                  fontSize: 11, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
                 }}>
                   {isEquipped ? "✓ Equipado" : "Equipar"}
                 </button>
-              )}
-              {!isUnlocked && (
-                <span style={{ fontSize: 14, flexShrink: 0 }}>🔒</span>
+              ) : (
+                <span style={{ fontSize: 13, flexShrink: 0, color: "var(--muted)" }}>🔒</span>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Ver más / menos */}
+      {filtered.length > 6 && (
+        <button onClick={() => setExpanded(e => !e)} style={{
+          width: "100%", marginTop: 10, padding: "8px",
+          background: "none", border: "1px solid var(--border)", borderRadius: 8,
+          color: "var(--muted)", fontSize: 12, cursor: "pointer",
+        }}>
+          {expanded ? "▲ Ver menos" : `▼ Ver todos (${filtered.length - 6} más)`}
+        </button>
+      )}
     </div>
   );
 }
