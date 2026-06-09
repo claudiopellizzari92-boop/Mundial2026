@@ -192,6 +192,7 @@ input,button,select{font-family:inherit;}
 .spinner{display:flex;align-items:center;justify-content:center;padding:80px;color:var(--muted);font-size:14px;gap:10px;}
 .spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+@keyframes slideUp{from{opacity:0;transform:translate(-50%,20px);}to{opacity:1;transform:translate(-50%,0);}}
 
 /* ── Mobile ── */
 .hamburger{display:none;flex-direction:column;gap:5px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;cursor:pointer;padding:9px 11px;}
@@ -333,6 +334,256 @@ function isLocked(kickoff, allMatches) {
   const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
   const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
   return new Date() >= deadline;
+}
+
+// ── Achievements System ───────────────────────────────────────────────────────
+const ACHIEVEMENTS = [
+  // Rendimiento
+  { key: "sniper",        icon: "🎯", name: "Francotirador",   desc: "5 marcadores exactos",                      tier: "silver" },
+  { key: "oracle",        icon: "🔮", name: "Adivino",         desc: "10 marcadores exactos",                     tier: "gold"   },
+  { key: "onfire",        icon: "🔥", name: "En llamas",       desc: "Racha de 5 predicciones correctas seguidas", tier: "silver" },
+  { key: "unstoppable",   icon: "⚡", name: "Imparable",       desc: "Racha de 10 predicciones correctas seguidas",tier: "gold"   },
+  // Participación
+  { key: "committed",     icon: "✅", name: "Comprometido",    desc: "Predecir todos los partidos de grupos",      tier: "silver" },
+  { key: "gambler",       icon: "🃏", name: "Apostador",       desc: "Usar los 4 comodines",                      tier: "silver" },
+  { key: "strategist",    icon: "📋", name: "Estratega",       desc: "Completar todas las predicciones pre-torneo",tier: "silver" },
+  { key: "globetrotter",  icon: "🌍", name: "Mundialista",     desc: "Predecir al menos 1 partido de cada grupo", tier: "bronze" },
+  { key: "earlybird",     icon: "⏰", name: "Madrugador",      desc: "Guardar una predicción 12hs antes del partido", tier: "bronze" },
+  // Posición
+  { key: "leader",        icon: "👑", name: "Líder",           desc: "Llegar al 1er lugar en algún snapshot",     tier: "gold"   },
+  { key: "podium",        icon: "🏅", name: "Podio",           desc: "Estar en top 3 en algún snapshot",          tier: "silver" },
+  { key: "champion",      icon: "🏆", name: "Campeón",         desc: "Terminar 1ro en la tabla final",            tier: "gold"   },
+  { key: "comeback",      icon: "📈", name: "Remontada",       desc: "Subir 3+ posiciones en un snapshot",        tier: "silver" },
+  // Precisión
+  { key: "drawmaster",    icon: "🤝", name: "Empate técnico",  desc: "Predecir empate y acertar 3 veces",         tier: "bronze" },
+  { key: "wildcard_ace",  icon: "🎪", name: "Comodín de oro",  desc: "Acertar exacto usando un comodín",          tier: "gold"   },
+  { key: "perfectday",    icon: "💎", name: "Día perfecto",    desc: "Acertar todos los partidos de un día",      tier: "gold"   },
+  // Divertidos
+  { key: "unlucky",       icon: "💀", name: "Sin suerte",      desc: "5 predicciones incorrectas seguidas",       tier: "bronze" },
+  { key: "iceman",        icon: "🧊", name: "Frío",            desc: "Predecir 0-0 y acertar 3 veces",           tier: "bronze" },
+];
+
+const TIER_COLORS = {
+  bronze: { bg: "rgba(205,127,50,.15)", border: "rgba(205,127,50,.4)", color: "#cd7f32" },
+  silver: { bg: "rgba(176,188,208,.15)", border: "rgba(176,188,208,.4)", color: "#b0bcd0" },
+  gold:   { bg: "rgba(245,183,49,.15)", border: "rgba(245,183,49,.4)",  color: "#f5b731" },
+};
+
+function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds, userId }) {
+  const myPreds = predictions.filter(p => p.user_id === userId);
+  const mySnaps = snapshots.filter(s => s.user_id === userId).sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  const myWildcards = wildcards.filter(w => w.user_id === userId);
+  const myPrePreds = prePreds.filter(p => p.user_id === userId);
+  const finishedPreds = myPreds
+    .filter(p => p.points !== null && p.points !== undefined)
+    .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
+    .filter(p => p.match)
+    .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
+
+  const unlocked = new Set();
+
+  // 🎯 Francotirador — 5 exactos
+  const exactCount = finishedPreds.filter(p => p.points >= 3).length;
+  if (exactCount >= 5) unlocked.add("sniper");
+
+  // 🔮 Adivino — 10 exactos
+  if (exactCount >= 10) unlocked.add("oracle");
+
+  // 🔥 En llamas — racha 5
+  // ⚡ Imparable — racha 10
+  let maxRacha = 0, curRacha = 0;
+  for (const p of finishedPreds) {
+    if (p.points > 0) { curRacha++; maxRacha = Math.max(maxRacha, curRacha); }
+    else curRacha = 0;
+  }
+  if (maxRacha >= 5)  unlocked.add("onfire");
+  if (maxRacha >= 10) unlocked.add("unstoppable");
+
+  // ✅ Comprometido — predecir todos los partidos de grupos
+  const groupMatches = matches.filter(m => m.phase === "Grupos" || !m.phase || m.phase === "");
+  const predictedGroupIds = new Set(myPreds.map(p => p.match_id));
+  if (groupMatches.length > 0 && groupMatches.every(m => predictedGroupIds.has(m.id)))
+    unlocked.add("committed");
+
+  // 🃏 Apostador — usar 4 comodines
+  if (myWildcards.length >= 4) unlocked.add("gambler");
+
+  // 📋 Estratega — completar pre-torneo (12 grupos x 2 posiciones + 8 terceros = 32)
+  const groupStandings = myPrePreds.filter(p => p.prediction_type === "group_standing");
+  const thirds = myPrePreds.filter(p => p.prediction_type === "third_place");
+  if (groupStandings.length >= 24 && thirds.length >= 8) unlocked.add("strategist");
+
+  // 🌍 Mundialista — predecir al menos 1 de cada grupo
+  const groupsCovered = new Set(
+    myPreds.map(p => matches.find(m => m.id === p.match_id)?.group_name).filter(Boolean)
+  );
+  if (groupsCovered.size >= 12) unlocked.add("globetrotter");
+
+  // 👑 Líder — 1er lugar en algún snapshot
+  if (mySnaps.some(s => s.position === 1)) unlocked.add("leader");
+
+  // 🏅 Podio — top 3 en algún snapshot
+  if (mySnaps.some(s => s.position <= 3)) unlocked.add("podium");
+
+  // 📈 Remontada — subir 3+ posiciones en un snapshot
+  for (let i = 1; i < mySnaps.length; i++) {
+    if (mySnaps[i - 1].position - mySnaps[i].position >= 3) { unlocked.add("comeback"); break; }
+  }
+
+  // 🤝 Empate técnico — predecir empate y acertar 3 veces
+  const drawWins = finishedPreds.filter(p => {
+    const m = p.match;
+    return p.home_score === p.away_score && m.home_score === m.away_score && p.points > 0;
+  }).length;
+  if (drawWins >= 3) unlocked.add("drawmaster");
+
+  // 🎪 Comodín de oro — exacto con comodín
+  const wcMatchIds = new Set(myWildcards.map(w => w.match_id));
+  const wcExact = finishedPreds.some(p => wcMatchIds.has(p.match_id) && p.points >= 6);
+  if (wcExact) unlocked.add("wildcard_ace");
+
+  // 💎 Día perfecto — todos los partidos de un día acertados
+  const byDay = {};
+  finishedPreds.forEach(p => {
+    const d = p.match.match_date;
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(p);
+  });
+  const allMatchesByDay = {};
+  matches.filter(m => m.status === "finished").forEach(m => {
+    if (!allMatchesByDay[m.match_date]) allMatchesByDay[m.match_date] = [];
+    allMatchesByDay[m.match_date].push(m);
+  });
+  for (const day of Object.keys(byDay)) {
+    const dayTotal = allMatchesByDay[day]?.length || 0;
+    const dayPreds = byDay[day];
+    if (dayTotal > 0 && dayPreds.length === dayTotal && dayPreds.every(p => p.points > 0))
+      unlocked.add("perfectday");
+  }
+
+  // 💀 Sin suerte — racha 5 incorrectas
+  let maxBadRacha = 0, curBadRacha = 0;
+  for (const p of finishedPreds) {
+    if (p.points === 0) { curBadRacha++; maxBadRacha = Math.max(maxBadRacha, curBadRacha); }
+    else curBadRacha = 0;
+  }
+  if (maxBadRacha >= 5) unlocked.add("unlucky");
+
+  // 🧊 Frío — predecir 0-0 y acertar 3 veces
+  const zeroZero = finishedPreds.filter(p => {
+    const m = p.match;
+    return p.home_score === 0 && p.away_score === 0 && m.home_score === 0 && m.away_score === 0;
+  }).length;
+  if (zeroZero >= 3) unlocked.add("iceman");
+
+  // ⏰ Madrugador — se marca desde la DB (se verifica si existe en achievements)
+  // Este se guarda al guardar predicción, no se puede calcular retroactivo aquí
+
+  return unlocked;
+}
+
+// Toast de logro desbloqueado
+function AchievementToast({ achievement, onClose }) {
+  const tier = TIER_COLORS[achievement.tier];
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{
+      position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
+      background: "var(--card)", border: `1px solid ${tier.border}`,
+      borderRadius: 14, padding: "14px 20px", zIndex: 999,
+      boxShadow: `0 0 30px ${tier.bg}`, display: "flex", alignItems: "center", gap: 12,
+      animation: "slideUp .3s ease", minWidth: 280, maxWidth: 340,
+    }}>
+      <span style={{ fontSize: 32 }}>{achievement.icon}</span>
+      <div>
+        <div style={{ fontSize: 10, color: tier.color, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
+          🏆 Logro desbloqueado
+        </div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 18, color: tier.color, letterSpacing: 1 }}>{achievement.name}</div>
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>{achievement.desc}</div>
+      </div>
+    </div>
+  );
+}
+
+// Sección de logros para el Dashboard
+function AchievementsSection({ userId, achievements: unlocked, equippedBadge, onEquip }) {
+  const [filter, setFilter] = useState("all");
+  const filtered = filter === "all" ? ACHIEVEMENTS
+    : filter === "unlocked" ? ACHIEVEMENTS.filter(a => unlocked.has(a.key))
+    : ACHIEVEMENTS.filter(a => !unlocked.has(a.key));
+
+  return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1 }}>
+          🏆 LOGROS ({unlocked.size}/{ACHIEVEMENTS.length})
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["all","Todos"],["unlocked","Obtenidos"],["locked","Bloqueados"]].map(([k,l]) => (
+            <button key={k} onClick={() => setFilter(k)} style={{
+              padding: "3px 10px", borderRadius: 20, border: "1px solid",
+              borderColor: filter === k ? "var(--gold)" : "var(--border)",
+              background: filter === k ? "var(--gold-dim)" : "none",
+              color: filter === k ? "var(--gold)" : "var(--muted)",
+              fontSize: 11, cursor: "pointer"
+            }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Progreso */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", marginBottom: 5 }}>
+          <span>Progreso total</span>
+          <span>{Math.round(unlocked.size / ACHIEVEMENTS.length * 100)}%</span>
+        </div>
+        <div style={{ background: "var(--border)", borderRadius: 20, height: 6, overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 20, background: "linear-gradient(90deg,var(--gold),var(--gold2))", width: `${unlocked.size / ACHIEVEMENTS.length * 100}%`, transition: "width .5s" }} />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
+        {filtered.map(a => {
+          const isUnlocked = unlocked.has(a.key);
+          const isEquipped = equippedBadge === a.key;
+          const tier = TIER_COLORS[a.tier];
+          return (
+            <div key={a.key} style={{
+              background: isUnlocked ? tier.bg : "var(--surface)",
+              border: `1px solid ${isUnlocked ? tier.border : "var(--border)"}`,
+              borderRadius: 10, padding: "10px 12px",
+              opacity: isUnlocked ? 1 : 0.45,
+              display: "flex", alignItems: "center", gap: 10, position: "relative",
+            }}>
+              <span style={{ fontSize: 26, filter: isUnlocked ? "none" : "grayscale(1)" }}>{a.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isUnlocked ? tier.color : "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.4 }}>{a.desc}</div>
+              </div>
+              {isUnlocked && (
+                <button onClick={() => onEquip(isEquipped ? null : a.key)} style={{
+                  padding: "3px 8px", borderRadius: 20, border: "1px solid",
+                  borderColor: isEquipped ? tier.color : "var(--border)",
+                  background: isEquipped ? tier.bg : "none",
+                  color: isEquipped ? tier.color : "var(--muted)",
+                  fontSize: 10, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                }}>
+                  {isEquipped ? "✓ Equipado" : "Equipar"}
+                </button>
+              )}
+              {!isUnlocked && (
+                <span style={{ fontSize: 14, flexShrink: 0 }}>🔒</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -593,7 +844,7 @@ function PreTournament({ user }) {
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ user, matches, predictions, onGoTab }) {
+function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
   const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).length;
@@ -697,6 +948,7 @@ function Dashboard({ user, matches, predictions, onGoTab }) {
         <button className="save-btn" onClick={() => onGoTab("pre")}>Completar →</button>
       </div>
     )}
+    <AchievementsSection userId={user.id} achievements={achievements} equippedBadge={equippedBadge} onEquip={onEquip} />
     <div className="sec-hdr"><h2>PRÓXIMOS SIN PREDECIR</h2></div>
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)"}}>
       {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).slice(0,5).map((m,i,arr) => (
@@ -856,7 +1108,7 @@ function Matches({ user, matches, predictions, onSave }) {
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
+function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchievements }) {
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [historyUser, setHistoryUser] = useState(null);
@@ -1141,7 +1393,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
               <td><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id === user.id && <span className="me-badge">TÚ</span>}</div></td>
+              <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id === user.id && <span className="me-badge">TÚ</span>}{row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}</div></td>
               <td className="c"><span className="pts-big">{row.pts}</span></td>
               <td className="c"><span className="pill">{row.exact}</span></td>
               <td className="c"><span className="pill">{row.result}</span></td>
@@ -1902,6 +2154,13 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifDebug, setNotifDebug] = useState("");
+  const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
+  const [equippedBadge, setEquippedBadge] = useState(null);
+  const [achievementToast, setAchievementToast] = useState(null);
+  const [knownAchievements, setKnownAchievements] = useState(new Set());
+  const [wildcards, setWildcards] = useState([]);
+  const [snapshots, setSnapshots] = useState([]);
+  const [prePreds, setPrePreds] = useState([]);
 
   function goTab(t) { setTab(t); setMenuOpen(false); }
 
@@ -2061,6 +2320,51 @@ export default function App() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Load extra data needed for achievements
+  const loadAchievementData = useCallback(async () => {
+    if (!user) return;
+    const [{ data: wc }, { data: snaps }, { data: pp }, { data: prof }] = await Promise.all([
+      sb.from("wildcards").select("*"),
+      sb.from("ranking_snapshots").select("*").order("snapshot_date"),
+      sb.from("pretournament_predictions").select("*"),
+      sb.from("profiles").select("equipped_badge").eq("id", user.id).single(),
+    ]);
+    setWildcards(wc || []);
+    setSnapshots(snaps || []);
+    setPrePreds(pp || []);
+    if (prof?.equipped_badge) setEquippedBadge(prof.equipped_badge);
+  }, [user]);
+
+  useEffect(() => { loadAchievementData(); }, [loadAchievementData]);
+
+  // Recalculate achievements whenever data changes
+  useEffect(() => {
+    if (!user || !allPredictions.length && !matches.length) return;
+    const unlocked = calcAchievements({
+      predictions: allPredictions, matches, wildcards, snapshots, prePreds, userId: user.id
+    });
+    // Check for newly unlocked
+    unlocked.forEach(key => {
+      if (!knownAchievements.has(key) && knownAchievements.size > 0) {
+        const achievement = ACHIEVEMENTS.find(a => a.key === key);
+        if (achievement) {
+          setAchievementToast(achievement);
+          // Save to DB
+          sb.from("achievements").upsert({ user_id: user.id, achievement_key: key }, { onConflict: "user_id,achievement_key" });
+        }
+      }
+    });
+    setKnownAchievements(unlocked);
+    setUnlockedAchievements(unlocked);
+  }, [allPredictions, matches, wildcards, snapshots, prePreds, user]);
+
+  async function handleEquipBadge(key) {
+    setEquippedBadge(key);
+    await sb.from("profiles").update({ equipped_badge: key }).eq("id", user.id);
+    // Update local profiles list so standings refreshes
+    setProfiles(prev => prev.map(p => p.id === user.id ? { ...p, equipped_badge: key } : p));
+  }
+
   async function handleLogout() { await sb.auth.signOut(); setUser(null); }
 
   if (booting) return (<><style>{css}</style><div className="spinner"><div className="spin"/><span>Cargando...</span></div></>);
@@ -2114,11 +2418,12 @@ export default function App() {
         </div>
       </div>
       <main className="main">
-        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab}/>}
+        {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
+        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/>}
         {tab==="pre"       && <PreTournament user={user}/>}
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
