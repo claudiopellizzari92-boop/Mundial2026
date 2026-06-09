@@ -575,7 +575,7 @@ function PreTournament({ user }) {
                 >
                   <option value="">— No seleccionado —</option>
                   {teams.map(t => (
-                    <option key={t.name} value={t.name}>{t.flag} {t.name}</option>
+                    <option key={t.name} value={t.name}>{t.name}</option>
                   ))}
                 </select>
               </div>
