@@ -2414,19 +2414,19 @@ function DebtorAdmin({ profiles, onRefresh }) {
   const [amount, setAmount] = useState("");
   const [since, setSince] = useState("");
   const [saving, setSaving] = useState(null);
-  const [intervalMins, setIntervalMins] = useState(2);
+  const [intervalSecs, setIntervalSecs] = useState(120);
   const [savingInterval, setSavingInterval] = useState(false);
   const [intervalSaved, setIntervalSaved] = useState(false);
 
   useEffect(() => {
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
-      .then(({ data }) => { if (data) setIntervalMins(data.rule_value); });
+      .then(({ data }) => { if (data) setIntervalSecs(data.rule_value); });
   }, []);
 
   async function saveInterval() {
     setSavingInterval(true);
     await sb.from("scoring_rules").upsert(
-      { rule_key: "debtor_video_interval", rule_value: parseInt(intervalMins) || 2, description: "Intervalo entre videos de morosos (minutos)" },
+      { rule_key: "debtor_video_interval", rule_value: parseInt(intervalSecs) || 120, description: 'Intervalo entre videos de morosos (segundos)' },
       { onConflict: "rule_key" }
     );
     setSavingInterval(false);
@@ -2470,11 +2470,11 @@ function DebtorAdmin({ profiles, onRefresh }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>📺 Video cada</span>
           <input
-            type="number" min="1" max="60" value={intervalMins}
-            onChange={e => setIntervalMins(e.target.value)}
+            type="number" min="10" max="3600" value={intervalSecs}
+            onChange={e => setIntervalSecs(e.target.value)}
             style={{ width: 52, padding: "4px 8px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 18, textAlign: "center", outline: "none" }}
           />
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>min</span>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>seg</span>
           <button className="btn-small" onClick={saveInterval} disabled={savingInterval}
             style={{ fontSize: 11, padding: "4px 10px" }}>
             {intervalSaved ? "✓" : savingInterval ? "..." : "Guardar"}
@@ -3239,11 +3239,11 @@ export default function App() {
     // Leer intervalo configurado por admin
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
       .then(({ data }) => {
-        const mins = data?.rule_value || 2;
+        const mins = data?.rule_value || 120;
         const interval = setInterval(() => {
           setDebtorVideoIndex(i => i + 1);
           setShowDebtorVideo(true);
-        }, mins * 60 * 1000);
+        }, mins * 1000);
         // Guardar ref para cleanup
         window._debtorInterval = interval;
       });
