@@ -196,6 +196,14 @@ input,button,select{font-family:inherit;}
 @keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
 @keyframes championGlow{0%,100%{text-shadow:0 0 8px rgba(245,183,49,.9),0 0 20px rgba(245,183,49,.5),0 0 40px rgba(245,183,49,.3);}50%{text-shadow:0 0 16px rgba(245,183,49,1),0 0 40px rgba(245,183,49,.8),0 0 80px rgba(245,183,49,.5);}}
 @keyframes silverGlow{0%,100%{text-shadow:0 0 8px rgba(192,192,192,.9),0 0 20px rgba(192,192,192,.5),0 0 40px rgba(192,192,192,.3);}50%{text-shadow:0 0 16px rgba(220,220,220,1),0 0 40px rgba(192,192,192,.8),0 0 80px rgba(192,192,192,.4);}}
+@keyframes debtorPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.15);}}
+@keyframes debtorShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-3px);}40%{transform:translateX(3px);}60%{transform:translateX(-2px);}80%{transform:translateX(2px);}}
+.debtor-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;background:rgba(255,77,109,.15);border:1px solid rgba(255,77,109,.4);color:var(--red);font-size:10px;font-weight:700;animation:debtorPulse 1.5s ease-in-out infinite;}
+.debtor-badge .icon{animation:debtorShake 2s ease-in-out infinite;}
+.debtor-overlay{position:fixed;inset:0;z-index:150;backdrop-filter:blur(6px) grayscale(80%);background:rgba(7,9,15,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;}
+.debtor-overlay-box{background:var(--card);border:2px solid var(--red);border-radius:20px;padding:32px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 0 60px rgba(255,77,109,.3);}
+.debtor-pts{position:relative;display:inline-block;}
+.debtor-pts::after{content:"❌";position:absolute;top:-6px;right:-18px;font-size:12px;}
 @keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
 .champion-name{background:linear-gradient(90deg,#f5b731,#ffe066,#f5b731,#e09820,#f5b731);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2.5s linear infinite,championGlow 2s ease-in-out infinite;font-weight:700;}
 .silver-name{background:linear-gradient(90deg,#b0bcd0,#e8edf5,#b0bcd0,#8899aa,#b0bcd0);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2.5s linear infinite,silverGlow 2s ease-in-out infinite;font-weight:700;}
@@ -391,6 +399,139 @@ function isLocked(kickoff, allMatches) {
   const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
   const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
   return new Date() >= deadline;
+}
+
+// ── Debtor helpers ────────────────────────────────────────────────────────────
+function DebtorBadge({ profile }) {
+  if (!profile?.is_debtor) return null;
+  const days = profile.debt_since
+    ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
+    : 0;
+  return (
+    <span className="debtor-badge">
+      <span className="icon">🚨</span>
+      <span>💸 En deuda</span>
+      {days > 0 && <span>· {days}d</span>}
+    </span>
+  );
+}
+
+function DebtorCounter({ profile }) {
+  if (!profile?.is_debtor) return null;
+  const days = profile.debt_since
+    ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
+    : 0;
+  return (
+    <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, display: "flex", gap: 6, alignItems: "center" }}>
+      {profile.debt_amount > 0 && <span>Debe ${profile.debt_amount}</span>}
+      {days > 0 && <span>· {days} día{days !== 1 ? "s" : ""} sin pagar</span>}
+    </div>
+  );
+}
+
+function DebtorOverlay({ profile, onDismiss }) {
+  const days = profile.debt_since
+    ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
+    : 0;
+  return (
+    <div className="debtor-overlay">
+      <div className="debtor-overlay-box">
+        <div style={{ fontSize: 56, marginBottom: 12 }}>💸</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--red)", letterSpacing: 2, marginBottom: 8 }}>
+          PAGO PENDIENTE
+        </div>
+        <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16, lineHeight: 1.6 }}>
+          Tenés un pago pendiente de inscripción al torneo.
+          {profile.debt_amount > 0 && <><br/><strong style={{ color: "var(--txt)" }}>${profile.debt_amount}</strong> sin abonar.</>}
+          {days > 0 && <><br/>Hace <strong style={{ color: "var(--red)" }}>{days} día{days !== 1 ? "s" : ""}</strong> que no pagás.</>}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 20 }}>
+          Contactá al organizador para regularizar tu situación y seguir participando.
+        </div>
+        <button onClick={onDismiss} style={{
+          padding: "10px 24px", background: "var(--red-dim)", border: "1px solid var(--red)",
+          borderRadius: 8, color: "var(--red)", fontSize: 13, cursor: "pointer", width: "100%",
+        }}>
+          Entendido, voy a pagar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Hall of Shame ─────────────────────────────────────────────────────────────
+function HallOfShame({ profiles }) {
+  const debtors = profiles.filter(p => p.is_debtor).sort((a, b) => {
+    const daysA = a.debt_since ? Math.floor((new Date() - new Date(a.debt_since)) / 86400000) : 0;
+    const daysB = b.debt_since ? Math.floor((new Date() - new Date(b.debt_since)) / 86400000) : 0;
+    return daysB - daysA;
+  });
+
+  if (debtors.length === 0) return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "40px 20px", textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+      <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--green)", letterSpacing: 1 }}>¡Todos al día!</div>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>No hay morosos en este torneo.</div>
+    </div>
+  );
+
+  const totalDebt = debtors.reduce((s, p) => s + (parseFloat(p.debt_amount) || 0), 0);
+
+  return (<>
+    <div className="sec-hdr"><h2>🚨 HALL OF SHAME</h2><span>{debtors.length} moroso{debtors.length !== 1 ? "s" : ""}</span></div>
+
+    {/* Resumen */}
+    <div style={{ background: "var(--red-dim)", border: "1px solid rgba(255,77,109,.3)", borderRadius: "var(--r)", padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div>
+        <div style={{ fontSize: 11, color: "var(--red)", textTransform: "uppercase", letterSpacing: .5 }}>Deuda total del grupo</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 32, color: "var(--red)" }}>${totalDebt.toFixed(2)}</div>
+      </div>
+      <div style={{ fontSize: 40 }}>💸</div>
+    </div>
+
+    {/* Lista de morosos */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {debtors.map((p, i) => {
+        const days = p.debt_since
+          ? Math.floor((new Date() - new Date(p.debt_since)) / 86400000)
+          : 0;
+        return (
+          <div key={p.id} style={{
+            background: "var(--card)", border: "1px solid rgba(255,77,109,.3)",
+            borderRadius: "var(--r)", padding: "16px 18px",
+            display: "flex", alignItems: "center", gap: 14,
+          }}>
+            {/* Posición */}
+            <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--red)", minWidth: 30, textAlign: "center", opacity: .5 }}>
+              {i + 1}
+            </div>
+            {/* Avatar */}
+            <div className="avatar" style={{ background: "linear-gradient(135deg,var(--red),#c0001a)", flexShrink: 0 }}>
+              {initials(p.name)}
+            </div>
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
+                <DebtorBadge profile={p} />
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3, display: "flex", gap: 10 }}>
+                {p.debt_since && <span>Desde: {new Date(p.debt_since).toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}</span>}
+                {days > 0 && <span style={{ color: "var(--red)" }}>⏰ {days} día{days !== 1 ? "s" : ""} sin pagar</span>}
+              </div>
+            </div>
+            {/* Monto */}
+            {p.debt_amount > 0 && (
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color: "var(--red)" }}>${p.debt_amount}</div>
+                <div style={{ fontSize: 10, color: "var(--muted)" }}>pendiente</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </>);
 }
 
 // ── Confetti ──────────────────────────────────────────────────────────────────
@@ -1920,13 +2061,26 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
               <td>
                 <div className="user-cell">
                   <div className={`avatar sm ${championAvatarClass(row)}`}>{initials(row.name)}</div>
-                  <ChampionName profile={row} name={row.name} />
-                  <TitleBadges profile={row} size={13} />
-                  {row.id === user.id && <span className="me-badge">TÚ</span>}
-                  {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                      <ChampionName profile={row} name={row.name} />
+                      <TitleBadges profile={row} size={13} />
+                      {row.id === user.id && <span className="me-badge">TÚ</span>}
+                      {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
+                    </div>
+                    {row.is_debtor && <DebtorCounter profile={row} />}
+                  </div>
+                  {row.is_debtor && <DebtorBadge profile={row} />}
                 </div>
               </td>
-              <td className="c"><span className="pts-big">{row.pts}</span></td>
+              <td className="c">
+                {row.is_debtor
+                  ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      <span className="pts-big" style={{ color: "var(--muted)", textDecoration: "line-through", opacity: .5 }}>{row.pts}</span>
+                      <span style={{ fontSize: 14 }}>❌</span>
+                    </div>
+                  : <span className="pts-big">{row.pts}</span>}
+              </td>
               <td className="c"><span className="pill">{row.exact}</span></td>
               <td className="c"><span className="pill">{row.result}</span></td>
               <td className="c" style={{ color: "var(--muted)", fontSize: 13 }}>{row.played}</td>
@@ -2130,6 +2284,115 @@ function Compare({ user, matches, allPredictions, profiles }) {
       )}
     </>)}
   </>);
+}
+
+// ── Debtor Admin ──────────────────────────────────────────────────────────────
+function DebtorAdmin({ profiles, onRefresh }) {
+  const [editing, setEditing] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [since, setSince] = useState("");
+  const [saving, setSaving] = useState(null);
+
+  async function toggleDebtor(prof) {
+    setSaving(prof.id);
+    if (prof.is_debtor) {
+      await sb.from("profiles").update({ is_debtor: false, debt_amount: 0, debt_since: null }).eq("id", prof.id);
+    } else {
+      setEditing(prof.id);
+      setAmount("");
+      setSince(new Date().toISOString().slice(0, 10));
+      setSaving(null);
+      return;
+    }
+    setSaving(null);
+    onRefresh();
+  }
+
+  async function saveDebtor(profId) {
+    setSaving(profId);
+    await sb.from("profiles").update({
+      is_debtor: true,
+      debt_amount: parseFloat(amount) || 0,
+      debt_since: since || new Date().toISOString().slice(0, 10),
+    }).eq("id", profId);
+    setEditing(null);
+    setSaving(null);
+    onRefresh();
+  }
+
+  const debtors = profiles.filter(p => p.is_debtor);
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-hdr">
+        <h3>💸 MOROSOS</h3>
+        <span style={{ fontSize: 12, color: "var(--red)" }}>{debtors.length} en deuda</span>
+      </div>
+      <div className="admin-section-body">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {profiles.map(prof => {
+            const isDebtor = prof.is_debtor;
+            const isEditing = editing === prof.id;
+            const days = prof.debt_since
+              ? Math.floor((new Date() - new Date(prof.debt_since)) / 86400000)
+              : 0;
+            return (
+              <div key={prof.id} style={{
+                background: isDebtor ? "rgba(255,77,109,.05)" : "var(--surface)",
+                border: `1px solid ${isDebtor ? "rgba(255,77,109,.3)" : "var(--border)"}`,
+                borderRadius: 8, overflow: "hidden",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className="avatar sm" style={{ background: isDebtor ? "linear-gradient(135deg,var(--red),#c0001a)" : undefined }}>
+                      {initials(prof.name)}
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>{prof.name}</span>
+                        {isDebtor && <DebtorBadge profile={prof} />}
+                      </div>
+                      {isDebtor && <DebtorCounter profile={prof} />}
+                    </div>
+                  </div>
+                  <button
+                    className={`btn-small ${isDebtor ? "" : "red"}`}
+                    onClick={() => toggleDebtor(prof)}
+                    disabled={saving === prof.id}
+                    style={isDebtor ? { background: "var(--green-dim)", borderColor: "var(--green)", color: "var(--green)" } : {}}
+                  >
+                    {saving === prof.id ? "..." : isDebtor ? "✓ Perdonar deuda" : "💸 Marcar moroso"}
+                  </button>
+                </div>
+                {isEditing && (
+                  <div style={{ padding: "0 14px 14px", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 100 }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>MONTO ($)</div>
+                      <input
+                        type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                        placeholder="0.00" style={{ width: "100%", padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>DESDE</div>
+                      <input
+                        type="date" value={since} onChange={e => setSince(e.target.value)}
+                        style={{ width: "100%", padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+                    <button className="btn-small red" onClick={() => saveDebtor(prof.id)} disabled={saving === prof.id}>
+                      {saving === prof.id ? "..." : "Confirmar"}
+                    </button>
+                    <button className="btn-small" onClick={() => setEditing(null)} style={{ background: "none" }}>Cancelar</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Titles Admin ─────────────────────────────────────────────────────────────
@@ -2741,6 +3004,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
       {/* ── Títulos ── */}
       <TitlesAdmin profiles={profiles} onRefresh={onRefresh} />
+      <DebtorAdmin profiles={profiles} onRefresh={onRefresh} />
 
     </div>
   );
@@ -2792,6 +3056,7 @@ export default function App() {
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifDebug, setNotifDebug] = useState("");
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
+  const [showDebtorOverlay, setShowDebtorOverlay] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastRank, setLastRank] = useState(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
@@ -3035,7 +3300,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","🚨 Morosos"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3057,7 +3322,7 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","🚨 Morosos"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3085,6 +3350,14 @@ export default function App() {
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
+        {tab==="shame"     && <HallOfShame profiles={profiles} />}
+        {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
+        {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
+          <DebtorOverlay
+            profile={profiles.find(p => p.id === user.id)}
+            onDismiss={() => setShowDebtorOverlay(false)}
+          />
+        )}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
