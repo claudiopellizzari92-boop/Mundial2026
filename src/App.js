@@ -763,11 +763,9 @@ function Matches({ user, matches, predictions, onSave }) {
     const hasWildcard = wildcards.find(w => w.match_id === match.id);
     setSavingWildcard(s => ({ ...s, [match.id]: true }));
     if (hasWildcard) {
-      // Cancel wildcard — refund the cost point
       await sb.from("wildcards").delete().eq("id", hasWildcard.id);
       setWildcards(w => w.filter(x => x.match_id !== match.id));
     } else {
-      // Buy wildcard — check limit
       if (wildcards.length >= maxWildcards) {
         setSavingWildcard(s => ({ ...s, [match.id]: false }));
         return;
@@ -864,7 +862,6 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
   const [historyUser, setHistoryUser] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [loadingSnaps, setLoadingSnaps] = useState(false);
-  // H2H state
   const [h2hUser, setH2hUser] = useState(null);
   const [showH2hPicker, setShowH2hPicker] = useState(false);
   const [h2hMatchData, setH2hMatchData] = useState([]);
@@ -930,7 +927,6 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
     return { ...p, pts, exact, result, played: preds.length };
   }).sort((a, b) => b.pts - a.pts || b.exact - a.exact);
 
-  // ── H2H View ─────────────────────────────────────────────────────────────
   function renderH2h() {
     const uA = historyUser;
     const uB = h2hUser;
@@ -975,16 +971,10 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
       <div className="modal-overlay" onClick={() => { setH2hUser(null); setH2hMatchData([]); }}>
         <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <button
-              onClick={() => { setH2hUser(null); setH2hMatchData([]); }}
-              style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
-            >
-              ← Volver
-            </button>
+            <button onClick={() => { setH2hUser(null); setH2hMatchData([]); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>← Volver</button>
             <div style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)", letterSpacing: 1 }}>⚔️ HEAD TO HEAD</div>
             <button onClick={() => { setHistoryUser(null); setH2hUser(null); setH2hMatchData([]); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
           </div>
-
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <div className="avatar">{initials(uA.name)}</div>
@@ -1002,12 +992,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
               <div style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--blue)" }}>{uB.pts} pts</div>
             </div>
           </div>
-          {ties > 0 && (
-            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: -10, marginBottom: 12 }}>
-              {ties} partido{ties !== 1 ? "s" : ""} empatados en puntos
-            </div>
-          )}
-
+          {ties > 0 && <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: -10, marginBottom: 12 }}>{ties} partido{ties !== 1 ? "s" : ""} empatados en puntos</div>}
           {loadingH2h ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>Cargando...</div>
           ) : (<>
@@ -1015,39 +1000,19 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
               <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
                 <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Evolución de puntos</div>
                 <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
-                    <div style={{ width: 16, height: 2.5, background: "var(--gold)", borderRadius: 2 }} />
-                    <span style={{ color: "var(--muted)" }}>{uA.name.split(" ")[0]}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
-                    <div style={{ width: 16, height: 2.5, background: "var(--blue)", borderRadius: 2 }} />
-                    <span style={{ color: "var(--muted)" }}>{uB.name.split(" ")[0]}</span>
-                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 2.5, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>{uA.name.split(" ")[0]}</span></div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 2.5, background: "var(--blue)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>{uB.name.split(" ")[0]}</span></div>
                 </div>
                 <svg viewBox={"0 0 " + chartW + " " + chartH} style={{ width: "100%", height: chartH }}>
                   {buildPath(snapsA) && <path d={buildPath(snapsA)} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />}
                   {buildPath(snapsB) && <path d={buildPath(snapsB)} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" />}
-                  {ptsA.map((p, i) => (
-                    <circle key={"a" + i} cx={p[0]} cy={p[1]} r="3.5" fill="var(--gold)" />
-                  ))}
-                  {ptsB.map((p, i) => (
-                    <circle key={"b" + i} cx={p[0]} cy={p[1]} r="3.5" fill="var(--blue)" />
-                  ))}
-                  {allDates.map((d, i) => {
-                    const x = pad + (i / Math.max(allDates.length - 1, 1)) * (chartW - pad * 2);
-                    return (
-                      <text key={i} x={x} y={chartH - 2} textAnchor="middle" fontSize="9" fill="var(--muted)">{d.slice(5)}</text>
-                    );
-                  })}
+                  {ptsA.map((p, i) => <circle key={"a" + i} cx={p[0]} cy={p[1]} r="3.5" fill="var(--gold)" />)}
+                  {ptsB.map((p, i) => <circle key={"b" + i} cx={p[0]} cy={p[1]} r="3.5" fill="var(--blue)" />)}
+                  {allDates.map((d, i) => { const x = pad + (i / Math.max(allDates.length - 1, 1)) * (chartW - pad * 2); return <text key={i} x={x} y={chartH - 2} textAnchor="middle" fontSize="9" fill="var(--muted)">{d.slice(5)}</text>; })}
                 </svg>
               </div>
             )}
-            {!hasChart && (
-              <div style={{ textAlign: "center", padding: "12px 0", color: "var(--muted)", fontSize: 13, marginBottom: 12 }}>
-                Sin snapshots aún para comparar evolución.
-              </div>
-            )}
-
+            {!hasChart && <div style={{ textAlign: "center", padding: "12px 0", color: "var(--muted)", fontSize: 13, marginBottom: 12 }}>Sin snapshots aún para comparar evolución.</div>}
             {h2hMatchData.length > 0 ? (
               <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}>
                 <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Partido a partido</div>
@@ -1059,69 +1024,29 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
                     const winB = pA !== null && pB !== null && pB > pA;
                     const tieMatch = pA !== null && pB !== null && pA === pB;
                     return (
-                      <div key={m.id} style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto 1fr",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "7px 0",
-                        borderBottom: idx < h2hMatchData.length - 1 ? "1px solid var(--border)" : "none",
-                      }}>
+                      <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 6, padding: "7px 0", borderBottom: idx < h2hMatchData.length - 1 ? "1px solid var(--border)" : "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
-                          {predA ? (
-                            <>
-                              <span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: winA ? "var(--gold)" : tieMatch ? "var(--txt)" : "var(--muted)" }}>
-                                {predA.home_score}–{predA.away_score}
-                              </span>
-                              {pA > 0 && (
-                                <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 20, background: winA ? "rgba(245,183,49,.15)" : "var(--green-dim)", color: winA ? "var(--gold)" : "var(--green)" }}>
-                                  +{pA}
-                                </span>
-                              )}
-                            </>
-                          ) : <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>—</span>}
+                          {predA ? (<><span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: winA ? "var(--gold)" : tieMatch ? "var(--txt)" : "var(--muted)" }}>{predA.home_score}–{predA.away_score}</span>{pA > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 20, background: winA ? "rgba(245,183,49,.15)" : "var(--green-dim)", color: winA ? "var(--gold)" : "var(--green)" }}>+{pA}</span>}</>) : <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>—</span>}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                            <img src={m.home_flag} alt="" style={{ width: 13, height: 10, objectFit: "cover", borderRadius: 1 }} />
-                            <span style={{ fontSize: 9, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.home.split(" ")[0]}</span>
-                            <span style={{ fontSize: 9, color: "var(--muted)" }}>vs</span>
-                            <span style={{ fontSize: 9, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.away.split(" ")[0]}</span>
-                            <img src={m.away_flag} alt="" style={{ width: 13, height: 10, objectFit: "cover", borderRadius: 1 }} />
-                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 3 }}><img src={m.home_flag} alt="" style={{ width: 13, height: 10, objectFit: "cover", borderRadius: 1 }} /><span style={{ fontSize: 9, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.home.split(" ")[0]}</span><span style={{ fontSize: 9, color: "var(--muted)" }}>vs</span><span style={{ fontSize: 9, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.away.split(" ")[0]}</span><img src={m.away_flag} alt="" style={{ width: 13, height: 10, objectFit: "cover", borderRadius: 1 }} /></div>
                           <span style={{ fontSize: 9, color: "var(--gold)", fontFamily: "Bebas Neue" }}>{m.home_score}–{m.away_score}</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          {predB ? (
-                            <>
-                              {pB > 0 && (
-                                <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 20, background: winB ? "rgba(74,158,255,.15)" : "var(--green-dim)", color: winB ? "var(--blue)" : "var(--green)" }}>
-                                  +{pB}
-                                </span>
-                              )}
-                              <span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: winB ? "var(--blue)" : tieMatch ? "var(--txt)" : "var(--muted)" }}>
-                                {predB.home_score}–{predB.away_score}
-                              </span>
-                            </>
-                          ) : <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>—</span>}
+                          {predB ? (<>{pB > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 20, background: winB ? "rgba(74,158,255,.15)" : "var(--green-dim)", color: winB ? "var(--blue)" : "var(--green)" }}>+{pB}</span>}<span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: winB ? "var(--blue)" : tieMatch ? "var(--txt)" : "var(--muted)" }}>{predB.home_score}–{predB.away_score}</span></>) : <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>—</span>}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "12px 0", color: "var(--muted)", fontSize: 13 }}>
-                Ninguno de los dos tiene predicciones en partidos jugados aún.
-              </div>
-            )}
+            ) : <div style={{ textAlign: "center", padding: "12px 0", color: "var(--muted)", fontSize: 13 }}>Ninguno de los dos tiene predicciones en partidos jugados aún.</div>}
           </>)}
         </div>
       </div>
     );
   }
 
-  // ── History Modal ─────────────────────────────────────────────────────────
   function renderHistory() {
     const prof = historyUser;
     const userSnaps = snapshots.filter(s => s.user_id === prof.id).sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
@@ -1145,33 +1070,20 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div className="avatar">{initials(prof.name)}</div>
-              <div>
-                <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", letterSpacing: 1 }}>{prof.name}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>{prof.pts} pts actuales</div>
-              </div>
+              <div><div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", letterSpacing: 1 }}>{prof.name}</div><div style={{ fontSize: 12, color: "var(--muted)" }}>{prof.pts} pts actuales</div></div>
             </div>
             <button onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
           </div>
-
           {others.length > 0 && (
             <div style={{ marginBottom: 14 }}>
               {!showH2hPicker ? (
-                <button
-                  onClick={() => setShowH2hPicker(true)}
-                  style={{ width: "100%", padding: "9px 14px", background: "rgba(74,158,255,.1)", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, color: "var(--blue)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                >
-                  ⚔️ Comparar con...
-                </button>
+                <button onClick={() => setShowH2hPicker(true)} style={{ width: "100%", padding: "9px 14px", background: "rgba(74,158,255,.1)", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, color: "var(--blue)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>⚔️ Comparar con...</button>
               ) : (
                 <div style={{ background: "rgba(74,158,255,.07)", border: "1px solid rgba(74,158,255,.2)", borderRadius: 8, padding: "10px 12px" }}>
                   <div style={{ fontSize: 11, color: "var(--blue)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Elegir rival</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {others.map(o => (
-                      <button
-                        key={o.id}
-                        onClick={() => openH2h(o)}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", color: "var(--txt)", fontSize: 13 }}
-                      >
+                      <button key={o.id} onClick={() => openH2h(o)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", color: "var(--txt)", fontSize: 13 }}>
                         <div className="avatar sm">{initials(o.name)}</div>
                         <span>{o.name}</span>
                         <span style={{ marginLeft: "auto", fontFamily: "Bebas Neue", fontSize: 14, color: "var(--muted)" }}>{calcPts(o.id)} pts</span>
@@ -1183,7 +1095,6 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
               )}
             </div>
           )}
-
           {loadingSnaps ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>Cargando...</div>
           ) : userSnaps.length === 0 ? (
@@ -1193,35 +1104,20 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
               <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Evolución de puntos</div>
               <svg viewBox={"0 0 " + chartW + " " + chartH} style={{ width: "100%", height: chartH }}>
                 <path d={pathD} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />
-                {points.map((p, i) => (
-                  <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="var(--gold)" />
-                ))}
-                {userSnaps.map((s, i) => (
-                  <text key={i} x={points[i][0]} y={chartH - 2} textAnchor="middle" fontSize="9" fill="var(--muted)">{s.snapshot_date.slice(5)}</text>
-                ))}
+                {points.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="var(--gold)" />)}
+                {userSnaps.map((s, i) => <text key={i} x={points[i][0]} y={chartH - 2} textAnchor="middle" fontSize="9" fill="var(--muted)">{s.snapshot_date.slice(5)}</text>)}
               </svg>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Días en 1er lugar</div>
-                <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--gold)" }}>{daysFirst}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>de {totalDays} snapshots</div>
-              </div>
-              <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Mejor posición</div>
-                <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--gold)" }}>#{userSnaps.length > 0 ? Math.min(...userSnaps.map(s => s.position)) : "-"}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>histórico</div>
-              </div>
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}><div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Días en 1er lugar</div><div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--gold)" }}>{daysFirst}</div><div style={{ fontSize: 11, color: "var(--muted)" }}>de {totalDays} snapshots</div></div>
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}><div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Mejor posición</div><div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--gold)" }}>#{userSnaps.length > 0 ? Math.min(...userSnaps.map(s => s.position)) : "-"}</div><div style={{ fontSize: 11, color: "var(--muted)" }}>histórico</div></div>
             </div>
             <div style={{ marginTop: 12, background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Historial de posiciones</div>
               {userSnaps.slice().reverse().slice(0, 5).map(s => (
                 <div key={s.snapshot_date} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>{s.snapshot_date}</span>
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: s.position === 1 ? "var(--gold)" : "var(--txt)" }}>#{s.position}</span>
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{s.points} pts</span>
-                  </div>
+                  <div style={{ display: "flex", gap: 12 }}><span style={{ fontFamily: "Bebas Neue", fontSize: 15, color: s.position === 1 ? "var(--gold)" : "var(--txt)" }}>#{s.position}</span><span style={{ fontSize: 12, color: "var(--muted)" }}>{s.points} pts</span></div>
                 </div>
               ))}
             </div>
@@ -1233,38 +1129,19 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin }) {
 
   return (<>
     <div className="sec-hdr" style={{ justifyContent: "space-between" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <h2>TABLA DE POSICIONES</h2>
-        <span>{profiles.length} participantes</span>
-      </div>
-      {isAdmin && (
-        <button className="btn-small" onClick={handleRefresh} disabled={refreshing} style={{ fontSize: 11 }}>
-          {refreshing ? "..." : "🔄 Actualizar"}
-        </button>
-      )}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}><h2>TABLA DE POSICIONES</h2><span>{profiles.length} participantes</span></div>
+      {isAdmin && <button className="btn-small" onClick={handleRefresh} disabled={refreshing} style={{ fontSize: 11 }}>{refreshing ? "..." : "🔄 Actualizar"}</button>}
     </div>
-
     {historyUser && h2hUser && renderH2h()}
     {historyUser && !h2hUser && renderHistory()}
-
     <div className="standings-wrap">
       <table className="standings-table">
-        <thead>
-          <tr>
-            <th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th>
-          </tr>
-        </thead>
+        <thead><tr><th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
               <td><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td>
-                <div className="user-cell">
-                  <div className="avatar sm">{initials(row.name)}</div>
-                  <span>{row.name}</span>
-                  {row.id === user.id && <span className="me-badge">TÚ</span>}
-                </div>
-              </td>
+              <td><div className="user-cell"><div className="avatar sm">{initials(row.name)}</div><span>{row.name}</span>{row.id === user.id && <span className="me-badge">TÚ</span>}</div></td>
               <td className="c"><span className="pts-big">{row.pts}</span></td>
               <td className="c"><span className="pill">{row.exact}</span></td>
               <td className="c"><span className="pill">{row.result}</span></td>
@@ -1376,28 +1253,16 @@ function Compare({ user, matches, allPredictions, profiles }) {
 
   return (<>
     <div className="sec-hdr"><h2>👁️ COMPARAR</h2></div>
-
     <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
       {allDays.map(d => {
         const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches));
         return (
-          <button
-            key={d}
-            onClick={() => setActiveDay(d)}
-            style={{
-              padding: "6px 12px", borderRadius: 20, border: "1px solid",
-              borderColor: activeDay === d ? "var(--gold)" : "var(--border)",
-              background: activeDay === d ? "var(--gold-dim)" : "none",
-              color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)",
-              fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
-            }}
-          >
+          <button key={d} onClick={() => setActiveDay(d)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: activeDay === d ? "var(--gold)" : "var(--border)", background: activeDay === d ? "var(--gold-dim)" : "none", color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {locked ? "✓ " : "🔒 "}{d}
           </button>
         );
       })}
     </div>
-
     {activeDay && (<>
       {!dayIsLocked ? (
         <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden", marginBottom: 16 }}>
@@ -1407,11 +1272,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
           </div>
           {dayMatches.map((m, i) => (
             <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 18px", borderBottom: i < dayMatches.length - 1 ? "1px solid var(--border)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                <img src={m.home_flag} alt={m.home} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
-                {m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}
-                <img src={m.away_flag} alt={m.away} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />
-              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><img src={m.home_flag} alt={m.home} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} />{m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}<img src={m.away_flag} alt={m.away} style={{ width: 18, height: 14, objectFit: "cover", borderRadius: 2 }} /></div>
               <span style={{ fontSize: 12, color: "var(--muted)" }}>{localTime(m.kickoff_at)}</span>
             </div>
           ))}
@@ -1428,15 +1289,11 @@ function Compare({ user, matches, allPredictions, profiles }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="group-badge">Grupo {m.group_name}</span>
                     <span style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
-                      <img src={m.home_flag} alt={m.home} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
-                      {m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}
-                      <img src={m.away_flag} alt={m.away} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
+                      <img src={m.home_flag} alt={m.home} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />{m.home} <span style={{ color: "var(--muted)" }}>vs</span> {m.away}<img src={m.away_flag} alt={m.away} style={{ width: 16, height: 12, objectFit: "cover", borderRadius: 2 }} />
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {hasResult
-                      ? <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)" }}>{m.home_score}–{m.away_score}</span>
-                      : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽</span>}
+                    {hasResult ? <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)" }}>{m.home_score}–{m.away_score}</span> : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽</span>}
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>{matchPreds.length} pred.</span>
                     <span style={{ color: "var(--muted)", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
                   </div>
@@ -1447,28 +1304,14 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     const isMe = prof.id === user.id;
                     return (
                       <div key={prof.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px", borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div className="avatar sm">{initials(prof.name)}</div><span style={{ fontSize: 13 }}>{prof.name}</span>{isMe && <span className="me-badge">TÚ</span>}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div className="avatar sm">{initials(prof.name)}</div>
-                          <span style={{ fontSize: 13 }}>{prof.name}</span>
-                          {isMe && <span className="me-badge">TÚ</span>}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {pred ? (<>
-                            {resultIcon(pred, m)}
-                            <span style={{ fontFamily: "Bebas Neue", fontSize: 18 }}>{pred.home_score}–{pred.away_score}</span>
-                            {pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points}</span>}
-                          </>) : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin pred.</span>}
+                          {pred ? (<>{resultIcon(pred, m)}<span style={{ fontFamily: "Bebas Neue", fontSize: 18 }}>{pred.home_score}–{pred.away_score}</span>{pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points}</span>}</>) : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin pred.</span>}
                         </div>
                       </div>
                     );
                   })}
-                  {hasResult && (
-                    <div style={{ padding: "6px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}>
-                      <span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span>
-                      <span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span>
-                      <span><span style={{ color: "var(--red)" }}>✗</span> Falló</span>
-                    </div>
-                  )}
+                  {hasResult && <div style={{ padding: "6px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}><span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span><span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span><span><span style={{ color: "var(--red)" }}>✗</span> Falló</span></div>}
                   {hasResult && (
                     <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {Object.entries(getReactionCounts(m.id)).map(([emoji, count]) => {
@@ -1479,9 +1322,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
                             <button onClick={() => setReaction(m.id, emoji)} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: mine ? "var(--gold)" : "var(--border)", background: mine ? "var(--gold-dim)" : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}>
                               {emoji} <span style={{ fontSize: 12, color: "var(--muted)" }}>{count}</span>
                             </button>
-                            <div className="reaction-tooltip">
-                              {reactors.join(", ")}
-                            </div>
+                            <div className="reaction-tooltip">{reactors.join(", ")}</div>
                           </div>
                         );
                       })}
@@ -1654,11 +1495,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
   async function toggleAdmin(userId, isCurrentlyAdmin) {
     setSavingAdmin(userId);
-    if (isCurrentlyAdmin) {
-      await sb.from("admins").delete().eq("user_id", userId);
-    } else {
-      await sb.from("admins").insert({ user_id: userId });
-    }
+    if (isCurrentlyAdmin) { await sb.from("admins").delete().eq("user_id", userId); }
+    else { await sb.from("admins").insert({ user_id: userId }); }
     const { data } = await sb.from("admins").select("*");
     if (data) setAdminList(data.map(a => a.user_id));
     setSavingAdmin(null);
@@ -1668,23 +1506,17 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     if (!editName.trim()) return;
     setSavingName(userId);
     await sb.from("profiles").update({ name: editName.trim() }).eq("id", userId);
-    setSavingName(null);
-    setEditingUser(null);
-    onRefresh();
+    setSavingName(null); setEditingUser(null); onRefresh();
   }
 
   async function deleteUser(userId) {
     setDeletingUser(userId);
     await sb.rpc("delete_user", { target_user_id: userId });
-    setConfirmDelete(null);
-    setDeletingUser(null);
-    onRefresh();
+    setConfirmDelete(null); setDeletingUser(null); onRefresh();
   }
 
   useEffect(() => {
-    sb.from("admins").select("*").then(({ data }) => {
-      if (data) setAdminList(data.map(a => a.user_id));
-    });
+    sb.from("admins").select("*").then(({ data }) => { if (data) setAdminList(data.map(a => a.user_id)); });
     sb.from("scoring_rules").select("*").then(({ data }) => {
       if (data) { setRules(data); const v={}; data.forEach(r=>{v[r.rule_key]=r.rule_value;}); setRuleVals(v); }
     });
@@ -1692,10 +1524,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     sb.from("group_results").select("*").then(({ data }) => {
       if (data) {
         const gr = {};
-        data.forEach(r => {
-          if (!gr[r.group_name]) gr[r.group_name] = {};
-          gr[r.group_name][r.position] = r.team;
-        });
+        data.forEach(r => { if (!gr[r.group_name]) gr[r.group_name] = {}; gr[r.group_name][r.position] = r.team; });
         setGroupResults(gr);
       }
     });
@@ -1707,10 +1536,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       for (const pos of [1, 2, 3]) {
         const team = groupResults[group]?.[pos];
         if (!team) continue;
-        await sb.from("group_results").upsert(
-          { group_name: group, position: pos, team },
-          { onConflict: "group_name,position" }
-        );
+        await sb.from("group_results").upsert({ group_name: group, position: pos, team }, { onConflict: "group_name,position" });
       }
     }
     setSavingGroupResults(false);
@@ -1723,45 +1549,30 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     const { data: preds } = await sb.from("pretournament_predictions").select("*");
     const { data: results } = await sb.from("group_results").select("*");
     const { data: rules2 } = await sb.from("scoring_rules").select("*");
-
     const rMap = {};
     (rules2||[]).forEach(r => { rMap[r.rule_key] = r.rule_value; });
     const pts1st = rMap["group_first"] || 2;
     const pts2nd = rMap["group_second"] || 2;
     const pts3rd = rMap["third_place_qualifier"] || 2;
-
     const resultMap = {};
-    (results||[]).forEach(r => {
-      if (!resultMap[r.group_name]) resultMap[r.group_name] = {};
-      resultMap[r.group_name][r.position] = r.team;
-    });
-
+    (results||[]).forEach(r => { if (!resultMap[r.group_name]) resultMap[r.group_name] = {}; resultMap[r.group_name][r.position] = r.team; });
     const userPreds = {};
-    (preds||[]).forEach(p => {
-      if (!userPreds[p.user_id]) userPreds[p.user_id] = [];
-      userPreds[p.user_id].push(p);
-    });
-
+    (preds||[]).forEach(p => { if (!userPreds[p.user_id]) userPreds[p.user_id] = []; userPreds[p.user_id].push(p); });
     let totalUpdated = 0;
     for (const userId of Object.keys(userPreds)) {
       for (const pred of userPreds[userId]) {
         let pts = 0;
         if (pred.prediction_type === "group_standing") {
           const real = resultMap[pred.group_name]?.[pred.position];
-          if (real && real === pred.team) {
-            pts = pred.position === 1 ? pts1st : pts2nd;
-          }
+          if (real && real === pred.team) { pts = pred.position === 1 ? pts1st : pts2nd; }
         } else if (pred.prediction_type === "third_place") {
           const isClassified = Object.values(resultMap).some(g => g[3] === pred.team);
           if (isClassified) pts = pts3rd;
         }
-        if (pts > 0) {
-          await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id);
-        }
+        if (pts > 0) { await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id); }
       }
       totalUpdated++;
     }
-
     setCalculatingPts(false);
     setGroupResultsMsg({ type: "ok", text: `✅ Puntos calculados para ${totalUpdated} usuarios` });
     setTimeout(() => setGroupResultsMsg(null), 3000);
@@ -1808,22 +1619,11 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       }
     }
     setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
-    // Notificar a todos: resultado cargado + puntos ganados por usuario
-    sendPushNotification("all", null, {
-      title: "⚽ Resultado cargado",
-      body: `${match.home} ${homeScore}–${awayScore} ${match.away}`,
-      tag: `result-${match.id}`,
-      url: "/",
-    });
+    sendPushNotification("all", null, { title: "⚽ Resultado cargado", body: `${match.home} ${homeScore}–${awayScore} ${match.away}`, tag: `result-${match.id}`, url: "/" });
     if (preds) {
       const winners = preds.filter(p => p.points > 0);
       for (const pred of winners) {
-        sendPushNotification("users", [pred.user_id], {
-          title: "🎉 ¡Ganaste puntos!",
-          body: `${match.home} vs ${match.away} — +${pred.points} pts`,
-          tag: `points-${match.id}-${pred.user_id}`,
-          url: "/",
-        });
+        sendPushNotification("users", [pred.user_id], { title: "🎉 ¡Ganaste puntos!", body: `${match.home} vs ${match.away} — +${pred.points} pts`, tag: `points-${match.id}-${pred.user_id}`, url: "/" });
       }
     }
   }
@@ -1859,20 +1659,12 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
   const filtered = filter==="all"?matches:filter==="finished"?matches.filter(m=>m.status==="finished"):matches.filter(m=>m.status!=="finished");
   const ruleLabels = {
-    exact_score_groups:      "Marcador exacto — Grupos",
-    exact_score_knockout:    "Marcador exacto — Eliminatorias",
-    correct_result_groups:   "Ganador — Grupos",
-    correct_result_knockout: "Ganador — Eliminatorias",
-    correct_goals_groups:    "Goles totales correctos — Grupos",
-    correct_goals_knockout:  "Goles totales correctos — Eliminatorias",
-    group_first:             "1ro de grupo",
-    group_second:            "2do de grupo",
-    third_place_qualifier:   "3er clasificado",
-    max_wildcards:           "Máximo de comodines por torneo",
-    wildcard_cost:           "Costo del comodín (pts)",
-    wildcard_exact:          "Comodín: marcador exacto",
-    wildcard_goals:          "Comodín: goles totales correctos",
-    wildcard_winner:         "Comodín: ganador correcto",
+    exact_score_groups:"Marcador exacto — Grupos",exact_score_knockout:"Marcador exacto — Eliminatorias",
+    correct_result_groups:"Ganador — Grupos",correct_result_knockout:"Ganador — Eliminatorias",
+    correct_goals_groups:"Goles totales correctos — Grupos",correct_goals_knockout:"Goles totales correctos — Eliminatorias",
+    group_first:"1ro de grupo",group_second:"2do de grupo",third_place_qualifier:"3er clasificado",
+    max_wildcards:"Máximo de comodines por torneo",wildcard_cost:"Costo del comodín (pts)",
+    wildcard_exact:"Comodín: marcador exacto",wildcard_goals:"Comodín: goles totales correctos",wildcard_winner:"Comodín: ganador correcto",
   };
 
   return (
@@ -1888,10 +1680,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             <div className="field"><label>Fecha</label><input value={editForm.match_date||""} onChange={e=>setEditForm(f=>({...f,match_date:e.target.value}))}/></div>
             <div className="field"><label>Hora</label><input value={editForm.match_time||""} onChange={e=>setEditForm(f=>({...f,match_time:e.target.value}))}/></div>
             <div className="field"><label>Kickoff UTC</label><input value={editForm.kickoff_at||""} onChange={e=>setEditForm(f=>({...f,kickoff_at:e.target.value}))}/></div>
-            <div className="modal-btns">
-              <button className="btn-cancel" onClick={()=>setEditMatch(null)}>Cancelar</button>
-              <button className="btn-confirm" onClick={saveEditMatch}>Guardar</button>
-            </div>
+            <div className="modal-btns"><button className="btn-cancel" onClick={()=>setEditMatch(null)}>Cancelar</button><button className="btn-confirm" onClick={saveEditMatch}>Guardar</button></div>
           </div>
         </div>
       )}
@@ -1906,50 +1695,46 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           <h3>⚽ RESULTADOS</h3>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             {syncMsg && <span style={{fontSize:12,color:syncMsg.type==="ok"?"var(--green)":"var(--red)",width:"100%"}}>{syncMsg.text}</span>}
-            <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>
-              {syncing ? "⏳ Sync..." : "🔄 Sincronizar"}
-            </button>
-            <button className="btn-small" onClick={()=>setShowMatches(s=>!s)}>
-              {showMatches ? "▲ Contraer" : "▼ Ver partidos"}
-            </button>
+            <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>{syncing ? "⏳ Sync..." : "🔄 Sincronizar"}</button>
+            <button className="btn-small" onClick={()=>setShowMatches(s=>!s)}>{showMatches ? "▲ Contraer" : "▼ Ver partidos"}</button>
             <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length}</div>
           </div>
         </div>
         {showMatches && (
-        <div className="admin-section-body">
-          <div className="match-filter">
-            {[["all","Todos"],["pending","Pendientes"],["finished","Finalizados"]].map(([k,l])=>(
-              <button key={k} className={`filter-btn ${filter===k?"active":""}`} onClick={()=>setFilter(k)}>{l}</button>
-            ))}
+          <div className="admin-section-body">
+            <div className="match-filter">
+              {[["all","Todos"],["pending","Pendientes"],["finished","Finalizados"]].map(([k,l])=>(
+                <button key={k} className={`filter-btn ${filter===k?"active":""}`} onClick={()=>setFilter(k)}>{l}</button>
+              ))}
+            </div>
+            <div className="admin-matches-list">
+              {filtered.map(m => {
+                const r=results[m.id]||{home:m.home_score!==null?String(m.home_score):"",away:m.away_score!==null?String(m.away_score):""};
+                const finished=m.status==="finished";
+                const kickoffPassed = new Date(m.kickoff_at) <= new Date();
+                return (
+                  <div key={m.id} className="admin-match-row">
+                    <div style={{fontSize:11,color:"var(--muted)"}}>{m.match_date}<br/><span style={{color:"var(--txt)"}}>Grupo {m.group_name}</span></div>
+                    <div style={{fontSize:13,fontWeight:500,display:"flex",flexDirection:"column",gap:3}}>
+                      <span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.home_flag} alt={m.home} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.home}</span>
+                      <span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.away}</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
+                      <span style={{color:"var(--muted)",fontFamily:"Bebas Neue",fontSize:16}}>–</span>
+                      <input className="admin-score-input" value={r.away??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],away:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
+                    </div>
+                    <div>{finished?<span className="result-badge">✓ {m.home_score}–{m.away_score}</span>:savedMatch[m.id]?<span style={{fontSize:11,color:"var(--green)"}}>✓</span>:!kickoffPassed?<span style={{fontSize:10,color:"var(--muted)"}}>⏳ No iniciado</span>:null}</div>
+                    <div style={{display:"flex",gap:5}}>
+                      <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]||!kickoffPassed}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
+                      <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
+                      {finished && <button className="admin-edit-btn" onClick={()=>resetMatch(m)} style={{color:"var(--red)",borderColor:"var(--red)"}}>↺</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="admin-matches-list">
-            {filtered.map(m => {
-              const r=results[m.id]||{home:m.home_score!==null?String(m.home_score):"",away:m.away_score!==null?String(m.away_score):""};
-              const finished=m.status==="finished";
-              const kickoffPassed = new Date(m.kickoff_at) <= new Date();
-              return (
-                <div key={m.id} className="admin-match-row">
-                  <div style={{fontSize:11,color:"var(--muted)"}}>{m.match_date}<br/><span style={{color:"var(--txt)"}}>Grupo {m.group_name}</span></div>
-                  <div style={{fontSize:13,fontWeight:500,display:"flex",flexDirection:"column",gap:3}}>
-                    <span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.home_flag} alt={m.home} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.home}</span>
-                    <span style={{display:"flex",alignItems:"center",gap:5}}><img src={m.away_flag} alt={m.away} style={{width:18,height:14,objectFit:"cover",borderRadius:2}}/>{m.away}</span>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <input className="admin-score-input" value={r.home??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],home:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
-                    <span style={{color:"var(--muted)",fontFamily:"Bebas Neue",fontSize:16}}>–</span>
-                    <input className="admin-score-input" value={r.away??""} onChange={e=>setResults(s=>({...s,[m.id]:{...s[m.id],away:e.target.value.replace(/[^0-9]/g,"").slice(0,2)}}))} placeholder="0" disabled={!kickoffPassed}/>
-                  </div>
-                  <div>{finished?<span className="result-badge">✓ {m.home_score}–{m.away_score}</span>:savedMatch[m.id]?<span style={{fontSize:11,color:"var(--green)"}}>✓</span>:!kickoffPassed?<span style={{fontSize:10,color:"var(--muted)"}}>⏳ No iniciado</span>:null}</div>
-                  <div style={{display:"flex",gap:5}}>
-                    <button className="admin-save-btn" onClick={()=>saveResult(m)} disabled={saving[m.id]||!kickoffPassed}>{saving[m.id]?"...":finished?"Actualizar":"Guardar"}</button>
-                    <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
-                    {finished && <button className="admin-edit-btn" onClick={()=>resetMatch(m)} style={{color:"var(--red)",borderColor:"var(--red)"}}>↺</button>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
         )}
       </div>
 
@@ -1973,11 +1758,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                   {[1,2,3].map(pos => (
                     <div key={pos} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                       <span style={{fontFamily:"Bebas Neue",fontSize:14,color:pos===1?"var(--gold)":pos===2?"#b0bcd0":"#cd7f32",width:16}}>{pos}°</span>
-                      <select
-                        value={groupResults[group]?.[pos] || ""}
-                        onChange={e => setGroupResults(r => ({...r,[group]:{...r[group],[pos]:e.target.value}}))}
-                        style={{flex:1,padding:"5px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:6,color:"var(--txt)",fontSize:12,outline:"none"}}
-                      >
+                      <select value={groupResults[group]?.[pos] || ""} onChange={e => setGroupResults(r => ({...r,[group]:{...r[group],[pos]:e.target.value}}))
+                      } style={{flex:1,padding:"5px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:6,color:"var(--txt)",fontSize:12,outline:"none"}}>
                         <option value="">— Seleccionar —</option>
                         {teams.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
                       </select>
@@ -1991,10 +1773,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr">
-          <h3>⚙️ SISTEMA DE PUNTOS</h3>
-          <button className="btn-small" onClick={saveRules} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button>
-        </div>
+        <div className="admin-section-hdr"><h3>⚙️ SISTEMA DE PUNTOS</h3><button className="btn-small" onClick={saveRules} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button></div>
         <div className="admin-section-body">
           <div className="rules-grid">
             {rules.map(r=>(
@@ -2029,10 +1808,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr">
-          <h3>👥 GESTIÓN DE USUARIOS</h3>
-          <span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span>
-        </div>
+        <div className="admin-section-hdr"><h3>👥 GESTIÓN DE USUARIOS</h3><span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span></div>
         <div className="admin-section-body">
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {profiles.map(prof => {
@@ -2053,23 +1829,14 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                     </div>
                     <div style={{display:"flex",gap:6}}>
                       <button className="btn-small" onClick={()=>{ setEditingUser(isEditing?null:prof.id); setEditName(prof.name); }}>✏️</button>
-                      <button className={`btn-small ${isAdminUser?"red":""}`} onClick={()=>toggleAdmin(prof.id, isAdminUser)} disabled={savingAdmin===prof.id}>
-                        {savingAdmin===prof.id?"...":(isAdminUser?"− Admin":"+ Admin")}
-                      </button>
+                      <button className={`btn-small ${isAdminUser?"red":""}`} onClick={()=>toggleAdmin(prof.id, isAdminUser)} disabled={savingAdmin===prof.id}>{savingAdmin===prof.id?"...":(isAdminUser?"− Admin":"+ Admin")}</button>
                       <button className="btn-small red" onClick={()=>setConfirmDelete(confirmDelete===prof.id?null:prof.id)}>🗑️</button>
                     </div>
                   </div>
                   {isEditing && (
                     <div style={{padding:"0 14px 12px",display:"flex",gap:8}}>
-                      <input
-                        value={editName}
-                        onChange={e=>setEditName(e.target.value)}
-                        style={{flex:1,padding:"8px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:7,color:"var(--txt)",fontSize:13,outline:"none"}}
-                        placeholder="Nuevo nombre..."
-                      />
-                      <button className="btn-small" onClick={()=>saveEditName(prof.id)} disabled={savingName===prof.id}>
-                        {savingName===prof.id?"...":"Guardar"}
-                      </button>
+                      <input value={editName} onChange={e=>setEditName(e.target.value)} style={{flex:1,padding:"8px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:7,color:"var(--txt)",fontSize:13,outline:"none"}} placeholder="Nuevo nombre..."/>
+                      <button className="btn-small" onClick={()=>saveEditName(prof.id)} disabled={savingName===prof.id}>{savingName===prof.id?"...":"Guardar"}</button>
                       <button className="btn-small red" onClick={()=>setEditingUser(null)}>×</button>
                     </div>
                   )}
@@ -2077,9 +1844,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                     <div style={{padding:"0 14px 12px",display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:12,color:"var(--red)",flex:1}}>¿Eliminar a {prof.name}? Esto no se puede deshacer.</span>
                       <button className="btn-small" onClick={()=>setConfirmDelete(null)}>Cancelar</button>
-                      <button className="btn-small red" onClick={()=>deleteUser(prof.id)} disabled={deletingUser===prof.id}>
-                        {deletingUser===prof.id?"...":"Confirmar"}
-                      </button>
+                      <button className="btn-small red" onClick={()=>deleteUser(prof.id)} disabled={deletingUser===prof.id}>{deletingUser===prof.id?"...":"Confirmar"}</button>
                     </div>
                   )}
                 </div>
@@ -2113,19 +1878,9 @@ function ResetPasswordScreen({ onDone }) {
   return (
     <div className="auth-wrap">
       <div className="auth-box">
-        <div className="auth-logo">
-          <span className="icon">🔑</span>
-          <h1>QUINIELA 2026</h1>
-          <p>Crear nueva contraseña</p>
-        </div>
-        <div className="field">
-          <label>Nueva contraseña</label>
-          <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" onKeyDown={e => e.key === "Enter" && handleReset()} />
-        </div>
-        <div className="field">
-          <label>Confirmar contraseña</label>
-          <input type="password" value={pass2} onChange={e => setPass2(e.target.value)} placeholder="Repite la contraseña" onKeyDown={e => e.key === "Enter" && handleReset()} />
-        </div>
+        <div className="auth-logo"><span className="icon">🔑</span><h1>QUINIELA 2026</h1><p>Crear nueva contraseña</p></div>
+        <div className="field"><label>Nueva contraseña</label><input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" onKeyDown={e => e.key === "Enter" && handleReset()} /></div>
+        <div className="field"><label>Confirmar contraseña</label><input type="password" value={pass2} onChange={e => setPass2(e.target.value)} placeholder="Repite la contraseña" onKeyDown={e => e.key === "Enter" && handleReset()} /></div>
         <button className="btn-gold" onClick={handleReset} disabled={loading}>{loading ? "GUARDANDO..." : "GUARDAR CONTRASEÑA"}</button>
         {msg && <p className={msg.type === "err" ? "msg-err" : "msg-ok"}>{msg.text}</p>}
       </div>
@@ -2146,27 +1901,68 @@ export default function App() {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
+  const [notifDebug, setNotifDebug] = useState("");
 
   function goTab(t) { setTab(t); setMenuOpen(false); }
 
-  // Register service worker and check notification permission
+  // ── FIX iOS: Register SW + guard Notification API ──────────────────────────
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) {
-      setNotifStatus("unsupported"); return;
+    // Registrar SW (silencioso, no bloquea nada)
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js")
+        .then(reg => reg.update())
+        .catch(console.warn);
     }
-    navigator.serviceWorker.register("/sw.js").catch(console.warn);
+
+    // Guard crítico: Notification NO existe en iOS Safari sin PWA instalada
+    if (typeof Notification === "undefined") {
+      setNotifStatus("unsupported");
+      return;
+    }
+
     const perm = Notification.permission;
     if (perm === "granted") setNotifStatus("granted");
     else if (perm === "denied") setNotifStatus("denied");
+    // si es "default" → queda en "idle"
   }, []);
 
-  const [notifDebug, setNotifDebug] = useState("");
-
+  // ── FIX iOS: enableNotifications con guard completo ────────────────────────
   async function enableNotifications() {
-    if (!("serviceWorker" in navigator)) { setNotifDebug("SW no soportado"); return; }
+    // Sin API de Notification → no hacer nada
+    if (typeof Notification === "undefined") {
+      setNotifDebug("Notificaciones no soportadas en este navegador");
+      setNotifStatus("unsupported");
+      return;
+    }
+
+    // En iOS: solo funciona si la app está instalada como PWA
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+    if (isIOS && !isStandalone) {
+      setNotifDebug("En iPhone: primero instalá la app (Compartir → Agregar a inicio)");
+      setNotifStatus("unsupported");
+      return;
+    }
+
+    if (!("serviceWorker" in navigator)) {
+      setNotifDebug("SW no soportado");
+      setNotifStatus("unsupported");
+      return;
+    }
+
     setNotifStatus("requesting");
-    setNotifDebug("Cargando Firebase...");
+    setNotifDebug("Solicitando permiso...");
+
     try {
+      // Pedir permiso explícitamente primero
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setNotifStatus("denied");
+        setNotifDebug("Permiso denegado");
+        return;
+      }
+
+      setNotifDebug("Cargando Firebase...");
       await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
       await loadScript("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
       setNotifDebug("Firebase cargado. Iniciando...");
@@ -2186,7 +1982,7 @@ export default function App() {
       });
 
       if (!token) { setNotifStatus("denied"); setNotifDebug("Token vacío"); return; }
-      setNotifDebug("Token: " + token.slice(0,20) + "...");
+      setNotifDebug("Token: " + token.slice(0, 20) + "...");
 
       await sb.from("push_subscriptions").upsert({
         user_id: user.id,
@@ -2197,7 +1993,7 @@ export default function App() {
       }, { onConflict: "user_id,endpoint" });
 
       setNotifStatus("granted");
-      setNotifDebug("✅ Guardado OK");
+      setNotifDebug("✅ Notificaciones activadas");
     } catch (e) {
       console.warn("FCM error:", e);
       setNotifDebug("Error: " + e.message);
@@ -2216,9 +2012,7 @@ export default function App() {
 
   async function disableNotifications() {
     try {
-      // Remove FCM token from Supabase
       await sb.from("push_subscriptions").delete().eq("user_id", user.id);
-      // Unregister service worker
       if ("serviceWorker" in navigator) {
         const reg = await navigator.serviceWorker.ready;
         await reg.pushManager.getSubscription().then(sub => sub && sub.unsubscribe());
@@ -2232,18 +2026,12 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT") {
-        setUser(null); setIsAdmin(false); setBooting(false); return;
-      }
-      if (event === "PASSWORD_RECOVERY") {
-        setResettingPassword(true); setBooting(false); return;
-      }
+      if (event === "SIGNED_OUT") { setUser(null); setIsAdmin(false); setBooting(false); return; }
+      if (event === "PASSWORD_RECOVERY") { setResettingPassword(true); setBooting(false); return; }
       if (session?.user) {
         const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
         setUser({ ...session.user, profile });
-      } else {
-        setUser(null); setIsAdmin(false);
-      }
+      } else { setUser(null); setIsAdmin(false); }
       setBooting(false);
     });
 
@@ -2294,27 +2082,14 @@ export default function App() {
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
           {notifStatus !== "unsupported" && notifStatus !== "granted" && (
-            <button
-              className="desktop-only"
-              onClick={enableNotifications}
-              disabled={notifStatus === "requesting" || notifStatus === "denied"}
-              style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}
-            >
+            <button className="desktop-only" onClick={enableNotifications} disabled={notifStatus === "requesting" || notifStatus === "denied"} style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}>
               {notifStatus === "requesting" ? "..." : notifStatus === "denied" ? "🔕 Bloqueado" : "🔔 Activar"}
             </button>
           )}
           {notifStatus === "granted" && (
-            <button
-              className="desktop-only"
-              onClick={disableNotifications}
-              style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}
-            >
-              🔔 Activado
-            </button>
+            <button className="desktop-only" onClick={disableNotifications} style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}>🔔 Activado</button>
           )}
-          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}>
-            <span/><span/><span/>
-          </button>
+          <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}><span/><span/><span/></button>
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
@@ -2326,21 +2101,12 @@ export default function App() {
           <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             {notifStatus !== "unsupported" && notifStatus !== "granted" && (
-              <button
-                onClick={enableNotifications}
-                disabled={notifStatus === "requesting" || notifStatus === "denied"}
-                style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}
-              >
+              <button onClick={enableNotifications} disabled={notifStatus === "requesting" || notifStatus === "denied"} style={{padding:"6px 13px",background:"none",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:notifStatus==="denied"?"not-allowed":"pointer",opacity:notifStatus==="denied"?0.5:1}}>
                 {notifStatus === "requesting" ? "..." : notifStatus === "denied" ? "🔕 Bloqueado" : "🔔 Activar avisos"}
               </button>
             )}
             {notifStatus === "granted" && (
-              <button
-                onClick={disableNotifications}
-                style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}
-              >
-                🔔 Activado
-              </button>
+              <button onClick={disableNotifications} style={{padding:"6px 13px",background:"none",border:"1px solid var(--green)",borderRadius:7,color:"var(--green)",fontSize:12,cursor:"pointer"}}>🔔 Activado</button>
             )}
             <button className="btn-logout" onClick={handleLogout}>Salir</button>
           </div>
