@@ -361,6 +361,16 @@ const ACHIEVEMENTS = [
   // Divertidos
   { key: "unlucky",       icon: "💀", name: "Sin suerte",      desc: "5 predicciones incorrectas seguidas",       tier: "bronze" },
   { key: "iceman",        icon: "🧊", name: "Frío",            desc: "Predecir 0-0 y acertar 3 veces",           tier: "bronze" },
+  // Momento
+  { key: "lastminute",    icon: "🎯", name: "Última hora",     desc: "Guardar una predicción en los últimos 5 min antes del cierre", tier: "silver" },
+  { key: "nightowl",      icon: "🌙", name: "Noctámbulo",      desc: "Guardar una predicción entre medianoche y las 6am",           tier: "bronze" },
+  // Competitivos
+  { key: "executioner",   icon: "😈", name: "Verdugo",         desc: "Ganarle en puntos al líder en un partido",                   tier: "gold"   },
+  { key: "ghost",         icon: "👻", name: "Fantasma",        desc: "Ser el único que acertó un partido",                         tier: "gold"   },
+  // Curiosos
+  { key: "goat",          icon: "🐐", name: "GOAT",            desc: "Tener el puntaje más alto del grupo en algún momento",       tier: "gold"   },
+  { key: "banger",        icon: "💣", name: "Bombazo",         desc: "Acertar un resultado con más de 4 goles en total",           tier: "silver" },
+  { key: "consistent",    icon: "🔁", name: "Consistente",     desc: "Predecir al menos 1 partido por día durante 7 días seguidos",tier: "silver" },
 ];
 
 const TIER_COLORS = {
@@ -478,6 +488,75 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
 
   // ⏰ Madrugador — se marca desde la DB (se verifica si existe en achievements)
   // Este se guarda al guardar predicción, no se puede calcular retroactivo aquí
+
+  // 🎯 Última hora — predicción en los últimos 5 min antes del cierre
+  for (const p of myPreds) {
+    const m = matches.find(m => m.id === p.match_id);
+    if (!m || !p.updated_at) continue;
+    const matchDate = new Date(m.kickoff_at).toISOString().slice(0, 10);
+    const sameDayMatches = matches.filter(x => new Date(x.kickoff_at).toISOString().slice(0, 10) === matchDate);
+    const firstKickoff = Math.min(...sameDayMatches.map(x => new Date(x.kickoff_at).getTime()));
+    const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
+    const savedAt = new Date(p.updated_at);
+    const diffMs = deadline - savedAt;
+    if (diffMs >= 0 && diffMs <= 5 * 60 * 1000) { unlocked.add("lastminute"); break; }
+  }
+
+  // 🌙 Noctámbulo — predicción entre medianoche y 6am UTC
+  for (const p of myPreds) {
+    if (!p.updated_at) continue;
+    const hour = new Date(p.updated_at).getUTCHours();
+    if (hour >= 0 && hour < 6) { unlocked.add("nightowl"); break; }
+  }
+
+  // 😈 Verdugo — ganarle en puntos al líder en un partido
+  // El líder es quien tiene más puntos totales entre todos los usuarios
+  const userTotals = {};
+  predictions.forEach(p => {
+    if (!userTotals[p.user_id]) userTotals[p.user_id] = 0;
+    userTotals[p.user_id] += (p.points || 0);
+  });
+  const leaderEntry = Object.entries(userTotals).filter(([uid]) => uid !== userId).sort((a, b) => b[1] - a[1])[0];
+  if (leaderEntry) {
+    const leaderId = leaderEntry[0];
+    const leaderPreds = predictions.filter(p => p.user_id === leaderId);
+    for (const myP of finishedPreds) {
+      const leaderP = leaderPreds.find(p => p.match_id === myP.match_id);
+      if (leaderP && (myP.points || 0) > (leaderP.points || 0)) { unlocked.add("executioner"); break; }
+    }
+  }
+
+  // 👻 Fantasma — único que acertó un partido
+  for (const myP of finishedPreds) {
+    if (!myP.points || myP.points <= 0) continue;
+    const allForMatch = predictions.filter(p => p.match_id === myP.match_id && p.points > 0);
+    if (allForMatch.length === 1 && allForMatch[0].user_id === userId) { unlocked.add("ghost"); break; }
+  }
+
+  // 🐐 GOAT — puntaje más alto del grupo en algún snapshot
+  if (mySnaps.some(s => s.position === 1)) unlocked.add("goat");
+
+  // 💣 Bombazo — acertar con 5+ goles totales
+  for (const p of finishedPreds) {
+    const m = p.match;
+    if (!p.points || p.points <= 0) continue;
+    const totalGoals = (m.home_score || 0) + (m.away_score || 0);
+    if (totalGoals >= 5) { unlocked.add("banger"); break; }
+  }
+
+  // 🔁 Consistente — 7 días seguidos con al menos 1 predicción
+  const predDays = [...new Set(
+    myPreds.filter(p => p.updated_at).map(p => new Date(p.updated_at).toISOString().slice(0, 10))
+  )].sort();
+  let maxConsec = 1, curConsec = 1;
+  for (let i = 1; i < predDays.length; i++) {
+    const prev = new Date(predDays[i - 1]);
+    const curr = new Date(predDays[i]);
+    const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+    if (diff === 1) { curConsec++; maxConsec = Math.max(maxConsec, curConsec); }
+    else curConsec = 1;
+  }
+  if (maxConsec >= 7) unlocked.add("consistent");
 
   return unlocked;
 }
