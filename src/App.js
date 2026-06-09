@@ -429,6 +429,21 @@ function DebtorCounter({ profile }) {
   );
 }
 
+const DEBTOR_VIDEOS = [
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/videos/quiero_que_el_video_lo_genere.mp4",
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/videos/dale_continua_el_video_en_otro.mp4",
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/videos/continualo_en_otro_de_seg_p.mp4",
+];
+
+const DEBTOR_MESSAGES = [
+  "💸 Che... ¿cuándo vas a pagar?",
+  "🚨 El grupo sabe que no pagaste",
+  "⏰ Ya van {days} días sin pagar...",
+  "😤 Todos te están mirando en la tabla",
+  "🤑 ${amount} no es tanto, ¡pagá ya!",
+  "👀 Tus predicciones existen... tu pago no",
+];
+
 function DebtorOverlay({ profile, onDismiss }) {
   const days = profile.debt_since
     ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
@@ -455,6 +470,73 @@ function DebtorOverlay({ profile, onDismiss }) {
           Entendido, voy a pagar
         </button>
       </div>
+    </div>
+  );
+}
+
+// Popup de video cada 2 minutos para morosos
+function DebtorVideoPopup({ profile, videoIndex, onClose }) {
+  const [canClose, setCanClose] = useState(false);
+  const [countdown, setCountdown] = useState(10);
+  const days = profile.debt_since
+    ? Math.floor((new Date() - new Date(profile.debt_since)) / 86400000)
+    : 0;
+  const msg = DEBTOR_MESSAGES[videoIndex % DEBTOR_MESSAGES.length]
+    .replace("{days}", days)
+    .replace("{amount}", profile.debt_amount || "?");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { setCanClose(true); clearInterval(interval); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 300,
+      background: "rgba(0,0,0,.92)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: 20,
+    }}>
+      {/* Mensaje */}
+      <div style={{
+        fontFamily: "Bebas Neue", fontSize: 22, color: "var(--red)",
+        letterSpacing: 2, marginBottom: 16, textAlign: "center",
+        animation: "debtorShake 2s ease-in-out infinite",
+      }}>{msg}</div>
+
+      {/* Video */}
+      <div style={{ width: "100%", maxWidth: 400, borderRadius: 12, overflow: "hidden", border: "2px solid var(--red)", marginBottom: 16 }}>
+        <video
+          src={DEBTOR_VIDEOS[videoIndex % DEBTOR_VIDEOS.length]}
+          autoPlay playsInline
+          style={{ width: "100%", display: "block" }}
+        />
+      </div>
+
+      {/* Contador / botón cerrar */}
+      {canClose ? (
+        <button onClick={onClose} style={{
+          padding: "12px 32px", background: "var(--red)", border: "none",
+          borderRadius: 10, color: "#fff", fontFamily: "Bebas Neue",
+          fontSize: 18, letterSpacing: 2, cursor: "pointer",
+        }}>
+          😭 Ya voy a pagar
+        </button>
+      ) : (
+        <div style={{
+          padding: "10px 24px", background: "var(--red-dim)",
+          border: "1px solid rgba(255,77,109,.3)", borderRadius: 10,
+          color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <div style={{ width: 16, height: 16, border: "2px solid var(--red)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+          Podés cerrar en {countdown}s...
+        </div>
+      )}
     </div>
   );
 }
@@ -2292,6 +2374,25 @@ function DebtorAdmin({ profiles, onRefresh }) {
   const [amount, setAmount] = useState("");
   const [since, setSince] = useState("");
   const [saving, setSaving] = useState(null);
+  const [intervalMins, setIntervalMins] = useState(2);
+  const [savingInterval, setSavingInterval] = useState(false);
+  const [intervalSaved, setIntervalSaved] = useState(false);
+
+  useEffect(() => {
+    sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
+      .then(({ data }) => { if (data) setIntervalMins(data.rule_value); });
+  }, []);
+
+  async function saveInterval() {
+    setSavingInterval(true);
+    await sb.from("scoring_rules").upsert(
+      { rule_key: "debtor_video_interval", rule_value: parseInt(intervalMins) || 2, description: "Intervalo entre videos de morosos (minutos)" },
+      { onConflict: "rule_key" }
+    );
+    setSavingInterval(false);
+    setIntervalSaved(true);
+    setTimeout(() => setIntervalSaved(false), 2000);
+  }
 
   async function toggleDebtor(prof) {
     setSaving(prof.id);
@@ -2324,9 +2425,22 @@ function DebtorAdmin({ profiles, onRefresh }) {
 
   return (
     <div className="admin-section">
-      <div className="admin-section-hdr">
+      <div className="admin-section-hdr" style={{ flexWrap: "wrap", gap: 8 }}>
         <h3>💸 MOROSOS</h3>
-        <span style={{ fontSize: 12, color: "var(--red)" }}>{debtors.length} en deuda</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>📺 Video cada</span>
+          <input
+            type="number" min="1" max="60" value={intervalMins}
+            onChange={e => setIntervalMins(e.target.value)}
+            style={{ width: 52, padding: "4px 8px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 18, textAlign: "center", outline: "none" }}
+          />
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>min</span>
+          <button className="btn-small" onClick={saveInterval} disabled={savingInterval}
+            style={{ fontSize: 11, padding: "4px 10px" }}>
+            {intervalSaved ? "✓" : savingInterval ? "..." : "Guardar"}
+          </button>
+          <span style={{ fontSize: 12, color: "var(--red)" }}>{debtors.length} en deuda</span>
+        </div>
       </div>
       <div className="admin-section-body">
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -3057,6 +3171,8 @@ export default function App() {
   const [notifDebug, setNotifDebug] = useState("");
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
   const [showDebtorOverlay, setShowDebtorOverlay] = useState(true);
+  const [showDebtorVideo, setShowDebtorVideo] = useState(false);
+  const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastRank, setLastRank] = useState(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
@@ -3074,6 +3190,25 @@ export default function App() {
     setDarkMode(next);
     localStorage.setItem("theme", next ? "dark" : "light");
   }
+
+  // Video periódico para morosos — intervalo configurable desde admin
+  useEffect(() => {
+    if (!user || !profiles.length) return;
+    const isDebtor = profiles.find(p => p.id === user.id)?.is_debtor;
+    if (!isDebtor) return;
+    // Leer intervalo configurado por admin
+    sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
+      .then(({ data }) => {
+        const mins = data?.rule_value || 2;
+        const interval = setInterval(() => {
+          setDebtorVideoIndex(i => i + 1);
+          setShowDebtorVideo(true);
+        }, mins * 60 * 1000);
+        // Guardar ref para cleanup
+        window._debtorInterval = interval;
+      });
+    return () => { if (window._debtorInterval) clearInterval(window._debtorInterval); };
+  }, [user, profiles]);
 
   // Confetti cuando subís en la tabla
   useEffect(() => {
@@ -3356,6 +3491,13 @@ export default function App() {
           <DebtorOverlay
             profile={profiles.find(p => p.id === user.id)}
             onDismiss={() => setShowDebtorOverlay(false)}
+          />
+        )}
+        {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorVideo && (
+          <DebtorVideoPopup
+            profile={profiles.find(p => p.id === user.id)}
+            videoIndex={debtorVideoIndex}
+            onClose={() => setShowDebtorVideo(false)}
           />
         )}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
