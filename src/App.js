@@ -1763,6 +1763,7 @@ function Matches({ user, matches, predictions, onSave }) {
     <div className="matches-grid">
       {matches.map(m => {
         const locked = isLocked(m.kickoff_at, matches, m.match_date);
+const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
