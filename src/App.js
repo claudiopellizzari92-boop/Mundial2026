@@ -175,14 +175,18 @@ input,button,select{font-family:inherit;}
 .reveal-score{font-family:'Bebas Neue';font-size:17px;}
 .reveal-pts{font-size:12px;color:var(--green);}
 .standings-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
-.standings-table{width:100%;border-collapse:collapse;}
+.standings-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.standings-table{width:100%;border-collapse:collapse;min-width:520px;}
 .standings-table thead tr{border-bottom:1px solid var(--border);}
-.standings-table th{padding:10px 14px;font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.5px;}
+.standings-table th{padding:10px 14px;font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;background:var(--card);}
 .standings-table th.c,.standings-table td.c{text-align:center;}
+.standings-table th.sticky,.standings-table td.sticky{position:sticky;left:0;z-index:2;background:var(--card);}
+.standings-table th.sticky2,.standings-table td.sticky2{position:sticky;left:42px;z-index:2;background:var(--card);}
 .standings-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
 .standings-table tbody tr:last-child{border-bottom:none;}
 .standings-table tbody tr:hover{background:var(--card2);}
-.standings-table td{padding:13px 14px;font-size:14px;}
+.standings-table tbody tr:hover td.sticky,.standings-table tbody tr:hover td.sticky2{background:var(--card2);}
+.standings-table td{padding:13px 14px;font-size:14px;white-space:nowrap;}
 .rank-num{font-family:'Bebas Neue';font-size:22px;color:var(--muted);}
 .rank-1{color:var(--gold)!important;}.rank-2{color:#b0bcd0!important;}.rank-3{color:#cd7f32!important;}
 .user-cell{display:flex;align-items:center;gap:10px;}
@@ -249,7 +253,7 @@ input,button,select{font-family:inherit;}
   .score-display{font-size:20px;}
   .groups-grid{grid-template-columns:1fr;}
   .thirds-grid{grid-template-columns:repeat(2,1fr);}
-  .standings-table th,.standings-table td{padding:8px 8px;font-size:12px;}
+  .standings-table th,.standings-table td{padding:10px 10px;font-size:12px;}
   .pts-big{font-size:20px;}
   .rules-grid{grid-template-columns:1fr;}
   .admin-match-row{grid-template-columns:55px 1fr auto auto auto;gap:6px;font-size:12px;}
@@ -390,10 +394,12 @@ function championAvatarClass(profile) {
   return "";
 }
 
-function isLocked(kickoff, allMatches) {
-  const matchDate = new Date(kickoff).toISOString().slice(0, 10);
+function isLocked(kickoff, allMatches, matchDate) {
+  // Usar match_date de la DB si está disponible, sino derivar del kickoff en UTC
+  const dateKey = matchDate || new Date(kickoff).toISOString().slice(0, 10);
   const sameDayMatches = (allMatches || []).filter(m => {
-    return new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate;
+    const mDateKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+    return mDateKey === dateKey;
   });
   if (sameDayMatches.length === 0) return new Date(kickoff) <= new Date();
   const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
@@ -676,16 +682,17 @@ function Confetti({ onDone }) {
 }
 
 // ── Countdown animado ─────────────────────────────────────────────────────────
-function MatchCountdown({ kickoff, matches: allMatches }) {
+function MatchCountdown({ kickoff, matchDate, matches: allMatches }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [urgent, setUrgent] = useState(false);
 
   useEffect(() => {
     function calc() {
-      const matchDate = new Date(kickoff).toISOString().slice(0, 10);
-      const sameDayMatches = (allMatches || []).filter(m =>
-        new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate
-      );
+      const dateKey = matchDate || new Date(kickoff).toISOString().slice(0, 10);
+      const sameDayMatches = (allMatches || []).filter(m => {
+        const mKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+        return mKey === dateKey;
+      });
       const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
       const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
       const diff = deadline - new Date();
@@ -701,7 +708,7 @@ function MatchCountdown({ kickoff, matches: allMatches }) {
     calc();
     const t = setInterval(calc, 1000);
     return () => clearInterval(t);
-  }, [kickoff]);
+  }, [kickoff, matchDate]);
 
   if (!timeLeft) return null;
   return (
@@ -1479,7 +1486,7 @@ function PreTournament({ user }) {
 function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
-  const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).length;
+  const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches, m.match_date)).length;
   const locked = isPreTournamentLocked();
 
   const played = myPreds.filter(p => p.points !== null && p.points !== undefined);
@@ -1583,11 +1590,11 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
     <AchievementsSection userId={user.id} achievements={achievements} equippedBadge={equippedBadge} onEquip={onEquip} />
     <div className="sec-hdr"><h2>PRÓXIMOS SIN PREDECIR</h2></div>
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)"}}>
-      {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches)).slice(0,5).map((m,i,arr) => (
+      {matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches, m.match_date)).slice(0,5).map((m,i,arr) => (
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:i<arr.length-1?"1px solid var(--border)":"none"}}>
           <span style={{fontSize:13,display:"flex",alignItems:"center",gap:6}}><img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/>{m.home} <span style={{color:"var(--muted)"}}>vs</span> {m.away} <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2}}/></span>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:8}}>
-            <MatchCountdown kickoff={m.kickoff_at} matches={matches} />
+            <MatchCountdown kickoff={m.kickoff_at} matchDate={m.match_date} matches={matches} />
             <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap"}}>{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
           </div>
         </div>
@@ -1718,7 +1725,7 @@ function Matches({ user, matches, predictions, onSave }) {
     </div>
     <div className="matches-grid">
       {matches.map(m => {
-        const locked = isLocked(m.kickoff_at, matches);
+        const locked = isLocked(m.kickoff_at, matches, m.match_date);
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
@@ -1734,7 +1741,7 @@ function Matches({ user, matches, predictions, onSave }) {
                   <span className="group-badge">{m.group_name ? `Grupo ${m.group_name}` : m.phase}</span>
                   <span className="match-meta">{localDate(m.kickoff_at)} · {localTime(m.kickoff_at)}</span>
                   {hasWildcard && <span style={{fontSize:14}}>🃏</span>}
-                  {!locked && <MatchCountdown kickoff={m.kickoff_at} matches={matches} />}
+                  {!locked && <MatchCountdown kickoff={m.kickoff_at} matchDate={m.match_date} matches={matches} />}
                 </div>
                 {locked ? (
                   myPred
@@ -2174,13 +2181,14 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     {historyUser && h2hUser && renderH2h()}
     {historyUser && !h2hUser && renderHistory()}
     <div className="standings-wrap">
+      <div className="standings-scroll">
       <table className="standings-table">
-        <thead><tr><th>#</th><th>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
+        <thead><tr><th className="sticky" style={{minWidth:36}}>#</th><th className="sticky2" style={{minWidth:160}}>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
-              <td><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td>
+              <td className="sticky"><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
+              <td className="sticky2">
                 <div className="user-cell">
                   <div className={`avatar sm ${championAvatarClass(row)}`}>{initials(row.name)}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -2210,6 +2218,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   </>);
 }
@@ -2271,7 +2280,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
   });
 
   const allDays = Object.keys(byDay);
-  const firstLockedDay = allDays.find(d => byDay[d].some(m => isLocked(m.kickoff_at, matches)));
+  const firstLockedDay = allDays.find(d => byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
   const [activeDay, setActiveDay] = useState(null);
 
   useEffect(() => {
@@ -2308,14 +2317,14 @@ function Compare({ user, matches, allPredictions, profiles }) {
   }
 
   const dayMatches = activeDay ? (byDay[activeDay] || []) : [];
-  const dayIsLocked = dayMatches.some(m => isLocked(m.kickoff_at, matches));
+  const dayIsLocked = dayMatches.some(m => isLocked(m.kickoff_at, matches, m.match_date));
   const countdown = dayMatches.length > 0 ? timeUntilReveal(dayMatches[0].kickoff_at) : null;
 
   return (<>
     <div className="sec-hdr"><h2>👁️ COMPARAR</h2></div>
     <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
       {allDays.map(d => {
-        const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches));
+        const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date));
         return (
           <button key={d} onClick={() => setActiveDay(d)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: activeDay === d ? "var(--gold)" : "var(--border)", background: activeDay === d ? "var(--gold-dim)" : "none", color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {locked ? "✓ " : "🔒 "}{d}
@@ -3210,9 +3219,20 @@ export default function App() {
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifDebug, setNotifDebug] = useState("");
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
-  const [showDebtorOverlay, setShowDebtorOverlay] = useState(true);
+  const [showDebtorOverlay, setShowDebtorOverlay] = useState(false);
   const [showDebtorVideo, setShowDebtorVideo] = useState(false);
   const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
+
+  // Activar overlay solo si el usuario es moroso, cuando los profiles cargan
+  useEffect(() => {
+    if (!user || !profiles.length) return;
+    const myProfile = profiles.find(p => p.id === user.id);
+    if (myProfile?.is_debtor === true) {
+      setShowDebtorOverlay(true);
+    } else {
+      setShowDebtorOverlay(false);
+    }
+  }, [user, profiles]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastRank, setLastRank] = useState(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
