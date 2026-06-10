@@ -176,17 +176,19 @@ input,button,select{font-family:inherit;}
 .reveal-pts{font-size:12px;color:var(--green);}
 .standings-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
 .standings-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.standings-table{width:100%;border-collapse:collapse;min-width:520px;}
+.standings-table{width:100%;border-collapse:collapse;min-width:420px;}
 .standings-table thead tr{border-bottom:1px solid var(--border);}
 .standings-table th{padding:10px 14px;font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;background:var(--card);}
 .standings-table th.c,.standings-table td.c{text-align:center;}
 .standings-table th.sticky,.standings-table td.sticky{position:sticky;left:0;z-index:2;background:var(--card);}
-.standings-table th.sticky2,.standings-table td.sticky2{position:sticky;left:42px;z-index:2;background:var(--card);}
+.standings-table th.sticky2,.standings-table td.sticky2{position:sticky;left:36px;z-index:2;background:var(--card);}
 .standings-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
 .standings-table tbody tr:last-child{border-bottom:none;}
 .standings-table tbody tr:hover{background:var(--card2);}
 .standings-table tbody tr:hover td.sticky,.standings-table tbody tr:hover td.sticky2{background:var(--card2);}
-.standings-table td{padding:13px 14px;font-size:14px;white-space:nowrap;}
+.standings-table td{padding:10px 10px;font-size:13px;white-space:nowrap;}
+.player-col{max-width:160px;}
+.player-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;display:inline-block;vertical-align:middle;}
 .rank-num{font-family:'Bebas Neue';font-size:22px;color:var(--muted);}
 .rank-1{color:var(--gold)!important;}.rank-2{color:#b0bcd0!important;}.rank-3{color:#cd7f32!important;}
 .user-cell{display:flex;align-items:center;gap:10px;}
@@ -202,7 +204,7 @@ input,button,select{font-family:inherit;}
 @keyframes silverGlow{0%,100%{text-shadow:0 0 8px rgba(192,192,192,.9),0 0 20px rgba(192,192,192,.5),0 0 40px rgba(192,192,192,.3);}50%{text-shadow:0 0 16px rgba(220,220,220,1),0 0 40px rgba(192,192,192,.8),0 0 80px rgba(192,192,192,.4);}}
 @keyframes debtorPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.15);}}
 @keyframes debtorShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-3px);}40%{transform:translateX(3px);}60%{transform:translateX(-2px);}80%{transform:translateX(2px);}}
-.debtor-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;background:rgba(255,77,109,.15);border:1px solid rgba(255,77,109,.4);color:var(--red);font-size:10px;font-weight:700;animation:debtorPulse 1.5s ease-in-out infinite;}
+.debtor-badge{display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:20px;background:rgba(255,77,109,.15);border:1px solid rgba(255,77,109,.4);color:var(--red);font-size:9px;font-weight:700;animation:debtorPulse 1.5s ease-in-out infinite;white-space:nowrap;}
 .debtor-badge .icon{animation:debtorShake 2s ease-in-out infinite;}
 .debtor-overlay{position:fixed;inset:0;z-index:150;backdrop-filter:blur(6px) grayscale(80%);background:rgba(7,9,15,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;}
 .debtor-overlay-box{background:var(--card);border:2px solid var(--red);border-radius:20px;padding:32px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 0 60px rgba(255,77,109,.3);}
@@ -2183,24 +2185,25 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     <div className="standings-wrap">
       <div className="standings-scroll">
       <table className="standings-table">
-        <thead><tr><th className="sticky" style={{minWidth:36}}>#</th><th className="sticky2" style={{minWidth:160}}>Jugador</th><th className="c">PTS</th><th className="c">Exactos</th><th className="c">Resultado</th><th className="c">Jugados</th></tr></thead>
+        <thead><tr><th className="sticky" style={{minWidth:30}}>#</th><th className="sticky2" style={{minWidth:140}}>Jugador</th><th className="c">PTS</th><th className="c">✓✓</th><th className="c">✓</th><th className="c">N</th></tr></thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
               <td className="sticky"><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td className="sticky2">
-                <div className="user-cell">
-                  <div className={`avatar sm ${championAvatarClass(row)}`}>{initials(row.name)}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                      <ChampionName profile={row} name={row.name} />
-                      <TitleBadges profile={row} size={13} />
+              <td className="sticky2" style={{maxWidth:160}}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div className={`avatar sm ${championAvatarClass(row)}`} style={{flexShrink:0}}>{initials(row.name)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 100, display: "inline-block" }}>
+                        <ChampionName profile={row} name={row.name} />
+                      </span>
+                      <TitleBadges profile={row} size={11} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
-                      {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
+                      {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:13,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
-                    {row.is_debtor && <DebtorCounter profile={row} />}
+                    {row.is_debtor && <DebtorBadge profile={row} />}
                   </div>
-                  {row.is_debtor && <DebtorBadge profile={row} />}
                 </div>
               </td>
               <td className="c">
