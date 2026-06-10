@@ -128,6 +128,7 @@ input,button,select{font-family:inherit;}
 .nav-user{display:flex;align-items:center;gap:8px;}
 .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07090f;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .avatar.sm{width:28px;height:28px;font-size:10px;}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
 .btn-logout{padding:6px 13px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:12px;cursor:pointer;transition:all .2s;}
 .btn-logout:hover{border-color:var(--red);color:var(--red);}
 .main{flex:1;padding:28px 24px;max-width:980px;margin:0 auto;width:100%;}
