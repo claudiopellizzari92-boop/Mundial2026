@@ -176,19 +176,19 @@ input,button,select{font-family:inherit;}
 .reveal-pts{font-size:12px;color:var(--green);}
 .standings-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
 .standings-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.standings-table{width:100%;border-collapse:collapse;min-width:420px;}
+.standings-table{width:100%;border-collapse:collapse;}
 .standings-table thead tr{border-bottom:1px solid var(--border);}
 .standings-table th{padding:10px 14px;font-size:11px;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;background:var(--card);}
 .standings-table th.c,.standings-table td.c{text-align:center;}
 .standings-table th.sticky,.standings-table td.sticky{position:sticky;left:0;z-index:2;background:var(--card);}
-.standings-table th.sticky2,.standings-table td.sticky2{position:sticky;left:36px;z-index:2;background:var(--card);}
+.standings-table th.sticky2,.standings-table td.sticky2{position:sticky;left:42px;z-index:2;background:var(--card);}
 .standings-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
 .standings-table tbody tr:last-child{border-bottom:none;}
 .standings-table tbody tr:hover{background:var(--card2);}
 .standings-table tbody tr:hover td.sticky,.standings-table tbody tr:hover td.sticky2{background:var(--card2);}
-.standings-table td{padding:10px 10px;font-size:13px;white-space:nowrap;}
-.player-col{max-width:160px;}
-.player-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;display:inline-block;vertical-align:middle;}
+.standings-table td{padding:13px 14px;font-size:14px;white-space:nowrap;}
+.mobile-col{display:none;}
+.desktop-col{display:table-cell;}
 .rank-num{font-family:'Bebas Neue';font-size:22px;color:var(--muted);}
 .rank-1{color:var(--gold)!important;}.rank-2{color:#b0bcd0!important;}.rank-3{color:#cd7f32!important;}
 .user-cell{display:flex;align-items:center;gap:10px;}
@@ -255,8 +255,15 @@ input,button,select{font-family:inherit;}
   .score-display{font-size:20px;}
   .groups-grid{grid-template-columns:1fr;}
   .thirds-grid{grid-template-columns:repeat(2,1fr);}
-  .standings-table th,.standings-table td{padding:10px 10px;font-size:12px;}
-  .pts-big{font-size:20px;}
+  .standings-table th,.standings-table td{padding:8px 6px;font-size:11px;}
+  .pts-big{font-size:18px;}
+  .mobile-col{display:table-cell!important;}
+  .desktop-col{display:none!important;}
+  .standings-table th.sticky2,.standings-table td.sticky2{left:32px;max-width:130px;}
+  .standings-table td.sticky2 .user-cell{gap:4px;}
+  .standings-table td.sticky2 .champion-name,
+  .standings-table td.sticky2 .silver-name,
+  .standings-table td.sticky2 span[style]{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;}
   .rules-grid{grid-template-columns:1fr;}
   .admin-match-row{grid-template-columns:55px 1fr auto auto auto;gap:6px;font-size:12px;}
   .sec-hdr h2{font-size:22px;}
@@ -1906,8 +1913,9 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     const prePts = prePreds.filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
     const pts = matchPts + prePts;
     const exact = preds.filter(pr => pr.points >= 3).length;
-    const result = preds.filter(pr => pr.points > 0 && pr.points < 3).length;
-    return { ...p, pts, exact, result, played: preds.length };
+    const winner = preds.filter(pr => pr.points === 2 || pr.points === 5).length;
+    const goals = preds.filter(pr => pr.points === 1 || pr.points === 2).length;
+    return { ...p, pts, exact, winner, goals, played: preds.length };
   }).sort((a, b) => b.pts - a.pts || b.exact - a.exact);
 
   function renderH2h() {
@@ -2185,28 +2193,42 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     <div className="standings-wrap">
       <div className="standings-scroll">
       <table className="standings-table">
-        <thead><tr><th className="sticky" style={{minWidth:30}}>#</th><th className="sticky2" style={{minWidth:140}}>Jugador</th><th className="c">PTS</th><th className="c">✓✓</th><th className="c">✓</th><th className="c">N</th></tr></thead>
+        <thead>
+          <tr>
+            <th className="sticky" style={{minWidth:30}}>#</th>
+            <th className="sticky2" style={{minWidth:140}}>Jugador</th>
+            <th className="c desktop-col">PTS</th>
+            <th className="c desktop-col">Exactos</th>
+            <th className="c desktop-col">Ganador</th>
+            <th className="c desktop-col">Goles</th>
+            <th className="c desktop-col">Partidos</th>
+            <th className="c mobile-col">PTS</th>
+            <th className="c mobile-col">Ext</th>
+            <th className="c mobile-col">Gan</th>
+            <th className="c mobile-col">Gols</th>
+            <th className="c mobile-col">Part</th>
+          </tr>
+        </thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
               <td className="sticky"><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
-              <td className="sticky2" style={{maxWidth:160}}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <td className="sticky2">
+                <div className="user-cell">
                   <div className={`avatar sm ${championAvatarClass(row)}`} style={{flexShrink:0}}>{initials(row.name)}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 100, display: "inline-block" }}>
-                        <ChampionName profile={row} name={row.name} />
-                      </span>
-                      <TitleBadges profile={row} size={11} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                      <ChampionName profile={row} name={row.name} />
+                      <TitleBadges profile={row} size={13} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
-                      {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:13,cursor:"default"}}>{a.icon}</span> : null; })()}
+                      {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
-                    {row.is_debtor && <DebtorBadge profile={row} />}
+                    {row.is_debtor && <DebtorCounter profile={row} />}
+                    {row.is_debtor && <span className="mobile-col"><DebtorBadge profile={row} /></span>}
                   </div>
                 </div>
               </td>
-              <td className="c">
+              <td className="c desktop-col">
                 {row.is_debtor
                   ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
                       <span className="pts-big" style={{ color: "var(--muted)", textDecoration: "line-through", opacity: .5 }}>{row.pts}</span>
@@ -2214,9 +2236,22 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
                     </div>
                   : <span className="pts-big">{row.pts}</span>}
               </td>
-              <td className="c"><span className="pill">{row.exact}</span></td>
-              <td className="c"><span className="pill">{row.result}</span></td>
-              <td className="c" style={{ color: "var(--muted)", fontSize: 13 }}>{row.played}</td>
+              <td className="c desktop-col"><span className="pill">{row.exact}</span></td>
+              <td className="c desktop-col"><span className="pill">{row.winner}</span></td>
+              <td className="c desktop-col"><span className="pill">{row.goals}</span></td>
+              <td className="c desktop-col" style={{ color: "var(--muted)", fontSize: 13 }}>{row.played}</td>
+              <td className="c mobile-col">
+                {row.is_debtor
+                  ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                      <span className="pts-big" style={{ color: "var(--muted)", textDecoration: "line-through", opacity: .5, fontSize: 18 }}>{row.pts}</span>
+                      <span style={{ fontSize: 12 }}>❌</span>
+                    </div>
+                  : <span className="pts-big" style={{fontSize:18}}>{row.pts}</span>}
+              </td>
+              <td className="c mobile-col"><span className="pill">{row.exact}</span></td>
+              <td className="c mobile-col"><span className="pill">{row.winner}</span></td>
+              <td className="c mobile-col"><span className="pill">{row.goals}</span></td>
+              <td className="c mobile-col" style={{ color: "var(--muted)", fontSize: 12 }}>{row.played}</td>
             </tr>
           ))}
         </tbody>
