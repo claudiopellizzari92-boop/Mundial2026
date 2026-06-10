@@ -259,8 +259,9 @@ input,button,select{font-family:inherit;}
   .pts-big{font-size:18px;}
   .mobile-col{display:table-cell!important;}
   .desktop-col{display:none!important;}
-  .standings-table th.sticky2,.standings-table td.sticky2{left:32px;max-width:130px;}
-  .standings-table td.sticky2 .user-cell{gap:4px;}
+  .standings-table th.sticky2,.standings-table td.sticky2{left:32px;max-width:130px;overflow:hidden;}
+.standings-table td.sticky2 .user-cell{gap:4px;min-width:0;overflow:hidden;}
+.standings-table td.sticky2 .user-cell > div{min-width:0;overflow:hidden;}
   .standings-table td.sticky2 .champion-name,
   .standings-table td.sticky2 .silver-name,
   .standings-table td.sticky2 span[style]{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;}
