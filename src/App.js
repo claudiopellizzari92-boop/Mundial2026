@@ -367,6 +367,25 @@ input,button,select{font-family:inherit;}
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
+function Avatar({ profile, size = "md" }) {
+  const ac = championAvatarClass(profile);
+  if (profile?.avatar_url) {
+    return (
+      <img
+        src={profile.avatar_url}
+        alt={profile.name || ""}
+        className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`}
+        style={{ objectFit: "cover", borderRadius: "50%", width: size === "sm" ? 28 : 34, height: size === "sm" ? 28 : 34 }}
+      />
+    );
+  }
+  return (
+    <div className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`}>
+      {initials(profile?.name)}
+    </div>
+  );
+}
+
 // ── Title helpers ─────────────────────────────────────────────────────────────
 function getTitleInfo(profile) {
   const titles = profile?.titles || [];
