@@ -1721,7 +1721,7 @@ function Matches({ user, matches, predictions, onSave }) {
       </div>
     </div>
     <div style={{background:"rgba(245,183,49,.08)",border:"1px solid rgba(245,183,49,.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"var(--muted)"}}>
-      🃏 <strong style={{color:"var(--gold)"}}>Comodín:</strong> Cuesta {wildcardCost} pt. Exacto <strong style={{color:"var(--gold)"}}>+8</strong> · Goles <strong style={{color:"var(--gold)"}}>+5</strong> · Ganador <strong style={{color:"var(--gold)"}}>+2</strong> · Falla <strong style={{color:"var(--red)"}}>0</strong>
+      🃏 <strong style={{color:"var(--gold)"}}>Comodín:</strong> Cuesta {wildcardCost} pt. Exacto <strong style={{color:"var(--gold)"}}>+8</strong> · Ganador <strong style={{color:"var(--gold)"}}>+5</strong> · Goles <strong style={{color:"var(--gold)"}}>+2</strong> · Falla <strong style={{color:"var(--red)"}}>0</strong>
     </div>
     <div className="matches-grid">
       {matches.map(m => {
