@@ -1327,7 +1327,9 @@ function PreTournament({ user }) {
           if (!gp[p.group_name]) gp[p.group_name] = {};
           gp[p.group_name][p.position] = p.team;
         } else if (p.prediction_type === "third_place") {
-  if (!tp.includes(p.team)) tp.push(p.team);
+  const teamGroup = Object.entries(GROUPS).find(([, teams]) => teams.some(t => t.name === p.team))?.[0];
+  const groupAlreadyAdded = tp.some(t => Object.entries(GROUPS).find(([, teams]) => teams.some(tm => tm.name === t))?.[0] === teamGroup);
+  if (!groupAlreadyAdded) tp.push(p.team);
 }
       });
       setGroupPreds(gp);
