@@ -1242,7 +1242,7 @@ function HallOfFame({ profiles, predictions, snapshots, allAchievements }) {
         {categories.map(cat => cat.winner && (
           <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ fontFamily: "Bebas Neue", fontSize: 14, color: "var(--gold)", minWidth: 110 }}>{cat.label}</div>
-            <div className="avatar sm">{initials(cat.winner.name)}</div>
+            <Avatar profile={cat.winner} size="sm" />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.winner.name}</div>
               <div style={{ fontSize: 11, color: "var(--muted)" }}>{cat.winner[cat.key]} {cat.key === "pts" ? "pts" : cat.key === "exact" ? "exactos" : "días"}</div>
@@ -1995,7 +1995,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div className={`avatar ${championAvatarClass(uA)}`}>{initials(uA.name)}</div>
+              <Avatar profile={uA} />
               <div style={{ textAlign: "center" }}>
                 <ChampionName profile={uA} name={uA.name} style={{ fontSize: 12, fontWeight: 600 }} />
                 <TitleBadges profile={uA} size={12} />
@@ -2008,7 +2008,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
               <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: winsB > winsA ? "var(--gold)" : winsA > winsB ? "var(--muted)" : "var(--txt)" }}>{winsB}</div>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div className={`avatar ${championAvatarClass(uB)}`} style={{ background: "linear-gradient(135deg,#4a9eff,#1a6fd4)" }}>{initials(uB.name)}</div>
+              <Avatar profile={uB} />
               <div style={{ textAlign: "center" }}>
                 <ChampionName profile={uB} name={uB.name} style={{ fontSize: 12, fontWeight: 600 }} />
                 <TitleBadges profile={uB} size={12} />
@@ -2097,7 +2097,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className={`avatar ${championAvatarClass(prof)}`}>{initials(prof.name)}</div>
+              <Avatar profile={prof} />
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <ChampionName profile={prof} name={prof.name} style={{ fontFamily: "Bebas Neue", fontSize: 20, letterSpacing: 1 }} />
@@ -2242,7 +2242,7 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
               <td className="sticky"><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
               <td className="sticky2">
                 <div className="user-cell">
-                  <div className={`avatar sm ${championAvatarClass(row)}`} style={{flexShrink:0}}>{initials(row.name)}</div>
+                  <Avatar profile={row} size="sm" />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                       <ChampionName profile={row} name={row.name} />
@@ -2699,7 +2699,7 @@ function TitlesAdmin({ profiles, onRefresh }) {
             {titledProfiles.map(prof => (
               <div key={prof.id} style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", border: "1px solid var(--border)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <div className={`avatar sm ${championAvatarClass(prof)}`}>{initials(prof.name)}</div>
+                  <Avatar profile={prof} size="sm" />
                   <ChampionName profile={prof} name={prof.name} style={{ fontSize: 14, fontWeight: 600 }} />
                   <TitleBadges profile={prof} size={14} />
                 </div>
@@ -3194,7 +3194,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                 <div key={prof.id} style={{background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden"}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div className="avatar sm">{initials(prof.name)}</div>
+                      <Avatar profile={prof} size="sm" />
                       <div>
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
                           <span style={{fontSize:14,fontWeight:500}}>{prof.name}</span>
@@ -3204,7 +3204,20 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6}}>
-                      <button className="btn-small" onClick={()=>{ setEditingUser(isEditing?null:prof.id); setEditName(prof.name); }}>✏️</button>
+                      <label style={{padding:"7px 14px",background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:7,color:"var(--gold)",fontSize:12,cursor:"pointer"}}>
+  🖼️
+  <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = `${prof.id}.${ext}`;
+    await sb.storage.from("avatars").upload(path, file, { upsert: true });
+    const { data: { publicUrl } } = sb.storage.from("avatars").getPublicUrl(path);
+    await sb.from("profiles").update({ avatar_url: publicUrl }).eq("id", prof.id);
+    onRefresh();
+  }}/>
+</label>
+<button className="btn-small" onClick={()=>{ setEditingUser(isEditing?null:prof.id); setEditName(prof.name); }}>✏️</button>
                       <button className={`btn-small ${isAdminUser?"red":""}`} onClick={()=>toggleAdmin(prof.id, isAdminUser)} disabled={savingAdmin===prof.id}>{savingAdmin===prof.id?"...":(isAdminUser?"− Admin":"+ Admin")}</button>
                       <button className="btn-small red" onClick={()=>setConfirmDelete(confirmDelete===prof.id?null:prof.id)}>🗑️</button>
                     </div>
@@ -3566,7 +3579,7 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
-          <div className="avatar">{initials(user.profile?.name||user.email)}</div>
+          <Avatar profile={user.profile} />
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="theme-toggle desktop-only" onClick={toggleTheme} title={darkMode ? "Modo claro" : "Modo oscuro"}>{darkMode ? "☀️" : "🌙"}</button>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
