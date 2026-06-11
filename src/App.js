@@ -1264,11 +1264,11 @@ function AuthScreen({ onAuth }) {
     const { data: profile } = await sb.from("profiles").select("*").eq("id", data.user.id).single();
     if (rememberMe) {
   localStorage.setItem("sb-remember", "true");
+  window.location.reload();
 } else {
   localStorage.removeItem("sb-remember");
+  onAuth({ ...data.user, profile }); setLoading(false);
 }
-onAuth({ ...data.user, profile }); setLoading(false);
-  }
 
   async function handleForgotPassword() {
     if (!email.trim()) { setMsg({ type: "err", text: "Ingresa tu email primero" }); return; }
