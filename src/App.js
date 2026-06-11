@@ -1440,6 +1440,52 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     setPublishingId(null);
   }
 
+  async function borrarBorrador(id) {
+    if (!window.confirm("¿Eliminar este borrador?")) return;
+    await sb.from("chronicles").delete().eq("id", id);
+    await loadChronicles();
+  }
+
+  function buildResumenPrueba() {
+    const nombres = profiles.map(p => p.name).filter(Boolean);
+    const pool = nombres.length ? [...nombres] : ["Marian", "El Colo", "Fede", "Naza", "Pipa", "Tato"];
+    const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(8, pool.length));
+    const base = [14, 9, 7, 5, 4, 3, 1, -1];
+    const tabla_fecha = shuffled.map((nombre, i) => ({
+      nombre,
+      puntos_fecha: i < base.length ? base[i] : 0,
+      exactos: i === 0 ? 3 : (i < 3 ? 1 : 0),
+      uso_comodin: i === 1 || i === shuffled.length - 1,
+    }));
+    const tabla_general = shuffled.map((nombre, i) => ({ puesto: i + 1, nombre, puntos: 45 - i * 5 }));
+    const partidos = [
+      { local: "Argentina", visitante: "México", resultado: "2-1", fase: "Grupo A" },
+      { local: "Brasil", visitante: "Croacia", resultado: "3-0", fase: "Grupo B" },
+      { local: "España", visitante: "Japón", resultado: "1-1", fase: "Grupo C" },
+    ];
+    return { jornada: "Fecha de PRUEBA", partidos, tabla_fecha, tabla_general, lider: tabla_general[0] || null };
+  }
+
+  async function generarPrueba() {
+    setGenerating(true); setError("");
+    try {
+      const resumen = buildResumenPrueba();
+      const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
+        body: { match_date: "PRUEBA", fecha_label: "Fecha de PRUEBA 🧪", ideas, resumen },
+      });
+      if (invErr) {
+        let msg = invErr.message || "Error llamando a la función";
+        try { const j = await invErr.context.json(); if (j && j.error) msg = j.error + (j.detalle ? ` — ${j.detalle}` : ""); } catch (_e) {}
+        setError(msg); setGenerating(false); return;
+      }
+      if (data && data.error) { setError(data.error); setGenerating(false); return; }
+      await loadChronicles();
+    } catch (e) {
+      setError(String(e));
+    }
+    setGenerating(false);
+  }
+
   return (<>
     {isAdmin && (
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:20}}>
@@ -1460,6 +1506,9 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
           <button onClick={generar} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
             {generating ? "🪄 Generando con la IA..." : "🪄 Generar crónica"}
           </button>
+          <button onClick={generarPrueba} disabled={generating} style={{padding:"10px 16px",background:"transparent",color:"var(--muted)",border:"1px dashed var(--border)",borderRadius:10,fontSize:13,fontWeight:600,cursor:generating?"default":"pointer"}}>
+            🧪 Generar crónica de prueba (datos de ejemplo · no se publica)
+          </button>
         </div>
       </div>
     )}
@@ -1479,9 +1528,14 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
             <div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
             <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.cuerpo}</div>
             {isAdmin && !c.published && (
-              <button onClick={()=>publicar(c.match_date)} disabled={publishingId===c.match_date} style={{marginTop:18,padding:"10px 18px",background:"var(--green)",color:"#0a0a0a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                {publishingId===c.match_date ? "Publicando..." : "📢 Publicar para todos"}
-              </button>
+              <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
+                <button onClick={()=>publicar(c.match_date)} disabled={publishingId===c.match_date} style={{padding:"10px 18px",background:"var(--green)",color:"#0a0a0a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                  {publishingId===c.match_date ? "Publicando..." : "📢 Publicar para todos"}
+                </button>
+                <button onClick={()=>borrarBorrador(c.id)} style={{padding:"10px 16px",background:"transparent",color:"#ff8080",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                  🗑️ Eliminar
+                </button>
+              </div>
             )}
           </div>
         ))}
