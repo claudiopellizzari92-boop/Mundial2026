@@ -1256,9 +1256,6 @@ function AuthScreen({ onAuth }) {
 
   async function handleLogin() {
     setLoading(true); setMsg(null);
-    if (rememberMe) {
-  sb.auth.storageKey && localStorage.setItem("sb-remember", "true");
-}
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) { setMsg({ type: "err", text: "Email o contraseña incorrectos" }); setLoading(false); return; }
     const { data: profile } = await sb.from("profiles").select("*").eq("id", data.user.id).single();
