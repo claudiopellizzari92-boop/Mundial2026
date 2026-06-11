@@ -2688,6 +2688,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
   const [emojiPicker, setEmojiPicker] = useState(null);
   const [wildcards, setWildcards] = useState([]);
   const [view, setView] = useState("partidos");
+  const visibleProfiles = (profiles || []).filter(p => !p.is_eliminated);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -2825,7 +2826,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
             const hasResult = m.home_score !== null && m.away_score !== null;
             const isOpen = expanded[m.id];
             const matchWildcardUsers = new Set(wildcards.filter(w => w.match_id === m.id).map(w => w.user_id));
-            const sortedProfiles = [...profiles].sort((a, b) => {
+            const sortedProfiles = [...visibleProfiles].sort((a, b) => {
               const pa = matchPreds.find(p => p.user_id === a.id);
               const pb = matchPreds.find(p => p.user_id === b.id);
               if (!pa && !pb) return 0;
@@ -2896,7 +2897,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
       )}
     </>)}
     </>)}
-    {view === "pretorneo" && <PreTournamentCompare user={user} profiles={profiles} />}
+    {view === "pretorneo" && <PreTournamentCompare user={user} profiles={visibleProfiles} />}
   </>);
 }
 
