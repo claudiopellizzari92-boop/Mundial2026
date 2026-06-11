@@ -3283,17 +3283,35 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         }).eq("id", existing.id);
 
         const isKnockout = phase !== "Grupos";
-        const exactPts = isKnockout ? (ruleMap["exact_score_knockout"]||6) : (ruleMap["exact_score_groups"]||3);
-        const resultPts = isKnockout ? (ruleMap["correct_result_knockout"]||2) : (ruleMap["correct_result_groups"]||1);
+        const exactPts = isKnockout ? (ruleMap["exact_score_knockout"]||3) : (ruleMap["exact_score_groups"]||3);
+        const resultPts = isKnockout ? (ruleMap["correct_result_knockout"]||1) : (ruleMap["correct_result_groups"]||1);
+        const goalsPts = isKnockout ? (ruleMap["correct_goals_knockout"]||2) : (ruleMap["correct_goals_groups"]||1);
+        const wcExact = ruleMap["wildcard_exact"]||8;
+        const wcGoals = ruleMap["wildcard_goals"]||5;
+        const wcWinner = ruleMap["wildcard_winner"]||2;
+        const wcCost = ruleMap["wildcard_cost"]||1;
         const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+        const realTotalGoals = homeScore + awayScore;
 
         const { data: preds } = await sb.from("predictions").select("*").eq("match_id", existing.id);
+        const { data: matchWildcards } = await sb.from("wildcards").select("*").eq("match_id", existing.id);
+        const wildcardUserIds = new Set((matchWildcards||[]).map(w => w.user_id));
         for (const pred of (preds||[])) {
+          const hasWildcard = wildcardUserIds.has(pred.user_id);
           let pts = 0;
-          if (pred.home_score === homeScore && pred.away_score === awayScore) pts = exactPts;
-          else {
-            const pr = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-            if (pr === realResult) pts = resultPts;
+          const isExact = pred.home_score === homeScore && pred.away_score === awayScore;
+          const predResult = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
+          const isCorrectResult = predResult === realResult;
+          const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
+          if (hasWildcard) {
+            if (isExact) pts = wcExact;
+            else if (isCorrectGoals) pts = wcGoals;
+            else if (isCorrectResult) pts = wcWinner;
+            else pts = -wcCost;
+          } else {
+            if (isExact) pts = exactPts;
+            else if (isCorrectGoals) pts = goalsPts;
+            else if (isCorrectResult) pts = resultPts;
           }
           await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
         }
