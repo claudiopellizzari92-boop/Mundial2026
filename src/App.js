@@ -1436,6 +1436,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   async function publicar(matchDate) {
     setPublishingId(matchDate);
     await sb.from("chronicles").update({ published: true, updated_at: new Date().toISOString() }).eq("match_date", matchDate);
+    sendPushNotification("all", null, { title: "📰 Nueva crónica disponible", body: `Ya podés leer la crónica de ${jornadaLabel(matchDate)} en la pestaña Info`, tag: `cronica-${matchDate}`, url: "/" });
     await loadChronicles();
     setPublishingId(null);
   }
@@ -1444,46 +1445,6 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     if (!window.confirm("¿Eliminar este borrador?")) return;
     await sb.from("chronicles").delete().eq("id", id);
     await loadChronicles();
-  }
-
-  function buildResumenPrueba() {
-    const nombres = profiles.map(p => p.name).filter(Boolean);
-    const pool = nombres.length ? [...nombres] : ["Marian", "El Colo", "Fede", "Naza", "Pipa", "Tato"];
-    const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(8, pool.length));
-    const base = [14, 9, 7, 5, 4, 3, 1, -1];
-    const tabla_fecha = shuffled.map((nombre, i) => ({
-      nombre,
-      puntos_fecha: i < base.length ? base[i] : 0,
-      exactos: i === 0 ? 3 : (i < 3 ? 1 : 0),
-      uso_comodin: i === 1 || i === shuffled.length - 1,
-    }));
-    const tabla_general = shuffled.map((nombre, i) => ({ puesto: i + 1, nombre, puntos: 45 - i * 5 }));
-    const partidos = [
-      { local: "Argentina", visitante: "México", resultado: "2-1", fase: "Grupo A" },
-      { local: "Brasil", visitante: "Croacia", resultado: "3-0", fase: "Grupo B" },
-      { local: "España", visitante: "Japón", resultado: "1-1", fase: "Grupo C" },
-    ];
-    return { jornada: "Fecha de PRUEBA", partidos, tabla_fecha, tabla_general, lider: tabla_general[0] || null };
-  }
-
-  async function generarPrueba() {
-    setGenerating(true); setError("");
-    try {
-      const resumen = buildResumenPrueba();
-      const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
-        body: { match_date: "PRUEBA", fecha_label: "Fecha de PRUEBA 🧪", ideas, resumen },
-      });
-      if (invErr) {
-        let msg = invErr.message || "Error llamando a la función";
-        try { const j = await invErr.context.json(); if (j && j.error) msg = j.error + (j.detalle ? ` — ${j.detalle}` : ""); } catch (_e) {}
-        setError(msg); setGenerating(false); return;
-      }
-      if (data && data.error) { setError(data.error); setGenerating(false); return; }
-      await loadChronicles();
-    } catch (e) {
-      setError(String(e));
-    }
-    setGenerating(false);
   }
 
   return (<>
@@ -1505,9 +1466,6 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
           {error && <div style={{padding:"10px 14px",background:"rgba(220,60,60,.12)",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:13,color:"#ff8080"}}>{error}</div>}
           <button onClick={generar} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
             {generating ? "🪄 Generando con la IA..." : "🪄 Generar crónica"}
-          </button>
-          <button onClick={generarPrueba} disabled={generating} style={{padding:"10px 16px",background:"transparent",color:"var(--muted)",border:"1px dashed var(--border)",borderRadius:10,fontSize:13,fontWeight:600,cursor:generating?"default":"pointer"}}>
-            🧪 Generar crónica de prueba (datos de ejemplo · no se publica)
           </button>
         </div>
       </div>
