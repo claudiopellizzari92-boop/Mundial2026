@@ -3530,8 +3530,6 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         <div className="admin-section-hdr" style={{flexWrap:"wrap",gap:8}}>
           <h3>⚽ RESULTADOS</h3>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            {syncMsg && <span style={{fontSize:12,color:syncMsg.type==="ok"?"var(--green)":"var(--red)",width:"100%"}}>{syncMsg.text}</span>}
-            <button className="btn-small" onClick={syncScores} disabled={syncing} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>{syncing ? "⏳ Sync..." : "🔄 Sincronizar"}</button>
             <button className="btn-small" onClick={()=>setShowMatches(s=>!s)}>{showMatches ? "▲ Contraer" : "▼ Ver partidos"}</button>
             <div style={{fontSize:12,color:"var(--muted)"}}>{matches.filter(m=>m.status==="finished").length}/{matches.length}</div>
           </div>
