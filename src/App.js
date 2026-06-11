@@ -2352,9 +2352,12 @@ function Compare({ user, matches, allPredictions, profiles }) {
 
   function toggleExpand(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
-  function timeUntilReveal(kickoff) {
-    const matchDate = new Date(kickoff).toISOString().slice(0, 10);
-    const sameDayMatches = matches.filter(m => new Date(m.kickoff_at).toISOString().slice(0, 10) === matchDate);
+  function timeUntilReveal(kickoff, matchDateStr) {
+    const dateKey = matchDateStr || new Date(kickoff).toISOString().slice(0, 10);
+    const sameDayMatches = matches.filter(m => {
+      const mKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+      return mKey === dateKey;
+    });
     const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
     const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
     const diff = deadline - now;
@@ -2380,7 +2383,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
 
   const dayMatches = activeDay ? (byDay[activeDay] || []) : [];
   const dayIsLocked = dayMatches.some(m => isLocked(m.kickoff_at, matches, m.match_date));
-  const countdown = dayMatches.length > 0 ? timeUntilReveal(dayMatches[0].kickoff_at) : null;
+  const countdown = dayMatches.length > 0 ? timeUntilReveal(dayMatches[0].kickoff_at, dayMatches[0].match_date) : null;
 
   return (<>
     <div className="sec-hdr"><h2>👁️ COMPARAR</h2></div>
