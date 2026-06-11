@@ -3728,6 +3728,48 @@ function ResetPasswordScreen({ onDone }) {
 }
 
 // ── App Root ──────────────────────────────────────────────────────────────────
+// ── Recordatorio de predicciones pendientes ───────────────────────────────────
+const PRED_REMINDER_MINUTES = 30;
+
+function getPendingPredReminder(matches, allPredictions, userId) {
+  if (!matches || !matches.length || !userId) return null;
+  const now = Date.now();
+  const byDate = {};
+  matches.forEach(m => { (byDate[m.match_date] = byDate[m.match_date] || []).push(m); });
+  let best = null;
+  Object.entries(byDate).forEach(([date, ms]) => {
+    const firstKickoff = Math.min(...ms.map(m => new Date(m.kickoff_at).getTime()));
+    const deadline = firstKickoff - 24 * 60 * 60 * 1000;
+    const msToClose = deadline - now;
+    if (msToClose > 0 && msToClose < 24 * 60 * 60 * 1000) {
+      const missing = ms.filter(m => !allPredictions.some(p => p.user_id === userId && p.match_id === m.id));
+      if (missing.length > 0 && (!best || msToClose < best.msToClose)) {
+        best = { date, missing: missing.length, total: ms.length, msToClose };
+      }
+    }
+  });
+  return best;
+}
+
+function PredReminderPopup({ reminder, onGo, onClose }) {
+  const hours = Math.floor(reminder.msToClose / 3600000);
+  const mins = Math.floor((reminder.msToClose % 3600000) / 60000);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 42, marginBottom: 6 }}>⏰</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 25, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>¡No te quedes afuera!</div>
+        <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Te faltan <strong style={{ color: "var(--gold)" }}>{reminder.missing}</strong> de {reminder.total} pronósticos de la próxima jornada.</p>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Cierran en <strong style={{ color: "var(--red)" }}>{hours}h {mins}m</strong>. ¡Después no se pueden cargar!</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Más tarde</button>
+          <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cargar ahora ⚽</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -3745,6 +3787,7 @@ export default function App() {
   const [showDebtorOverlay, setShowDebtorOverlay] = useState(false);
   const [showDebtorVideo, setShowDebtorVideo] = useState(false);
   const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
+  const [showPredReminder, setShowPredReminder] = useState(false);
 
   // Activar overlay solo si el usuario es moroso, cuando los profiles cargan
   useEffect(() => {
@@ -3791,6 +3834,15 @@ export default function App() {
       });
     return () => { if (window._debtorInterval) clearInterval(window._debtorInterval); };
   }, [user, profiles]);
+
+  // Recordatorio de predicciones pendientes — cada PRED_REMINDER_MINUTES min mientras falte <24h para cerrar
+  useEffect(() => {
+    if (!user || !matches.length) return;
+    const check = () => { if (getPendingPredReminder(matches, allPredictions, user.id)) setShowPredReminder(true); };
+    check();
+    const interval = setInterval(check, PRED_REMINDER_MINUTES * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user, matches, allPredictions]);
 
   // Confetti cuando subís en la tabla
   useEffect(() => {
@@ -4083,6 +4135,10 @@ export default function App() {
             onClose={() => setShowDebtorVideo(false)}
           />
         )}
+        {user && showPredReminder && (() => {
+          const r = getPendingPredReminder(matches, allPredictions, user.id);
+          return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("matches"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} /> : null;
+        })()}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
