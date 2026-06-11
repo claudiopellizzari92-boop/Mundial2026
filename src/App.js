@@ -1246,15 +1246,25 @@ function HallOfFame({ profiles, predictions, snapshots, allAchievements }) {
   );
 }
 // ── Info Tab ─────────────────────────────────────────────────────────────────
-function InfoTab() {
-  const [subTab, setSubTab] = useState("sponsors");
+function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
+  const [subTab, setSubTab] = useState("cronica");
   return (<>
     <div className="sec-hdr"><h2>📋 INFO</h2></div>
     <div className="pre-tabs" style={{marginBottom:20}}>
+      <button className={`pre-tab ${subTab==="cronica"?"active":""}`} onClick={()=>setSubTab("cronica")}>📰 Crónica</button>
       <button className={`pre-tab ${subTab==="sponsors"?"active":""}`} onClick={()=>setSubTab("sponsors")}>🤝 Patrocinantes</button>
       <button className={`pre-tab ${subTab==="rules"?"active":""}`} onClick={()=>setSubTab("rules")}>📜 Reglamento</button>
       <button className={`pre-tab ${subTab==="prizes"?"active":""}`} onClick={()=>setSubTab("prizes")}>🏆 Premios</button>
     </div>
+
+    {subTab === "cronica" && (
+      <div style={{display:"flex",flexDirection:"column",gap:20}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
+          <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
+        </div>
+        <CronistaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />
+      </div>
+    )}
 
     {subTab === "sponsors" && (
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
@@ -1341,6 +1351,152 @@ function InfoTab() {
   </>);
 }
 // ── Auth ──────────────────────────────────────────────────────────────────────
+// ── Cronista IA ───────────────────────────────────────────────────────────────
+function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
+  const [chronicles, setChronicles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [ideas, setIdeas] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+  const [publishingId, setPublishingId] = useState(null);
+
+  const allDates = [...new Set(matches.map(m => m.match_date))].sort();
+  function jornadaLabel(d) {
+    const i = allDates.indexOf(d);
+    return i >= 0 ? `Fecha ${i + 1}` : d;
+  }
+  const hasScore = (m) => m.home_score !== null && m.home_score !== undefined && m.away_score !== null && m.away_score !== undefined;
+  const fechasFinished = [...new Set(matches.filter(hasScore).map(m => m.match_date))].sort().reverse();
+
+  async function loadChronicles() {
+    setLoading(true);
+    const { data } = await sb.from("chronicles").select("*").order("created_at", { ascending: false });
+    setChronicles(data || []);
+    setLoading(false);
+  }
+  useEffect(() => { loadChronicles(); }, []);
+  useEffect(() => { if (!selectedDate && fechasFinished.length) setSelectedDate(fechasFinished[0]); }, [fechasFinished.length]);
+
+  async function buildResumen(matchDate) {
+    const finished = matches.filter(m => m.match_date === matchDate && hasScore(m));
+    const matchIds = finished.map(m => m.id);
+
+    const { data: wcs } = await sb.from("wildcards").select("*")
+      .in("match_id", matchIds.length ? matchIds : ["00000000-0000-0000-0000-000000000000"]);
+    const wcSet = new Set((wcs || []).map(w => `${w.user_id}:${w.match_id}`));
+
+    const { data: prePreds } = await sb.from("pretournament_predictions").select("*");
+
+    const nameById = {};
+    profiles.forEach(p => { nameById[p.id] = p.name; });
+
+    const partidos = finished.map(m => ({
+      local: m.home,
+      visitante: m.away,
+      resultado: `${m.home_score}-${m.away_score}`,
+      fase: m.group_name ? `Grupo ${m.group_name}` : (m.phase || ""),
+    }));
+
+    const fechaPreds = allPredictions.filter(p => matchIds.includes(p.match_id));
+    const fechaMap = {};
+    fechaPreds.forEach(p => {
+      if (!fechaMap[p.user_id]) fechaMap[p.user_id] = { nombre: nameById[p.user_id] || "Desconocido", puntos_fecha: 0, exactos: 0, uso_comodin: false };
+      fechaMap[p.user_id].puntos_fecha += (p.points || 0);
+      if ((p.points || 0) >= 3) fechaMap[p.user_id].exactos += 1;
+      if (wcSet.has(`${p.user_id}:${p.match_id}`)) fechaMap[p.user_id].uso_comodin = true;
+    });
+    const tabla_fecha = Object.values(fechaMap).sort((a, b) => b.puntos_fecha - a.puntos_fecha);
+
+    const general = profiles.map(p => {
+      const mPts = allPredictions.filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
+      const pPts = (prePreds || []).filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
+      return { nombre: p.name, puntos: mPts + pPts };
+    }).sort((a, b) => b.puntos - a.puntos);
+    const tabla_general = general.slice(0, 5).map((g, i) => ({ puesto: i + 1, nombre: g.nombre, puntos: g.puntos }));
+
+    return { jornada: jornadaLabel(matchDate), partidos, tabla_fecha, tabla_general, lider: tabla_general[0] || null };
+  }
+
+  async function generar() {
+    if (!selectedDate) return;
+    setGenerating(true); setError("");
+    try {
+      const resumen = await buildResumen(selectedDate);
+      const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
+        body: { match_date: selectedDate, fecha_label: jornadaLabel(selectedDate), ideas, resumen },
+      });
+      if (invErr) {
+        let msg = invErr.message || "Error llamando a la función";
+        try { const j = await invErr.context.json(); if (j && j.error) msg = j.error + (j.detalle ? ` — ${j.detalle}` : ""); } catch (_e) {}
+        setError(msg); setGenerating(false); return;
+      }
+      if (data && data.error) { setError(data.error); setGenerating(false); return; }
+      setIdeas("");
+      await loadChronicles();
+    } catch (e) {
+      setError(String(e));
+    }
+    setGenerating(false);
+  }
+
+  async function publicar(matchDate) {
+    setPublishingId(matchDate);
+    await sb.from("chronicles").update({ published: true, updated_at: new Date().toISOString() }).eq("match_date", matchDate);
+    await loadChronicles();
+    setPublishingId(null);
+  }
+
+  return (<>
+    {isAdmin && (
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:20}}>
+        <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>✍️ GENERAR CRÓNICA (ADMIN)</div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <label style={{fontSize:12,color:"var(--muted)",display:"block",marginBottom:6}}>Jornada</label>
+            <select value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:14}}>
+              {fechasFinished.length===0 && <option value="">No hay fechas con resultados todavía</option>}
+              {fechasFinished.map(d => <option key={d} value={d}>{jornadaLabel(d)} · {d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:12,color:"var(--muted)",display:"block",marginBottom:6}}>💡 Ideas para esta crónica (opcional)</label>
+            <textarea value={ideas} onChange={e=>setIdeas(e.target.value)} placeholder={'Ej: "Cargá fuerte al que falló el comodín", "es el cumple del Colo", "tono más picante"...'} rows={3} style={{width:"100%",padding:"10px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:14,resize:"vertical",fontFamily:"inherit"}}/>
+          </div>
+          {error && <div style={{padding:"10px 14px",background:"rgba(220,60,60,.12)",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:13,color:"#ff8080"}}>{error}</div>}
+          <button onClick={generar} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
+            {generating ? "🪄 Generando con la IA..." : "🪄 Generar crónica"}
+          </button>
+        </div>
+      </div>
+    )}
+
+    {loading ? (
+      <div style={{textAlign:"center",padding:40,color:"var(--muted)"}}>Cargando crónicas...</div>
+    ) : chronicles.length===0 ? (
+      <div style={{textAlign:"center",padding:40,color:"var(--muted)"}}>Todavía no hay crónicas. {isAdmin ? "Generá la primera 👆" : "Pronto el cronista va a narrar la primera fecha."}</div>
+    ) : (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        {chronicles.map(c => (
+          <div key={c.id} style={{background:"var(--card)",border:`1px solid ${c.published?"var(--border)":"rgba(245,183,49,.4)"}`,borderRadius:"var(--r)",padding:"22px 26px"}}>
+            {!c.published && (
+              <div style={{display:"inline-block",fontSize:11,fontWeight:700,letterSpacing:.5,color:"var(--gold)",background:"rgba(245,183,49,.15)",padding:"3px 10px",borderRadius:20,marginBottom:12}}>BORRADOR · solo vos lo ves</div>
+            )}
+            <div style={{fontFamily:"Bebas Neue",fontSize:26,color:"var(--gold)",letterSpacing:.5,lineHeight:1.1,marginBottom:6}}>{c.titulo}</div>
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
+            <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.cuerpo}</div>
+            {isAdmin && !c.published && (
+              <button onClick={()=>publicar(c.match_date)} disabled={publishingId===c.match_date} style={{marginTop:18,padding:"10px 18px",background:"var(--green)",color:"#0a0a0a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                {publishingId===c.match_date ? "Publicando..." : "📢 Publicar para todos"}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </>);
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState(""); const [pass, setPass] = useState("");
@@ -3747,7 +3903,7 @@ export default function App() {
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
         {tab==="shame"     && <HallOfShame profiles={profiles} />}
-{tab==="info"      && <InfoTab />}
+{tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
           <DebtorOverlay
