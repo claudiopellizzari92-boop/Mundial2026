@@ -3222,11 +3222,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   async function syncScores() {
     setSyncing(true); setSyncMsg(null);
     try {
-      const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
-        headers: { "X-Auth-Token": "7b202a7eafec421fbfe1b5eb2d3749bb" }
-      });
-      const apiData = await res.json();
-      if (!apiData.matches) { setSyncMsg({ type: "err", text: "No se pudo conectar con la API" }); setSyncing(false); return; }
+      const { data: apiData, error: syncErr } = await sb.functions.invoke("sync-matches");
+      if (syncErr || !apiData || !apiData.matches) { setSyncMsg({ type: "err", text: "No se pudo conectar con la API" }); setSyncing(false); return; }
 
       const NAMES_ES = {
         "Mexico":"México","South Africa":"Sudáfrica","South Korea":"Corea del Sur","Czechia":"Chequia",
