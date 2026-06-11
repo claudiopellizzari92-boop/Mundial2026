@@ -2564,6 +2564,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
   const [expanded, setExpanded] = useState({});
   const [reactions, setReactions] = useState({});
   const [emojiPicker, setEmojiPicker] = useState(null);
+  const [wildcards, setWildcards] = useState([]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -2580,6 +2581,10 @@ function Compare({ user, matches, allPredictions, profiles }) {
       });
       setReactions(r);
     });
+  }, []);
+
+  useEffect(() => {
+    sb.from("wildcards").select("*").then(({ data }) => { if (data) setWildcards(data); });
   }, []);
 
   async function setReaction(matchId, emoji) {
@@ -2690,6 +2695,15 @@ function Compare({ user, matches, allPredictions, profiles }) {
             const matchPreds = allPredictions.filter(p => p.match_id === m.id);
             const hasResult = m.home_score !== null && m.away_score !== null;
             const isOpen = expanded[m.id];
+            const matchWildcardUsers = new Set(wildcards.filter(w => w.match_id === m.id).map(w => w.user_id));
+            const sortedProfiles = [...profiles].sort((a, b) => {
+              const pa = matchPreds.find(p => p.user_id === a.id);
+              const pb = matchPreds.find(p => p.user_id === b.id);
+              if (!pa && !pb) return 0;
+              if (!pa) return 1;
+              if (!pb) return -1;
+              return (pb.points || 0) - (pa.points || 0);
+            });
             return (
               <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
                 <div onClick={() => toggleExpand(m.id)} style={{ padding: "12px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -2706,12 +2720,12 @@ function Compare({ user, matches, allPredictions, profiles }) {
                   </div>
                 </div>
                 {isOpen && (<>
-                  {profiles.map((prof, idx) => {
+                  {sortedProfiles.map((prof, idx) => {
                     const pred = matchPreds.find(p => p.user_id === prof.id);
                     const isMe = prof.id === user.id;
                     return (
-                      <div key={prof.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px", borderBottom: idx < profiles.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div className={`avatar sm ${championAvatarClass(prof)}`}>{initials(prof.name)}</div><ChampionName profile={prof} name={prof.name} style={{fontSize:13}}/><TitleBadges profile={prof} size={12}/>{isMe && <span className="me-badge">TÚ</span>}</div>
+                      <div key={prof.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px", borderBottom: idx < sortedProfiles.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar profile={prof} size="sm" /><ChampionName profile={prof} name={prof.name} style={{fontSize:13}}/><TitleBadges profile={prof} size={12}/>{isMe && <span className="me-badge">TÚ</span>}{matchWildcardUsers.has(prof.id) && <span title="Usó comodín" style={{fontSize:13}}>🃏</span>}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           {pred ? (<>{resultIcon(pred, m)}<span style={{ fontFamily: "Bebas Neue", fontSize: 18 }}>{pred.home_score}–{pred.away_score}</span>{pred.points > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pred.points}</span>}</>) : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>Sin pred.</span>}
                         </div>
