@@ -2559,12 +2559,135 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
 }
 
 // ── Compare View ─────────────────────────────────────────────────────────────
+// ── Comparar Pre-Torneo ───────────────────────────────────────────────────────
+function PreTournamentCompare({ user, profiles }) {
+  const [preds, setPreds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState("participante");
+  const [expanded, setExpanded] = useState({});
+  const locked = isPreTournamentLocked();
+
+  useEffect(() => {
+    if (!locked) { setLoading(false); return; }
+    sb.from("pretournament_predictions").select("*").then(({ data }) => {
+      if (data) setPreds(data);
+      setLoading(false);
+    });
+  }, []);
+
+  function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+  const teamGroup = name => (ALL_TEAMS.find(t => t.name === name) || {}).group;
+  const teamFlag = name => (ALL_TEAMS.find(t => t.name === name) || {}).flag;
+  const userPts = id => preds.filter(p => p.user_id === id).reduce((sm, p) => sm + (p.points || 0), 0);
+  const flagImg = name => { const f = teamFlag(name); return f ? <img src={f} alt="" style={{ width: 15, height: 11, objectFit: "cover", borderRadius: 2, verticalAlign: "middle", marginRight: 3 }} /> : null; };
+  const teamSpan = pred => pred ? <span style={{ color: pred.points > 0 ? "var(--green)" : "var(--txt)" }}>{flagImg(pred.team)}{pred.team}{pred.points > 0 ? " ✓" : ""}</span> : <span style={{ color: "var(--muted)" }}>—</span>;
+
+  if (!locked) {
+    return (
+      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "20px 18px", textAlign: "center", color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>
+        🔒 Las predicciones de pre-torneo de todos se revelan cuando cierre el pre-torneo<br/>
+        <span style={{ color: "var(--gold)", fontWeight: 600 }}>{localDate(TOURNAMENT_START)} · {localTime(TOURNAMENT_START)} ({localTzName()})</span>
+      </div>
+    );
+  }
+  if (loading) return <div style={{ textAlign: "center", color: "var(--muted)", padding: 20, fontSize: 13 }}>Cargando…</div>;
+
+  const participants = profiles.filter(p => preds.some(pr => pr.user_id === p.id));
+  const sorted = [...participants].sort((a, b) => userPts(b.id) - userPts(a.id));
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {[["participante","👤 Por participante"],["grupo","🏆 Por grupo"]].map(([k, l]) => (
+          <button key={k} onClick={() => setMode(k)} style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "1px solid", borderColor: mode === k ? "var(--gold)" : "var(--border)", background: mode === k ? "var(--gold-dim)" : "var(--card)", color: mode === k ? "var(--gold)" : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{l}</button>
+        ))}
+      </div>
+
+      {participants.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--muted)", padding: 20, fontSize: 13 }}>Todavía nadie cargó predicciones de pre-torneo.</div>
+      ) : mode === "participante" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {sorted.map(p => {
+            const mine = preds.filter(pr => pr.user_id === p.id);
+            const thirds = mine.filter(pr => pr.prediction_type === "third_place");
+            const isOpen = expanded[p.id];
+            const pts = userPts(p.id);
+            const isMe = p.id === user.id;
+            return (
+              <div key={p.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+                <div onClick={() => toggle(p.id)} style={{ padding: "11px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar profile={p} size="sm" /><ChampionName profile={p} name={p.name} style={{fontSize:13}}/><TitleBadges profile={p} size={12}/>{isMe && <span className="me-badge">TÚ</span>}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{pts > 0 && <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 20, background: "var(--green-dim)", color: "var(--green)" }}>+{pts}</span>}<span style={{ color: "var(--muted)", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span></div>
+                </div>
+                {isOpen && (
+                  <div style={{ padding: "8px 16px 12px" }}>
+                    {Object.keys(GROUPS).map(g => {
+                      const first = mine.find(pr => pr.prediction_type === "group_standing" && pr.group_name === g && pr.position === 1);
+                      const second = mine.find(pr => pr.prediction_type === "group_standing" && pr.group_name === g && pr.position === 2);
+                      return (
+                        <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border)", fontSize: 12 }}>
+                          <span className="group-badge" style={{ minWidth: 54, flexShrink: 0 }}>Grupo {g}</span>
+                          <span style={{ flex: 1 }}><span style={{ color: "var(--muted)" }}>1° </span>{teamSpan(first)}</span>
+                          <span style={{ flex: 1 }}><span style={{ color: "var(--muted)" }}>2° </span>{teamSpan(second)}</span>
+                        </div>
+                      );
+                    })}
+                    <div style={{ marginTop: 8, fontSize: 12 }}>
+                      <span style={{ color: "var(--gold)", fontWeight: 600 }}>🥉 Terceros: </span>
+                      {thirds.length ? thirds.map((t, i) => <span key={t.id} style={{ color: t.points > 0 ? "var(--green)" : "var(--txt)" }}>{flagImg(t.team)}{t.team}{t.points > 0 ? " ✓" : ""}{i < thirds.length - 1 ? ",  " : ""}</span>) : <span style={{ color: "var(--muted)" }}>—</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {Object.entries(GROUPS).map(([g, teams]) => {
+            const isOpen = expanded["g_" + g];
+            return (
+              <div key={g} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+                <div onClick={() => toggle("g_" + g)} style={{ padding: "11px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><span className="group-badge" style={{ flexShrink: 0 }}>Grupo {g}</span><span style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{teams.map(t => t.name).join(" · ")}</span></span>
+                  <span style={{ color: "var(--muted)", fontSize: 13, flexShrink: 0 }}>{isOpen ? "▲" : "▼"}</span>
+                </div>
+                {isOpen && (
+                  <div>
+                    {sorted.map((p, idx) => {
+                      const first = preds.find(pr => pr.user_id === p.id && pr.prediction_type === "group_standing" && pr.group_name === g && pr.position === 1);
+                      const second = preds.find(pr => pr.user_id === p.id && pr.prediction_type === "group_standing" && pr.group_name === g && pr.position === 2);
+                      const third = preds.find(pr => pr.user_id === p.id && pr.prediction_type === "third_place" && teamGroup(pr.team) === g);
+                      const isMe = p.id === user.id;
+                      return (
+                        <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 16px", borderBottom: idx < sorted.length - 1 ? "1px solid var(--border)" : "none", background: isMe ? "rgba(245,183,49,.04)" : "transparent", fontSize: 11 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: "0 0 38%" }}><Avatar profile={p} size="sm" /><ChampionName profile={p} name={p.name} style={{fontSize:12}}/>{isMe && <span className="me-badge">TÚ</span>}</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end", flex: 1, minWidth: 0 }}>
+                            <span><span style={{ color: "var(--muted)" }}>1° </span>{teamSpan(first)}</span>
+                            <span><span style={{ color: "var(--muted)" }}>2° </span>{teamSpan(second)}</span>
+                            <span><span style={{ color: "var(--muted)" }}>3° </span>{teamSpan(third)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Compare({ user, matches, allPredictions, profiles }) {
   const [now, setNow] = useState(new Date());
   const [expanded, setExpanded] = useState({});
   const [reactions, setReactions] = useState({});
   const [emojiPicker, setEmojiPicker] = useState(null);
   const [wildcards, setWildcards] = useState([]);
+  const [view, setView] = useState("partidos");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -2665,6 +2788,12 @@ function Compare({ user, matches, allPredictions, profiles }) {
 
   return (<>
     <div className="sec-hdr"><h2>👁️ COMPARAR</h2></div>
+    <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+      {[["partidos","⚽ Partidos"],["pretorneo","📋 Pre-Torneo"]].map(([k, l]) => (
+        <button key={k} onClick={() => setView(k)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "1px solid", borderColor: view === k ? "var(--gold)" : "var(--border)", background: view === k ? "var(--gold-dim)" : "var(--card)", color: view === k ? "var(--gold)" : "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{l}</button>
+      ))}
+    </div>
+    {view === "partidos" && (<>
     <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
       {allDays.map(d => {
         const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date));
@@ -2766,6 +2895,8 @@ function Compare({ user, matches, allPredictions, profiles }) {
         </div>
       )}
     </>)}
+    </>)}
+    {view === "pretorneo" && <PreTournamentCompare user={user} profiles={profiles} />}
   </>);
 }
 
