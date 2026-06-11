@@ -3305,13 +3305,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
           if (hasWildcard) {
             if (isExact) pts = wcExact;
-            else if (isCorrectGoals) pts = wcGoals;
             else if (isCorrectResult) pts = wcWinner;
+            else if (isCorrectGoals) pts = wcGoals;
             else pts = -wcCost;
           } else {
             if (isExact) pts = exactPts;
-            else if (isCorrectGoals) pts = goalsPts;
             else if (isCorrectResult) pts = resultPts;
+            else if (isCorrectGoals) pts = goalsPts;
           }
           await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
         }
@@ -3443,13 +3443,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
         if (hasWildcard) {
           if (isExact) pts = wcExact;
-          else if (isCorrectGoals) pts = wcGoals;
           else if (isCorrectResult) pts = wcWinner;
+          else if (isCorrectGoals) pts = wcGoals;
           else pts = -wcCost;
         } else {
           if (isExact) pts = exactPts;
-          else if (isCorrectGoals) pts = goalsPts;
           else if (isCorrectResult) pts = resultPts;
+          else if (isCorrectGoals) pts = goalsPts;
         }
         await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
       }
