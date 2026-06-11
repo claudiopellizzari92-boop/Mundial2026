@@ -1252,9 +1252,15 @@ function AuthScreen({ onAuth }) {
   const [email, setEmail] = useState(""); const [pass, setPass] = useState("");
   const [name, setName] = useState(""); const [invite, setInvite] = useState("");
   const [msg, setMsg] = useState(null); const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   async function handleLogin() {
     setLoading(true); setMsg(null);
+    if (rememberMe) {
+      await sb.auth.updateSession({ storage: window.localStorage });
+    } else {
+      await sb.auth.updateSession({ storage: window.sessionStorage });
+    }
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) { setMsg({ type: "err", text: "Email o contraseña incorrectos" }); setLoading(false); return; }
     const { data: profile } = await sb.from("profiles").select("*").eq("id", data.user.id).single();
@@ -1299,6 +1305,10 @@ function AuthScreen({ onAuth }) {
         {mode === "login" ? (<>
           <div className="field"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="tu@email.com"/></div>
           <div className="field"><label>Contraseña</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••"/></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,margin:"12px 0"}}>
+            <input type="checkbox" id="rememberMe" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)} style={{width:16,height:16,cursor:"pointer",accentColor:"var(--gold)"}}/>
+            <label htmlFor="rememberMe" style={{fontSize:13,color:"var(--muted)",cursor:"pointer"}}>Recordar este dispositivo</label>
+          </div>
           <button className="btn-gold" onClick={handleLogin} disabled={loading}>{loading?"CARGANDO...":"ENTRAR"}</button>
           <button onClick={handleForgotPassword} disabled={loading} style={{marginTop:12,width:"100%",background:"none",border:"none",color:"var(--muted)",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>
             ¿Olvidaste tu contraseña?
@@ -1316,7 +1326,6 @@ function AuthScreen({ onAuth }) {
     </div>
   );
 }
-
 // ── Pre-Tournament Predictions ────────────────────────────────────────────────
 function PreTournament({ user }) {
   const [subTab, setSubTab] = useState("groups");
