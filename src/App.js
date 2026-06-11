@@ -1324,15 +1324,20 @@ function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
     {subTab === "prizes" && (
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         {[
-          {pos:"🥇 1er Lugar", pct:"75%", desc:"del acumulado total", color:"var(--gold)", bg:"rgba(245,183,49,.1)", border:"rgba(245,183,49,.3)"},
-          {pos:"🥈 2do Lugar", pct:"25%", desc:"del acumulado total", color:"#b0bcd0", bg:"rgba(176,188,208,.1)", border:"rgba(176,188,208,.3)"},
+          {pos:"🥇 1er Lugar", pct:"75%", monto:"$540", desc:"del acumulado total", color:"var(--gold)", bg:"rgba(245,183,49,.1)", border:"rgba(245,183,49,.3)"},
+          {pos:"🥈 2do Lugar", pct:"25%", monto:"$180", desc:"del acumulado total", color:"#b0bcd0", bg:"rgba(176,188,208,.1)", border:"rgba(176,188,208,.3)"},
           {pos:"🥉 3er Lugar", pct:"🎟️", desc:"Participación gratis en la siguiente quiniela", color:"#cd7f32", bg:"rgba(205,127,50,.1)", border:"rgba(205,127,50,.3)"},
+          {pos:"✨ Premio Especial", pct:"🏰", desc:"Una experiencia soñada: entrada gratis para 2 personas a cualquier parque de Disney a tu elección. Incluye guía turístico, descuento en bebidas y comidas, y fotos gratis para el recuerdo.", donor:"Premio donado por Florentino Pérez Quintero", color:"#e85d9c", bg:"rgba(232,93,156,.1)", border:"rgba(232,93,156,.4)"},
         ].map((p,i) => (
           <div key={i} style={{background:p.bg,border:`1px solid ${p.border}`,borderRadius:"var(--r)",padding:"24px 28px",display:"flex",alignItems:"center",gap:20}}>
-            <div style={{fontFamily:"Bebas Neue",fontSize:48,color:p.color,minWidth:80,textAlign:"center",lineHeight:1}}>{p.pct}</div>
-            <div>
+            <div style={{minWidth:80,textAlign:"center"}}>
+              <div style={{fontFamily:"Bebas Neue",fontSize:48,color:p.color,lineHeight:1}}>{p.pct}</div>
+              {p.monto && <div style={{fontFamily:"Bebas Neue",fontSize:28,color:p.color,letterSpacing:1,marginTop:2}}>{p.monto}</div>}
+            </div>
+            <div style={{flex:1}}>
               <div style={{fontFamily:"Bebas Neue",fontSize:22,color:p.color,letterSpacing:1}}>{p.pos}</div>
-              <div style={{fontSize:14,color:"var(--muted)",marginTop:4}}>{p.desc}</div>
+              <div style={{fontSize:14,color:"var(--muted)",marginTop:4,lineHeight:1.5}}>{p.desc}</div>
+              {p.donor && <div style={{marginTop:10,display:"inline-block",fontSize:12,fontWeight:700,color:p.color,background:"rgba(0,0,0,.25)",border:`1px solid ${p.border}`,borderRadius:20,padding:"4px 14px"}}>🎁 {p.donor}</div>}
             </div>
           </div>
         ))}
