@@ -1245,7 +1245,101 @@ function HallOfFame({ profiles, predictions, snapshots, allAchievements }) {
     </div>
   );
 }
+// ── Info Tab ─────────────────────────────────────────────────────────────────
+function InfoTab() {
+  const [subTab, setSubTab] = useState("sponsors");
+  return (<>
+    <div className="sec-hdr"><h2>📋 INFO</h2></div>
+    <div className="pre-tabs" style={{marginBottom:20}}>
+      <button className={`pre-tab ${subTab==="sponsors"?"active":""}`} onClick={()=>setSubTab("sponsors")}>🤝 Patrocinantes</button>
+      <button className={`pre-tab ${subTab==="rules"?"active":""}`} onClick={()=>setSubTab("rules")}>📜 Reglamento</button>
+      <button className={`pre-tab ${subTab==="prizes"?"active":""}`} onClick={()=>setSubTab("prizes")}>🏆 Premios</button>
+    </div>
 
+    {subTab === "sponsors" && (
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
+        <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
+      </div>
+    )}
+
+    {subTab === "rules" && (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px"}}>
+          <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>⚽ PUNTOS POR PARTIDO</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[
+              {pts:"5 pts", desc:"Acertar el resultado exacto (ganador y marcador)", color:"var(--gold)"},
+              {pts:"3 pts", desc:"Acertar únicamente el ganador", color:"var(--green)"},
+              {pts:"1 pt",  desc:"Acertar únicamente la cantidad total de goles", color:"var(--blue)"},
+            ].map((r,i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:"var(--surface)",borderRadius:10}}>
+                <div style={{fontFamily:"Bebas Neue",fontSize:28,color:r.color,minWidth:60,textAlign:"center"}}>{r.pts}</div>
+                <div style={{fontSize:14,color:"var(--txt)"}}>{r.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px"}}>
+          <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>🏆 BONIFICACIÓN FASE DE GRUPOS</div>
+          <div style={{padding:"12px 16px",background:"var(--surface)",borderRadius:10,fontSize:14,color:"var(--txt)",lineHeight:1.7}}>
+            <strong style={{color:"var(--gold)"}}>+1 punto extra</strong> por cada equipo cuya posición de clasificación sea acertada (1°, 2° y los 8 mejores terceros).
+          </div>
+        </div>
+
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px"}}>
+          <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>🃏 REGLAS DEL COMODÍN</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+            {[
+              {label:"Cantidad", value:"5 comodines por participante para todo el torneo"},
+              {label:"Costo", value:"Activar un comodín resta 1 punto de la tabla general"},
+              {label:"Límites", value:"Intransferibles · Máximo 1 por partido"},
+            ].map((r,i) => (
+              <div key={i} style={{display:"flex",gap:12,padding:"10px 14px",background:"var(--surface)",borderRadius:10}}>
+                <span style={{fontSize:12,color:"var(--gold)",fontWeight:700,minWidth:80,textTransform:"uppercase",letterSpacing:.5,paddingTop:2}}>{r.label}</span>
+                <span style={{fontSize:14,color:"var(--txt)"}}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{fontFamily:"Bebas Neue",fontSize:16,color:"var(--gold)",letterSpacing:1,marginBottom:10}}>Puntuación con comodín activado:</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[
+              {pts:"8 pts", desc:"Acertar resultado exacto", color:"var(--gold)"},
+              {pts:"5 pts", desc:"Acertar únicamente el ganador", color:"var(--green)"},
+              {pts:"2 pts", desc:"Acertar únicamente la cantidad total de goles", color:"var(--blue)"},
+            ].map((r,i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"10px 14px",background:"var(--surface)",borderRadius:10}}>
+                <div style={{fontFamily:"Bebas Neue",fontSize:24,color:r.color,minWidth:60,textAlign:"center"}}>{r.pts}</div>
+                <div style={{fontSize:14,color:"var(--txt)"}}>{r.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {subTab === "prizes" && (
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {[
+          {pos:"🥇 1er Lugar", pct:"75%", desc:"del acumulado total", color:"var(--gold)", bg:"rgba(245,183,49,.1)", border:"rgba(245,183,49,.3)"},
+          {pos:"🥈 2do Lugar", pct:"25%", desc:"del acumulado total", color:"#b0bcd0", bg:"rgba(176,188,208,.1)", border:"rgba(176,188,208,.3)"},
+          {pos:"🥉 3er Lugar", pct:"🎟️", desc:"Participación gratis en la siguiente quiniela", color:"#cd7f32", bg:"rgba(205,127,50,.1)", border:"rgba(205,127,50,.3)"},
+        ].map((p,i) => (
+          <div key={i} style={{background:p.bg,border:`1px solid ${p.border}`,borderRadius:"var(--r)",padding:"24px 28px",display:"flex",alignItems:"center",gap:20}}>
+            <div style={{fontFamily:"Bebas Neue",fontSize:48,color:p.color,minWidth:80,textAlign:"center",lineHeight:1}}>{p.pct}</div>
+            <div>
+              <div style={{fontFamily:"Bebas Neue",fontSize:22,color:p.color,letterSpacing:1}}>{p.pos}</div>
+              <div style={{fontSize:14,color:"var(--muted)",marginTop:4}}>{p.desc}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"16px 20px",textAlign:"center",fontSize:13,color:"var(--muted)"}}>
+          💰 El acumulado se calcula sobre el total de inscripciones del torneo.
+        </div>
+      </div>
+    )}
+  </>);
+}
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
@@ -3602,7 +3696,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3624,7 +3718,7 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3653,6 +3747,7 @@ export default function App() {
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
         {tab==="shame"     && <HallOfShame profiles={profiles} />}
+{tab==="info"      && <InfoTab />}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
           <DebtorOverlay
