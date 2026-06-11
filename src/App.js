@@ -1265,7 +1265,8 @@ function AuthScreen({ onAuth }) {
 } else {
   localStorage.removeItem("sb-remember");
   onAuth({ ...data.user, profile }); setLoading(false);
-}
+    }
+  }
 
   async function handleForgotPassword() {
     if (!email.trim()) { setMsg({ type: "err", text: "Ingresa tu email primero" }); return; }
