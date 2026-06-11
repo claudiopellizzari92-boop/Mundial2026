@@ -620,70 +620,60 @@ function DebtorVideoPopup({ profile, videoIndex, onClose }) {
 
 // ── Hall of Shame ─────────────────────────────────────────────────────────────
 function HallOfShame({ profiles }) {
-  const debtors = profiles.filter(p => p.is_debtor).sort((a, b) => {
+  const eliminated = profiles.filter(p => p.is_eliminated).sort((a, b) => {
     const daysA = a.debt_since ? Math.floor((new Date() - new Date(a.debt_since)) / 86400000) : 0;
     const daysB = b.debt_since ? Math.floor((new Date() - new Date(b.debt_since)) / 86400000) : 0;
     return daysB - daysA;
   });
 
-  if (debtors.length === 0) return (
+  if (eliminated.length === 0) return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "40px 20px", textAlign: "center" }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
       <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--green)", letterSpacing: 1 }}>¡Todos al día!</div>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>No hay morosos en este torneo.</div>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Nadie ha sido eliminado por mala paga.</div>
     </div>
   );
 
-  const totalDebt = debtors.reduce((s, p) => s + (parseFloat(p.debt_amount) || 0), 0);
-
   return (<>
-    <div className="sec-hdr"><h2>🚨 HALL OF SHAME</h2><span>{debtors.length} moroso{debtors.length !== 1 ? "s" : ""}</span></div>
+    <div className="sec-hdr"><h2>💀 HALL OF SHAME</h2><span>{eliminated.length} eliminado{eliminated.length !== 1 ? "s" : ""}</span></div>
 
-    {/* Resumen */}
     <div style={{ background: "var(--red-dim)", border: "1px solid rgba(255,77,109,.3)", borderRadius: "var(--r)", padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <div>
-        <div style={{ fontSize: 11, color: "var(--red)", textTransform: "uppercase", letterSpacing: .5 }}>Deuda total del grupo</div>
-        <div style={{ fontFamily: "Bebas Neue", fontSize: 32, color: "var(--red)" }}>${totalDebt.toFixed(2)}</div>
+        <div style={{ fontSize: 11, color: "var(--red)", textTransform: "uppercase", letterSpacing: .5 }}>Eliminados por mala paga</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 32, color: "var(--red)" }}>{eliminated.length} jugador{eliminated.length !== 1 ? "es" : ""}</div>
       </div>
-      <div style={{ fontSize: 40 }}>💸</div>
+      <div style={{ fontSize: 40 }}>💀</div>
     </div>
 
-    {/* Lista de morosos */}
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {debtors.map((p, i) => {
-        const days = p.debt_since
-          ? Math.floor((new Date() - new Date(p.debt_since)) / 86400000)
-          : 0;
+      {eliminated.map((p, i) => {
+        const days = p.debt_since ? Math.floor((new Date() - new Date(p.debt_since)) / 86400000) : 0;
         return (
           <div key={p.id} style={{
             background: "var(--card)", border: "1px solid rgba(255,77,109,.3)",
             borderRadius: "var(--r)", padding: "16px 18px",
             display: "flex", alignItems: "center", gap: 14,
+            opacity: 0.85,
           }}>
-            {/* Posición */}
-            <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--red)", minWidth: 30, textAlign: "center", opacity: .5 }}>
-              {i + 1}
+            <div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--red)", minWidth: 30, textAlign: "center", opacity: .5 }}>{i + 1}</div>
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <Avatar profile={p} size="md" />
+              <div style={{ position: "absolute", bottom: -4, right: -4, fontSize: 14 }}>💀</div>
             </div>
-            {/* Avatar */}
-            <div className="avatar" style={{ background: "linear-gradient(135deg,var(--red),#c0001a)", flexShrink: 0 }}>
-              {initials(p.name)}
-            </div>
-            {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
-                <DebtorBadge profile={p} />
+                <span style={{ fontSize: 14, fontWeight: 600, textDecoration: "line-through", opacity: .6 }}>{p.name}</span>
+                <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: "rgba(255,77,109,.2)", border: "1px solid rgba(255,77,109,.4)", color: "var(--red)", fontWeight: 700 }}>💀 Eliminado por mala paga</span>
               </div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3, display: "flex", gap: 10 }}>
                 {p.debt_since && <span>Desde: {new Date(p.debt_since).toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}</span>}
                 {days > 0 && <span style={{ color: "var(--red)" }}>⏰ {days} día{days !== 1 ? "s" : ""} sin pagar</span>}
               </div>
             </div>
-            {/* Monto */}
             {p.debt_amount > 0 && (
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color: "var(--red)" }}>${p.debt_amount}</div>
-                <div style={{ fontSize: 10, color: "var(--muted)" }}>pendiente</div>
+                <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color: "var(--red)", textDecoration: "line-through", opacity: .6 }}>${p.debt_amount}</div>
+                <div style={{ fontSize: 10, color: "var(--muted)" }}>no pagado</div>
               </div>
             )}
           </div>
@@ -1642,7 +1632,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
 }
 
 // ── Matches ──────────────────────────────────────────────────────────────────
-function Matches({ user, matches, predictions, onSave }) {
+function Matches({ user, matches, predictions, onSave, profiles }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
@@ -1744,7 +1734,8 @@ function Matches({ user, matches, predictions, onSave }) {
   }
 
   const usedWildcards = wildcards.length;
-  const remainingWildcards = maxWildcards - usedWildcards;
+const remainingWildcards = maxWildcards - usedWildcards;
+const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
 
   return (<>
     <div className="sec-hdr" style={{justifyContent:"space-between"}}>
@@ -1762,8 +1753,7 @@ function Matches({ user, matches, predictions, onSave }) {
     </div>
     <div className="matches-grid">
       {matches.map(m => {
-        const locked = isLocked(m.kickoff_at, matches, m.match_date);
-const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
+        const locked = isLocked(m.kickoff_at, matches, m.match_date) || isEliminated;
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
         const hasScore = sc.home!==undefined&&sc.away!==undefined&&sc.home!==""&&sc.away!=="";
@@ -2247,13 +2237,18 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
                   <Avatar profile={row} size="sm" />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                      <ChampionName profile={row} name={row.name} />
+                      <ChampionName profile={row} name={row.name} style={row.is_eliminated ? {textDecoration:"line-through",opacity:.5} : {}} />
                       <TitleBadges profile={row} size={13} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
                       {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
-                    {row.is_debtor && <DebtorCounter profile={row} />}
-                    {row.is_debtor && <span className="mobile-col"><DebtorBadge profile={row} /></span>}
+                    {row.is_eliminated && (
+  <div style={{fontSize:10,color:"var(--red)",marginTop:2,display:"flex",alignItems:"center",gap:4}}>
+    <span>💀 Eliminado por mala paga</span>
+  </div>
+)}
+{row.is_debtor && !row.is_eliminated && <DebtorCounter profile={row} />}
+{row.is_debtor && !row.is_eliminated && <span className="mobile-col"><DebtorBadge profile={row} /></span>}
                   </div>
                 </div>
               </td>
@@ -2510,6 +2505,16 @@ function DebtorAdmin({ profiles, onRefresh }) {
     setTimeout(() => setIntervalSaved(false), 2000);
   }
 
+  async function toggleEliminated(prof) {
+  setSaving(prof.id);
+  await sb.from("profiles").update({ 
+    is_eliminated: !prof.is_eliminated,
+    is_debtor: !prof.is_eliminated ? true : prof.is_debtor,
+  }).eq("id", prof.id);
+  setSaving(null);
+  onRefresh();
+}
+
   async function toggleDebtor(prof) {
     setSaving(prof.id);
     if (prof.is_debtor) {
@@ -2585,14 +2590,24 @@ function DebtorAdmin({ profiles, onRefresh }) {
                       {isDebtor && <DebtorCounter profile={prof} />}
                     </div>
                   </div>
-                  <button
-                    className={`btn-small ${isDebtor ? "" : "red"}`}
-                    onClick={() => toggleDebtor(prof)}
-                    disabled={saving === prof.id}
-                    style={isDebtor ? { background: "var(--green-dim)", borderColor: "var(--green)", color: "var(--green)" } : {}}
-                  >
-                    {saving === prof.id ? "..." : isDebtor ? "✓ Perdonar deuda" : "💸 Marcar moroso"}
-                  </button>
+                 <div style={{display:"flex",gap:6}}>
+  <button
+    className={`btn-small ${isDebtor ? "" : "red"}`}
+    onClick={() => toggleDebtor(prof)}
+    disabled={saving === prof.id}
+    style={isDebtor ? { background: "var(--green-dim)", borderColor: "var(--green)", color: "var(--green)" } : {}}
+  >
+    {saving === prof.id ? "..." : isDebtor ? "✓ Perdonar deuda" : "💸 Marcar moroso"}
+  </button>
+  <button
+    className="btn-small red"
+    onClick={() => toggleEliminated(prof)}
+    disabled={saving === prof.id}
+    style={prof.is_eliminated ? { background: "var(--red)", color: "#fff" } : {}}
+  >
+    {prof.is_eliminated ? "💀 Reintegrar" : "💀 Eliminar"}
+  </button>
+</div>
                 </div>
                 {isEditing && (
                   <div style={{ padding: "0 14px 14px", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -3335,8 +3350,8 @@ export default function App() {
   useEffect(() => {
     if (!user || !profiles.length) return;
     const isDebtor = profiles.find(p => p.id === user.id)?.is_debtor;
-    if (!isDebtor) return;
-    // Leer intervalo configurado por admin
+    const isElim = profiles.find(p => p.id === user.id)?.is_eliminated;
+    if (!isDebtor && !isElim) return;
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
       .then(({ data }) => {
         const mins = data?.rule_value || 120;
@@ -3344,7 +3359,6 @@ export default function App() {
           setDebtorVideoIndex(i => i + 1);
           setShowDebtorVideo(true);
         }, mins * 1000);
-        // Guardar ref para cleanup
         window._debtorInterval = interval;
       });
     return () => { if (window._debtorInterval) clearInterval(window._debtorInterval); };
@@ -3575,7 +3589,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","🚨 Morosos"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3597,7 +3611,7 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","🚨 Morosos"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -3621,7 +3635,7 @@ export default function App() {
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
         {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/>}
         {tab==="pre"       && <PreTournament user={user}/>}
-        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData}/>}
+        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
