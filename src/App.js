@@ -2834,6 +2834,8 @@ function Compare({ user, matches, allPredictions, profiles }) {
               if (!pb) return -1;
               return (pb.points || 0) - (pa.points || 0);
             });
+            const iPredicted = matchPreds.some(p => p.user_id === user.id);
+            const canSee = iPredicted || matchPreds.length > 0;
             return (
               <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
                 <div onClick={() => toggleExpand(m.id)} style={{ padding: "12px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -2850,6 +2852,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
                   </div>
                 </div>
                 {isOpen && (<>
+                  {canSee ? (<>
                   {sortedProfiles.map((prof, idx) => {
                     const pred = matchPreds.find(p => p.user_id === prof.id);
                     const isMe = prof.id === user.id;
@@ -2863,6 +2866,9 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     );
                   })}
                   {hasResult && <div style={{ padding: "6px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}><span><span style={{ color: "var(--gold)" }}>★</span> Exacto</span><span><span style={{ color: "var(--green)" }}>✓</span> Correcto</span><span><span style={{ color: "var(--red)" }}>✗</span> Falló</span></div>}
+                  </>) : (
+                    <div style={{ padding: "18px 16px", textAlign: "center", color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>🙈 No cargaste tu pronóstico para este partido,<br/>así que no podés ver los de los demás.</div>
+                  )}
                   {hasResult && (
                     <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {Object.entries(getReactionCounts(m.id)).map(([emoji, count]) => {
