@@ -3304,10 +3304,11 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           const isCorrectResult = predResult === realResult;
           const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
           if (hasWildcard) {
-            if (isExact) pts = wcExact;
-            else if (isCorrectResult) pts = wcWinner;
-            else if (isCorrectGoals) pts = wcGoals;
-            else pts = -wcCost;
+            let base = 0;
+            if (isExact) base = wcExact;
+            else if (isCorrectResult) base = wcWinner;
+            else if (isCorrectGoals) base = wcGoals;
+            pts = base - wcCost;
           } else {
             if (isExact) pts = exactPts;
             else if (isCorrectResult) pts = resultPts;
@@ -3442,10 +3443,11 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         const isCorrectResult = predResult === realResult;
         const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
         if (hasWildcard) {
-          if (isExact) pts = wcExact;
-          else if (isCorrectResult) pts = wcWinner;
-          else if (isCorrectGoals) pts = wcGoals;
-          else pts = -wcCost;
+          let base = 0;
+          if (isExact) base = wcExact;
+          else if (isCorrectResult) base = wcWinner;
+          else if (isCorrectGoals) base = wcGoals;
+          pts = base - wcCost;
         } else {
           if (isExact) pts = exactPts;
           else if (isCorrectResult) pts = resultPts;
