@@ -1252,7 +1252,6 @@ function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
     <div className="sec-hdr"><h2>📋 INFO</h2></div>
     <div className="pre-tabs" style={{marginBottom:20}}>
       <button className={`pre-tab ${subTab==="cronica"?"active":""}`} onClick={()=>setSubTab("cronica")}>📰 Crónica</button>
-      <button className={`pre-tab ${subTab==="sponsors"?"active":""}`} onClick={()=>setSubTab("sponsors")}>🤝 Patrocinantes</button>
       <button className={`pre-tab ${subTab==="rules"?"active":""}`} onClick={()=>setSubTab("rules")}>📜 Reglamento</button>
       <button className={`pre-tab ${subTab==="prizes"?"active":""}`} onClick={()=>setSubTab("prizes")}>🏆 Premios</button>
     </div>
@@ -1263,12 +1262,6 @@ function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
           <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
         </div>
         <CronistaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />
-      </div>
-    )}
-
-    {subTab === "sponsors" && (
-      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
-        <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
       </div>
     )}
 
