@@ -2077,7 +2077,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
                   </button>
                 )}
                 {/* Encuesta: % de quién gana según predicciones */}
-                {polls[m.id] && polls[m.id].total >= 2 && (
+                {isLocked(m.kickoff_at, matches, m.match_date) && polls[m.id] && polls[m.id].total >= 2 && (
                   <div style={{width:"100%",marginTop:4}}>
                     {(() => {
                       const p = polls[m.id];
