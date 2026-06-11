@@ -3421,8 +3421,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
     await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
     const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
-    const { data: matchWildcards } = await sb.from("wildcards").select("*").eq("match_id", match.id);
-    const wildcardUserIds = new Set((matchWildcards||[]).map(w => w.user_id));
+    const { data: matchWildcards } = await sb.rpc("match_wildcard_users", { p_match_id: match.id });
+    const wildcardUserIds = new Set(matchWildcards || []);
     if (preds) {
       const isKnockout = match.phase && match.phase !== "Grupos";
       const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 3) : (ruleVals["exact_score_groups"] || 3);
