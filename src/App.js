@@ -1634,14 +1634,22 @@ function PreTournament({ user }) {
   async function saveThirds() {
     if (thirdPreds.length !== 8) return;
     setSavingThirds(true);
-    await sb.from("pretournament_predictions").delete().eq("user_id", user.id).eq("prediction_type", "third_place");
+    // Borrar solo los terceros que el usuario ya NO tiene seleccionados (no borramos todo)
+    await sb.from("pretournament_predictions")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("prediction_type", "third_place")
+      .not("team", "in", `(${thirdPreds.map(t => `"${t}"`).join(",")})`);
+    // Upsert: gracias a la constraint unique_user_prediction_team nunca duplica,
+    // aunque se ejecute dos veces seguidas
     for (const team of thirdPreds) {
-  const groupEntry = Object.entries(GROUPS).find(([, teams]) => teams.some(t => t.name === team));
-  const groupName = groupEntry ? groupEntry[0] : null;
-  await sb.from("pretournament_predictions").insert({
-    user_id: user.id, prediction_type: "third_place", group_name: groupName, team,
-  });
-}
+      const groupEntry = Object.entries(GROUPS).find(([, teams]) => teams.some(t => t.name === team));
+      const groupName = groupEntry ? groupEntry[0] : null;
+      await sb.from("pretournament_predictions").upsert({
+        user_id: user.id, prediction_type: "third_place", group_name: groupName, team,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,prediction_type,team" });
+    }
     setThirdsSaved(true); setSavingThirds(false);
   }
 
@@ -1766,7 +1774,7 @@ function PreTournament({ user }) {
         </div>
         {!locked && (
           <button className="thirds-save-btn" onClick={saveThirds} disabled={thirdPreds.length !== 8 || savingThirds}>
-            {savingThirds ? "GUARDANDO..." : thirdsSaved ? "✓ GUARDADO" : `GUARDAR (${thirdPreds.length}/8 grupos seleccionados)`}
+            {savingThirds ? "GUARDANDO..." : thirdsSaved ? "✓ Actualizar" : `GUARDAR (${thirdPreds.length}/8 grupos seleccionados)`}
           </button>
         )}
       </div>
