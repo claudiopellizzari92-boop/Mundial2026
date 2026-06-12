@@ -4045,16 +4045,13 @@ export default function App() {
     // Guardar los nuevos en la DB (DIAGNÓSTICO: muestra el error si falla)
     (async () => {
       for (const k of newKeys) {
-        const { data, error } = await sb
+        const { error } = await sb
           .from("achievements")
           .upsert({ user_id: user.id, achievement_key: k }, { onConflict: "user_id,achievement_key" })
           .select();
         if (error) {
-          console.error("ACH SAVE ERROR", k, error);
-          window.alert("⚠️ No se pudo guardar el logro '" + k + "'\n\nmensaje: " + (error.message || "(sin mensaje)") + "\ncode: " + (error.code || "?") + "\ndetails: " + (error.details || "-") + "\nhint: " + (error.hint || "-"));
+          console.error("No se pudo guardar el logro", k, error);
           break;
-        } else {
-          console.log("ACH SAVED OK", k, data);
         }
       }
     })();
