@@ -3054,6 +3054,32 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     <span style={{ color: "var(--muted)", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
                   </div>
                 </div>
+                {hasResult && !isOpen && (
+                  <div onClick={e => e.stopPropagation()} style={{ padding: "8px 16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    {Object.entries(getReactionCounts(m.id)).map(([emoji, count]) => {
+                      const mine = (reactions[m.id] || []).find(r => r.user_id === user.id && r.emoji === emoji);
+                      const reactors = (reactions[m.id] || []).filter(r => r.emoji === emoji).map(r => profileMap[r.user_id]?.name || "?");
+                      return (
+                        <div key={emoji} style={{ position: "relative" }} className="reaction-wrap">
+                          <button onClick={() => setReaction(m.id, emoji)} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: mine ? "var(--gold)" : "var(--border)", background: mine ? "var(--gold-dim)" : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}>
+                            {emoji} <span style={{ fontSize: 12, color: "var(--muted)" }}>{count}</span>
+                          </button>
+                          <div className="reaction-tooltip">{reactors.join(", ")}</div>
+                        </div>
+                      );
+                    })}
+                    {emojiPicker === m.id ? (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {["😂","🔥","😱","🎉","😤","🤯","👏","💀","🥶","😭","🤩","😴"].map(e => (
+                          <button key={e} onClick={() => setReaction(m.id, e)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", padding: "2px" }}>{e}</button>
+                        ))}
+                        <button onClick={() => setEmojiPicker(null)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 20, color: "var(--muted)", fontSize: 11, cursor: "pointer", padding: "2px 8px" }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setEmojiPicker(m.id)} style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid var(--border)", background: "none", cursor: "pointer", fontSize: 14, color: "var(--muted)" }}>+ 😊</button>
+                    )}
+                  </div>
+                )}
                 {isOpen && (<>
                   {canSee ? (<>
                   {sortedProfiles.map((prof, idx) => {
