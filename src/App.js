@@ -439,6 +439,23 @@ function isLocked(kickoff, allMatches, matchDate) {
   return new Date() >= deadline;
 }
 
+// ── Resultado de un pronóstico vs el partido (fuente única de verdad) ──────────
+// Devuelve "exact" | "winner" | "goals" | "miss" | null (null si el partido no tiene resultado).
+// "winner" = acertó el signo (local/empate/visita) sin clavar el marcador.
+// "goals"  = acertó el total de goles sin acertar el signo ni el exacto.
+function matchSign(h, a) { return h > a ? "H" : a > h ? "A" : "D"; }
+function predOutcome(pred, match) {
+  if (!pred || !match) return null;
+  if (match.home_score == null || match.away_score == null) return null;
+  if (pred.home_score == null || pred.away_score == null) return null;
+  if (pred.home_score === match.home_score && pred.away_score === match.away_score) return "exact";
+  if (matchSign(pred.home_score, pred.away_score) === matchSign(match.home_score, match.away_score)) return "winner";
+  if ((pred.home_score + pred.away_score) === (match.home_score + match.away_score)) return "goals";
+  return "miss";
+}
+const isExactPred = (pred, match) => predOutcome(pred, match) === "exact";
+const isCorrectSign = (pred, match) => { const o = predOutcome(pred, match); return o === "exact" || o === "winner"; };
+
 // ── Debtor helpers ────────────────────────────────────────────────────────────
 function DebtorBadge({ profile }) {
   if (!profile?.is_debtor) return null;
@@ -801,7 +818,7 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
   const unlocked = new Set();
 
   // 🎯 Francotirador — 5 exactos
-  const exactCount = finishedPreds.filter(p => p.home_score === p.match.home_score && p.away_score === p.match.away_score).length;
+  const exactCount = finishedPreds.filter(p => isExactPred(p, p.match)).length;
   if (exactCount >= 5) unlocked.add("sniper");
 
   // 🔮 Adivino — 10 exactos
@@ -851,13 +868,13 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
   // 🤝 Empate técnico — predecir empate y acertar 3 veces
   const drawWins = finishedPreds.filter(p => {
     const m = p.match;
-    return p.home_score === p.away_score && m.home_score === m.away_score && p.points > 0;
+    return p.home_score === p.away_score && m.home_score === m.away_score && p.points > 0;  // empate predicho y real, con puntos
   }).length;
   if (drawWins >= 3) unlocked.add("drawmaster");
 
   // 🎪 Comodín de oro — exacto con comodín
   const wcMatchIds = new Set(myWildcards.map(w => w.match_id));
-  const wcExact = finishedPreds.some(p => wcMatchIds.has(p.match_id) && p.home_score === p.match.home_score && p.away_score === p.match.away_score);
+  const wcExact = finishedPreds.some(p => wcMatchIds.has(p.match_id) && isExactPred(p, p.match));
   if (wcExact) unlocked.add("wildcard_ace");
 
   // 💎 Día perfecto — todos los partidos de un día acertados
@@ -1184,10 +1201,8 @@ function StatsDeep({ user, matches, predictions }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {lastTen.map((p, i) => {
               const m = p.match;
-              const isExact = p.home_score === m.home_score && p.away_score === m.away_score;
-              const predResult = p.home_score > p.away_score ? "H" : p.away_score > p.home_score ? "A" : "D";
-              const realResult = m.home_score > m.away_score ? "H" : m.away_score > m.home_score ? "A" : "D";
-              const isCorrect = predResult === realResult;
+              const isExact = isExactPred(p, m);
+              const isCorrect = isCorrectSign(p, m);
               const color = isExact ? "var(--gold)" : isCorrect ? "var(--green)" : "var(--red)";
               return (
                 <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 1fr", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: i < lastTen.length - 1 ? "1px solid var(--border)" : "none" }}>
@@ -1432,10 +1447,8 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
       if (!m) return null;
       const p = allPredictions.find(pr => pr.user_id === w.user_id && pr.match_id === w.match_id);
       if (!p || p.home_score == null) return null;
-      const exact = p.home_score === m.home_score && p.away_score === m.away_score;
-      const winner = win(p.home_score, p.away_score) === win(m.home_score, m.away_score);
-      const goles = (p.home_score + p.away_score) === (m.home_score + m.away_score);
-      const salio = exact ? "exacto" : winner ? "ganador" : goles ? "goles" : "falló";
+      const o = predOutcome(p, m);
+      const salio = o === "exact" ? "exacto" : o === "winner" ? "ganador" : o === "goals" ? "goles" : "falló";
       return {
         nombre: nameById[w.user_id] || "?",
         partido: `${m.home} ${m.home_score}-${m.away_score} ${m.away}`,
@@ -1987,12 +2000,8 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const played = myPreds
     .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
     .filter(p => p.match && p.match.home_score !== null && p.match.home_score !== undefined && p.match.away_score !== null && p.match.away_score !== undefined);
-  const exact = played.filter(p => p.home_score === p.match.home_score && p.away_score === p.match.away_score);
-  const correct = played.filter(p => {
-    const pr = p.home_score > p.away_score ? "h" : p.away_score > p.home_score ? "a" : "d";
-    const rr = p.match.home_score > p.match.away_score ? "h" : p.match.away_score > p.match.home_score ? "a" : "d";
-    return pr === rr;
-  });
+  const exact = played.filter(p => isExactPred(p, p.match));
+  const correct = played.filter(p => isCorrectSign(p, p.match));
   const pctExact = played.length > 0 ? Math.round(exact.length / played.length * 100) : 0;
   const pctCorrect = played.length > 0 ? Math.round(correct.length / played.length * 100) : 0;
 
@@ -2414,11 +2423,10 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       const m = (matches || []).find(mm => mm.id === pr.match_id);
       if (!m || m.home_score == null || m.away_score == null) continue;
       played++;
-      const isExact = pr.home_score === m.home_score && pr.away_score === m.away_score;
-      const predRes = pr.home_score > pr.away_score ? "home" : pr.away_score > pr.home_score ? "away" : "draw";
-      const realRes = m.home_score > m.away_score ? "home" : m.away_score > m.home_score ? "away" : "draw";
-      const isWinner = predRes === realRes;
-      const isGoals = (pr.home_score + pr.away_score) === (m.home_score + m.away_score);
+      const o = predOutcome(pr, m);
+      const isExact = o === "exact";
+      const isWinner = o === "winner";
+      const isGoals = o === "goals";
       if (isExact) exact++;
       else if (isWinner) winner++;
       else if (isGoals) goals++;
@@ -2581,12 +2589,8 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       const m = (matches || []).find(mm => mm.id === w.match_id);
       const pr = predictions.find(p => p.user_id === prof.id && p.match_id === w.match_id);
       if (!m || m.home_score == null || m.away_score == null || !pr || pr.home_score == null) { wcPend++; return; }
-      const exact = pr.home_score === m.home_score && pr.away_score === m.away_score;
-      const predRes = pr.home_score > pr.away_score ? "h" : pr.away_score > pr.home_score ? "a" : "d";
-      const realRes = m.home_score > m.away_score ? "h" : m.away_score > m.home_score ? "a" : "d";
-      const win = predRes === realRes;
-      const goles = (pr.home_score + pr.away_score) === (m.home_score + m.away_score);
-      if (exact || win || goles) wcOk++; else wcFail++;
+      const o = predOutcome(pr, m);
+      if (o === "exact" || o === "winner" || o === "goals") wcOk++; else wcFail++;
     });
     const wcUsed = myWc.length;
     const wcLeft = Math.max(0, (maxWild || 0) - wcUsed);
@@ -3052,12 +3056,10 @@ function Compare({ user, matches, allPredictions, profiles }) {
   }
 
   function resultIcon(pred, match) {
-    if (match.home_score === null || match.away_score === null) return null;
-    if (pred.home_score === match.home_score && pred.away_score === match.away_score)
-      return <span style={{ color: "var(--gold)", fontSize: 13 }}>★</span>;
-    const real = match.home_score > match.away_score ? "H" : match.away_score > match.home_score ? "A" : "D";
-    const predicted = pred.home_score > pred.away_score ? "H" : pred.away_score > pred.home_score ? "A" : "D";
-    if (real === predicted) return <span style={{ color: "var(--green)", fontSize: 13 }}>✓</span>;
+    const o = predOutcome(pred, match);
+    if (o === null) return null;
+    if (o === "exact") return <span style={{ color: "var(--gold)", fontSize: 13 }}>★</span>;
+    if (o === "winner") return <span style={{ color: "var(--green)", fontSize: 13 }}>✓</span>;
     return <span style={{ color: "var(--red)", fontSize: 13 }}>✗</span>;
   }
 
