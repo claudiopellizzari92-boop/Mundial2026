@@ -2132,7 +2132,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchievements }) {
+function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, allAchievements }) {
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [historyUser, setHistoryUser] = useState(null);
@@ -2209,10 +2209,21 @@ function Standings({ user, predictions, profiles, onRefresh, isAdmin, allAchieve
     const matchPts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
     const prePts = prePreds.filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
     const pts = matchPts + prePts;
-    const exact = preds.filter(pr => pr.points >= 3).length;
-    const winner = preds.filter(pr => pr.points === 2 || pr.points === 5).length;
-    const goals = preds.filter(pr => pr.points === 1 || pr.points === 2).length;
-    return { ...p, pts, exact, winner, goals, played: preds.length };
+    let exact = 0, winner = 0, goals = 0, played = 0;
+    for (const pr of preds) {
+      const m = (matches || []).find(mm => mm.id === pr.match_id);
+      if (!m || m.home_score == null || m.away_score == null) continue;
+      played++;
+      const isExact = pr.home_score === m.home_score && pr.away_score === m.away_score;
+      const predRes = pr.home_score > pr.away_score ? "home" : pr.away_score > pr.home_score ? "away" : "draw";
+      const realRes = m.home_score > m.away_score ? "home" : m.away_score > m.home_score ? "away" : "draw";
+      const isWinner = predRes === realRes;
+      const isGoals = (pr.home_score + pr.away_score) === (m.home_score + m.away_score);
+      if (isExact) exact++;
+      else if (isWinner) winner++;
+      else if (isGoals) goals++;
+    }
+    return { ...p, pts, exact, winner, goals, played };
   }).sort((a, b) => b.pts - a.pts || b.exact - a.exact);
 
   function renderH2h() {
@@ -4105,7 +4116,7 @@ export default function App() {
         {tab==="pre"       && <PreTournament user={user}/>}
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
         {tab==="shame"     && <HallOfShame profiles={profiles} />}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
