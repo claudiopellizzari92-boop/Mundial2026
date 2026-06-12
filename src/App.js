@@ -3803,7 +3803,7 @@ export default function App() {
   const [unlockedAchievements, setUnlockedAchievements] = useState(new Set());
   const [equippedBadge, setEquippedBadge] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
-  const [knownAchievements, setKnownAchievements] = useState(new Set());
+  const [savedAchKeys, setSavedAchKeys] = useState(null);
   const [wildcards, setWildcards] = useState([]);
   const [snapshots, setSnapshots] = useState([]);
   const [prePreds, setPrePreds] = useState([]);
@@ -4014,16 +4014,18 @@ export default function App() {
   // Load extra data needed for achievements
   const loadAchievementData = useCallback(async () => {
     if (!user) return;
-    const [{ data: wc }, { data: snaps }, { data: pp }, { data: prof }] = await Promise.all([
+    const [{ data: wc }, { data: snaps }, { data: pp }, { data: prof }, { data: savedAch }] = await Promise.all([
       sb.from("wildcards").select("*"),
       sb.from("ranking_snapshots").select("*").order("snapshot_date"),
       sb.from("pretournament_predictions").select("*"),
       sb.from("profiles").select("equipped_badge").eq("id", user.id).single(),
+      sb.from("achievements").select("achievement_key").eq("user_id", user.id),
     ]);
     setWildcards(wc || []);
     setSnapshots(snaps || []);
     setPrePreds(pp || []);
     if (prof?.equipped_badge) setEquippedBadge(prof.equipped_badge);
+    setSavedAchKeys(new Set((savedAch || []).map(a => a.achievement_key)));
   }, [user]);
 
   useEffect(() => { loadAchievementData(); }, [loadAchievementData]);
@@ -4034,20 +4036,26 @@ export default function App() {
     const unlocked = calcAchievements({
       predictions: allPredictions, matches, wildcards, snapshots, prePreds, userId: user.id
     });
-    // Check for newly unlocked
-    unlocked.forEach(key => {
-      if (!knownAchievements.has(key) && knownAchievements.size > 0) {
-        const achievement = ACHIEVEMENTS.find(a => a.key === key);
-        if (achievement) {
-          setAchievementToast(achievement);
-          // Save to DB
-          sb.from("achievements").upsert({ user_id: user.id, achievement_key: key }, { onConflict: "user_id,achievement_key" });
-        }
-      }
-    });
-    setKnownAchievements(unlocked);
     setUnlockedAchievements(unlocked);
-  }, [allPredictions, matches, wildcards, snapshots, prePreds, user]);
+    // Esperar a tener los logros ya guardados en la DB antes de comparar
+    if (savedAchKeys === null) return;
+    // Nuevos = desbloqueados pero todavía NO guardados en la DB
+    const newKeys = [...unlocked].filter(k => !savedAchKeys.has(k));
+    if (newKeys.length === 0) return;
+    // Guardar los nuevos en la DB
+    newKeys.forEach(k =>
+      sb.from("achievements").upsert({ user_id: user.id, achievement_key: k }, { onConflict: "user_id,achievement_key" })
+    );
+    // Mostrar popup del primer logro nuevo
+    const ach = ACHIEVEMENTS.find(a => a.key === newKeys[0]);
+    if (ach) setAchievementToast(ach);
+    // Marcar como conocidos para no repetir el popup
+    setSavedAchKeys(prev => {
+      const next = new Set(prev);
+      newKeys.forEach(k => next.add(k));
+      return next;
+    });
+  }, [allPredictions, matches, wildcards, snapshots, prePreds, user, savedAchKeys]);
 
   async function handleEquipBadge(key) {
     setEquippedBadge(key);
