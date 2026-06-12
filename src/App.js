@@ -857,7 +857,7 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
 
   // 🎪 Comodín de oro — exacto con comodín
   const wcMatchIds = new Set(myWildcards.map(w => w.match_id));
-  const wcExact = finishedPreds.some(p => wcMatchIds.has(p.match_id) && p.points >= 6);
+  const wcExact = finishedPreds.some(p => wcMatchIds.has(p.match_id) && p.home_score === p.match.home_score && p.away_score === p.match.away_score);
   if (wcExact) unlocked.add("wildcard_ace");
 
   // 💎 Día perfecto — todos los partidos de un día acertados
@@ -1210,11 +1210,14 @@ function StatsDeep({ user, matches, predictions }) {
 }
 
 // ── Hall of Fame ───────────────────────────────────────────────────────────────
-function HallOfFame({ profiles, predictions, snapshots, allAchievements }) {
+function HallOfFame({ profiles, predictions, matches, snapshots, allAchievements }) {
   const rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
     const pts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
-    const exact = preds.filter(pr => pr.points >= 3).length;
+    const exact = preds.filter(pr => {
+      const m = (matches || []).find(mm => mm.id === pr.match_id);
+      return m && m.home_score != null && m.away_score != null && pr.home_score === m.home_score && pr.away_score === m.away_score;
+    }).length;
     const userSnaps = (snapshots || []).filter(s => s.user_id === p.id);
     const daysFirst = userSnaps.filter(s => s.position === 1).length;
     return { ...p, pts, exact, daysFirst };
@@ -1981,9 +1984,15 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches, m.match_date)).length;
   const locked = isPreTournamentLocked();
 
-  const played = myPreds.filter(p => p.points !== null && p.points !== undefined);
-  const exact = played.filter(p => p.points >= 3);
-  const correct = played.filter(p => p.points === 1 || p.points === 2);
+  const played = myPreds
+    .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
+    .filter(p => p.match && p.match.home_score !== null && p.match.home_score !== undefined && p.match.away_score !== null && p.match.away_score !== undefined);
+  const exact = played.filter(p => p.home_score === p.match.home_score && p.away_score === p.match.away_score);
+  const correct = played.filter(p => {
+    const pr = p.home_score > p.away_score ? "h" : p.away_score > p.home_score ? "a" : "d";
+    const rr = p.match.home_score > p.match.away_score ? "h" : p.match.away_score > p.match.home_score ? "a" : "d";
+    return pr === rr;
+  });
   const pctExact = played.length > 0 ? Math.round(exact.length / played.length * 100) : 0;
   const pctCorrect = played.length > 0 ? Math.round(correct.length / played.length * 100) : 0;
 
@@ -1994,9 +2003,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       }, 0) / allUserIds.length)
     : 0;
 
-  const finishedPreds = played
-    .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
-    .filter(p => p.match)
+  const finishedPreds = [...played]
     .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
 
   let racha = 0;
@@ -4425,7 +4432,7 @@ export default function App() {
         {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
-        {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} snapshots={snapshots}/></>}
+        {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/></>}
         {tab==="shame"     && <HallOfShame profiles={profiles} />}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
