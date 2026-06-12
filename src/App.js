@@ -3489,6 +3489,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [results, setResults] = useState({});
   const [saving, setSaving] = useState({});
   const [savedMatch, setSavedMatch] = useState({});
+  const [resultError, setResultError] = useState({});
   const [rules, setRules] = useState([]);
   const [ruleVals, setRuleVals] = useState({});
   const [savingRules, setSavingRules] = useState(false);
@@ -3733,10 +3734,22 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     const r = results[match.id] || {};
     if (r.home===undefined||r.away===undefined||r.home===""||r.away==="") return;
     setSaving(s=>({...s,[match.id]:true}));
+    setResultError(e=>({...e,[match.id]:null}));
     const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
-    await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
+    const { error: matchErr } = await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
+    if (matchErr) {
+      setResultError(e=>({...e,[match.id]:`❌ No se guardó el resultado: ${matchErr.message}`}));
+      setSaving(s=>({...s,[match.id]:false}));
+      return;
+    }
     // Calcular puntos del lado del servidor (comodín, costo y orden exacto>ganador>goles)
-    await sb.rpc("recalc_match_points", { p_match_id: match.id });
+    const { error: rpcErr } = await sb.rpc("recalc_match_points", { p_match_id: match.id });
+    if (rpcErr) {
+      setResultError(e=>({...e,[match.id]:`⚠️ Resultado guardado pero FALLÓ el cálculo de puntos: ${rpcErr.message}. Tocá "Actualizar" para reintentar.`}));
+      setSaving(s=>({...s,[match.id]:false}));
+      onRefresh();
+      return;
+    }
     const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
     setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
     sendPushNotification("all", null, { title: "⚽ Resultado cargado", body: `${match.home} ${homeScore}–${awayScore} ${match.away}`, tag: `result-${match.id}`, url: "/" });
@@ -3848,6 +3861,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
                       <button className="admin-edit-btn" onClick={()=>{setEditMatch(m);setEditForm({...m});}}>✏️</button>
                       {finished && <button className="admin-edit-btn" onClick={()=>resetMatch(m)} style={{color:"var(--red)",borderColor:"var(--red)"}}>↺</button>}
                     </div>
+                    {resultError[m.id] && <div style={{gridColumn:"1 / -1",fontSize:11,color:"#ff8a8a",background:"rgba(220,60,60,0.12)",border:"1px solid rgba(220,60,60,0.4)",borderRadius:7,padding:"6px 9px",marginTop:5,width:"100%"}}>{resultError[m.id]}</div>}
                   </div>
                 );
               })}
@@ -4072,6 +4086,7 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [booting, setBooting] = useState(true);
   const [matches, setMatches] = useState([]);
+  const [loadError, setLoadError] = useState(false);
   const [myPredictions, setMyPredictions] = useState([]);
   const [allPredictions, setAllPredictions] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -4296,15 +4311,26 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const [{ data: m }, { data: myP }, { data: allP }, { data: prof }, { data: adminCheck }] = await Promise.all([
+    const [mq, myPq, allPq, profq, adminq] = await Promise.all([
       sb.from("matches").select("*").order("kickoff_at"),
       sb.from("predictions").select("*").eq("user_id", user.id),
       sb.from("predictions").select("*"),
       sb.from("profiles").select("*"),
       sb.from("admins").select("*").eq("user_id", user.id),
     ]);
-    setMatches(m||[]); setMyPredictions(myP||[]); setAllPredictions(allP||[]); setProfiles(prof||[]);
-    setIsAdmin((adminCheck||[]).length>0);
+    const firstErr = mq.error || myPq.error || allPq.error || profq.error || adminq.error;
+    if (firstErr) {
+      console.error("loadData error:", firstErr);
+      setLoadError(true);
+    } else {
+      setLoadError(false);
+    }
+    // Solo pisar el estado con datos que llegaron bien (no vaciar la app por un fallo transitorio)
+    if (mq.data) setMatches(mq.data);
+    if (myPq.data) setMyPredictions(myPq.data);
+    if (allPq.data) setAllPredictions(allPq.data);
+    if (profq.data) setProfiles(profq.data);
+    if (adminq.data) setIsAdmin(adminq.data.length>0);
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -4380,6 +4406,12 @@ export default function App() {
   return (<><style>{css}</style>
     <div className={`shell${darkMode ? "" : " light-mode"}`}>
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
+      {loadError && (
+        <div style={{background:"rgba(180,40,40,0.95)",color:"#fff",padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:12,fontSize:13,position:"sticky",top:0,zIndex:200}}>
+          <span>⚠️ Error de conexión: algunos datos no cargaron.</span>
+          <button onClick={loadData} style={{background:"#fff",color:"#8a1f1f",border:"none",borderRadius:7,padding:"5px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}>Reintentar</button>
+        </div>
+      )}
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
