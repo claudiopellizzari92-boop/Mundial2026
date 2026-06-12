@@ -4042,10 +4042,22 @@ export default function App() {
     // Nuevos = desbloqueados pero todavía NO guardados en la DB
     const newKeys = [...unlocked].filter(k => !savedAchKeys.has(k));
     if (newKeys.length === 0) return;
-    // Guardar los nuevos en la DB
-    newKeys.forEach(k =>
-      sb.from("achievements").upsert({ user_id: user.id, achievement_key: k }, { onConflict: "user_id,achievement_key" })
-    );
+    // Guardar los nuevos en la DB (DIAGNÓSTICO: muestra el error si falla)
+    (async () => {
+      for (const k of newKeys) {
+        const { data, error } = await sb
+          .from("achievements")
+          .upsert({ user_id: user.id, achievement_key: k }, { onConflict: "user_id,achievement_key" })
+          .select();
+        if (error) {
+          console.error("ACH SAVE ERROR", k, error);
+          window.alert("⚠️ No se pudo guardar el logro '" + k + "'\n\nmensaje: " + (error.message || "(sin mensaje)") + "\ncode: " + (error.code || "?") + "\ndetails: " + (error.details || "-") + "\nhint: " + (error.hint || "-"));
+          break;
+        } else {
+          console.log("ACH SAVED OK", k, data);
+        }
+      }
+    })();
     // Mostrar popup del primer logro nuevo
     const ach = ACHIEVEMENTS.find(a => a.key === newKeys[0]);
     if (ach) setAchievementToast(ach);
