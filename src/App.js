@@ -2323,6 +2323,12 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [historyUser, setHistoryUser] = useState(null);
+  const [allWildcards, setAllWildcards] = useState([]);
+  const [maxWild, setMaxWild] = useState(4);
+  useEffect(() => {
+    sb.from("wildcards").select("*").then(({ data }) => setAllWildcards(data || []));
+    sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWild(data.rule_value); });
+  }, []);
   const [snapshots, setSnapshots] = useState([]);
   const [loadingSnaps, setLoadingSnaps] = useState(false);
   const [userAchievements, setUserAchievements] = useState({});
@@ -2558,6 +2564,25 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
     const profTitles = prof.titles || [];
     const profAchievements = userAchievements[prof.id] || new Set();
     const unlockedAchs = ACHIEVEMENTS.filter(a => profAchievements.has(a.key));
+    const myRow = rows.find(r => r.id === prof.id) || prof;
+    const curPos = rows.findIndex(r => r.id === prof.id) + 1;
+    const aciertos = (myRow.exact || 0) + (myRow.winner || 0) + (myRow.goals || 0);
+    const pctAcierto = myRow.played ? Math.round(aciertos / myRow.played * 100) : 0;
+    const myWc = allWildcards.filter(w => w.user_id === prof.id);
+    let wcOk = 0, wcFail = 0, wcPend = 0;
+    myWc.forEach(w => {
+      const m = (matches || []).find(mm => mm.id === w.match_id);
+      const pr = predictions.find(p => p.user_id === prof.id && p.match_id === w.match_id);
+      if (!m || m.home_score == null || m.away_score == null || !pr || pr.home_score == null) { wcPend++; return; }
+      const exact = pr.home_score === m.home_score && pr.away_score === m.away_score;
+      const predRes = pr.home_score > pr.away_score ? "h" : pr.away_score > pr.home_score ? "a" : "d";
+      const realRes = m.home_score > m.away_score ? "h" : m.away_score > m.home_score ? "a" : "d";
+      const win = predRes === realRes;
+      const goles = (pr.home_score + pr.away_score) === (m.home_score + m.away_score);
+      if (exact || win || goles) wcOk++; else wcFail++;
+    });
+    const wcUsed = myWc.length;
+    const wcLeft = Math.max(0, (maxWild || 0) - wcUsed);
 
     return (
       <div className="modal-overlay" onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }}>
@@ -2571,7 +2596,7 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                   <ChampionName profile={prof} name={prof.name} style={{ fontFamily: "Bebas Neue", fontSize: 20, letterSpacing: 1 }} />
                   <TitleBadges profile={prof} size={16} />
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>{prof.pts} pts actuales</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{curPos > 0 ? "#" + curPos + " · " : ""}{prof.pts} pts actuales</div>
               </div>
             </div>
             <button onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
@@ -2645,6 +2670,30 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
             </div>
           )}
 
+          {/* Rendimiento de pronósticos */}
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>📊 Rendimiento</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, textAlign: "center" }}>
+              <div><div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)" }}>{myRow.exact || 0}</div><div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>Exactos</div></div>
+              <div><div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--green)" }}>{myRow.winner || 0}</div><div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>Ganador</div></div>
+              <div><div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--txt)" }}>{pctAcierto}%</div><div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>Acierto</div></div>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>{aciertos} de {myRow.played || 0} partidos jugados con puntos</div>
+          </div>
+
+          {/* Comodines */}
+          <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>🃏 Comodines</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontSize: 13, color: "var(--txt)" }}><strong style={{ color: "var(--gold)" }}>{wcUsed}</strong> usados · <strong style={{ color: "var(--gold)" }}>{wcLeft}</strong> disponibles</div>
+              <div style={{ fontSize: 12, display: "flex", gap: 10 }}>
+                <span style={{ color: "var(--green)" }}>✅ {wcOk}</span>
+                <span style={{ color: "var(--red)" }}>❌ {wcFail}</span>
+                {wcPend > 0 && <span style={{ color: "var(--muted)" }}>⏳ {wcPend}</span>}
+              </div>
+            </div>
+          </div>
+
           {/* Snapshots */}
           {loadingSnaps ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>Cargando...</div>
@@ -2653,11 +2702,30 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
           ) : (<>
             <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Evolución de puntos</div>
-              <svg viewBox={"0 0 " + chartW + " " + chartH} style={{ width: "100%", height: chartH }}>
-                <path d={pathD} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />
-                {points.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="var(--gold)" />)}
-                {userSnaps.map((s, i) => <text key={i} x={points[i][0]} y={chartH - 2} textAnchor="middle" fontSize="9" fill="var(--muted)">{s.snapshot_date.slice(5)}</text>)}
-              </svg>
+              {(() => {
+                const padL = 26, padR = 12, padT = 18, padB = 18;
+                const w = chartW, h = chartH;
+                const niceMax = Math.max(...pts, 1);
+                const xFor = (i) => padL + (i / Math.max(userSnaps.length - 1, 1)) * (w - padL - padR);
+                const yFor = (v) => h - padB - (v / niceMax) * (h - padT - padB);
+                const pts2 = userSnaps.map((sn, i) => [xFor(i), yFor(sn.points)]);
+                const d = pts2.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+                const ticks = [...new Set([0, Math.round(niceMax / 2), niceMax])];
+                return (
+                  <svg viewBox={"0 0 " + w + " " + h} style={{ width: "100%", height: h }}>
+                    {ticks.map((t, i) => (
+                      <g key={"t" + i}>
+                        <line x1={padL} y1={yFor(t)} x2={w - padR} y2={yFor(t)} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 3" />
+                        <text x={padL - 4} y={yFor(t) + 3} textAnchor="end" fontSize="8" fill="var(--muted)">{t}</text>
+                      </g>
+                    ))}
+                    <path d={d} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />
+                    {pts2.map((p, i) => <circle key={"c" + i} cx={p[0]} cy={p[1]} r="4" fill="var(--gold)" />)}
+                    {pts2.map((p, i) => <text key={"v" + i} x={p[0]} y={p[1] - 8} textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--gold)">{userSnaps[i].points}</text>)}
+                    {userSnaps.map((sn, i) => <text key={"d" + i} x={pts2[i][0]} y={h - 4} textAnchor="middle" fontSize="8" fill="var(--muted)">{sn.snapshot_date.slice(5)}</text>)}
+                  </svg>
+                );
+              })()}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}><div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Días en 1er lugar</div><div style={{ fontFamily: "Bebas Neue", fontSize: 28, color: "var(--gold)" }}>{daysFirst}</div><div style={{ fontSize: 11, color: "var(--muted)" }}>de {totalDays} snapshots</div></div>
