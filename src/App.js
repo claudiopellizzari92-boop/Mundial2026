@@ -351,7 +351,8 @@ input,button,select{font-family:inherit;}
 .btn-small.red{background:var(--red-dim);border-color:var(--red);color:var(--red);}
 .btn-small.red:hover{background:var(--red);color:#fff;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;}
-.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
+.modal::-webkit-scrollbar{display:none;}
 .modal h3{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px;margin-bottom:18px;color:var(--gold);}
 .modal-btns{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
 .btn-cancel{padding:9px 18px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;}
