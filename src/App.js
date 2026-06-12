@@ -3105,7 +3105,10 @@ function Compare({ user, matches, allPredictions, profiles }) {
               if (!pa) return 1;
               if (!pb) return -1;
               if (hasResult) {
-                // Partido terminado: por puntos (como antes)
+                // Partido terminado: 1º los que sumaron (desc), 2º comodines fallados (-1), 3º los que fallaron (0)
+                const ra = (pa.points || 0) > 0 ? 1 : (pa.points || 0) < 0 ? 2 : 3;
+                const rb = (pb.points || 0) > 0 ? 1 : (pb.points || 0) < 0 ? 2 : 3;
+                if (ra !== rb) return ra - rb;
                 return (pb.points || 0) - (pa.points || 0);
               }
               // Partido sin terminar: agrupar por resultado pronosticado (local desc, visitante asc)
