@@ -1733,8 +1733,8 @@ function AuthScreen({ onAuth }) {
     if (!name.trim()) { setMsg({ type: "err", text: "Ingresa tu nombre" }); return; }
     if (pass.length < 6) { setMsg({ type: "err", text: "Mínimo 6 caracteres" }); return; }
     setLoading(true); setMsg(null);
-    const { data: codes } = await sb.from("invite_codes").select("*").eq("code", invite.trim().toLowerCase()).eq("active", true);
-    if (!codes?.length) { setMsg({ type: "err", text: "Código de invitación inválido" }); setLoading(false); return; }
+    const { data: codeOk, error: codeErr } = await sb.rpc("check_invite_code", { p_code: invite });
+    if (codeErr || !codeOk) { setMsg({ type: "err", text: "Código de invitación inválido" }); setLoading(false); return; }
     const { data, error } = await sb.auth.signUp({ email, password: pass });
     if (error) { setMsg({ type: "err", text: error.message }); setLoading(false); return; }
     if (data.user) {
