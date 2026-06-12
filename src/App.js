@@ -3426,41 +3426,9 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     setSaving(s=>({...s,[match.id]:true}));
     const homeScore=parseInt(r.home), awayScore=parseInt(r.away);
     await sb.from("matches").update({home_score:homeScore,away_score:awayScore,status:"finished"}).eq("id",match.id);
+    // Calcular puntos del lado del servidor (comodín, costo y orden exacto>ganador>goles)
+    await sb.rpc("recalc_match_points", { p_match_id: match.id });
     const { data: preds } = await sb.from("predictions").select("*").eq("match_id", match.id);
-    const { data: matchWildcards } = await sb.rpc("match_wildcard_users", { p_match_id: match.id });
-    const wildcardUserIds = new Set(matchWildcards || []);
-    if (preds) {
-      const isKnockout = match.phase && match.phase !== "Grupos";
-      const exactPts = isKnockout ? (ruleVals["exact_score_knockout"] || 3) : (ruleVals["exact_score_groups"] || 3);
-      const resultPts = isKnockout ? (ruleVals["correct_result_knockout"] || 1) : (ruleVals["correct_result_groups"] || 1);
-      const goalsPts = isKnockout ? (ruleVals["correct_goals_knockout"] || 2) : (ruleVals["correct_goals_groups"] || 1);
-      const wcExact = ruleVals["wildcard_exact"] || 8;
-      const wcGoals = ruleVals["wildcard_goals"] || 5;
-      const wcWinner = ruleVals["wildcard_winner"] || 2;
-      const wcCost = ruleVals["wildcard_cost"] || 1;
-      const realResult = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
-      const realTotalGoals = homeScore + awayScore;
-      for (const pred of preds) {
-        const hasWildcard = wildcardUserIds.has(pred.user_id);
-        let pts = 0;
-        const isExact = pred.home_score === homeScore && pred.away_score === awayScore;
-        const predResult = pred.home_score > pred.away_score ? "home" : pred.away_score > pred.home_score ? "away" : "draw";
-        const isCorrectResult = predResult === realResult;
-        const isCorrectGoals = (pred.home_score + pred.away_score) === realTotalGoals;
-        if (hasWildcard) {
-          let base = 0;
-          if (isExact) base = wcExact;
-          else if (isCorrectResult) base = wcWinner;
-          else if (isCorrectGoals) base = wcGoals;
-          pts = base - wcCost;
-        } else {
-          if (isExact) pts = exactPts;
-          else if (isCorrectResult) pts = resultPts;
-          else if (isCorrectGoals) pts = goalsPts;
-        }
-        await sb.from("predictions").update({ points: pts }).eq("id", pred.id);
-      }
-    }
     setSavedMatch(s=>({...s,[match.id]:true})); setSaving(s=>({...s,[match.id]:false})); onRefresh();
     sendPushNotification("all", null, { title: "⚽ Resultado cargado", body: `${match.home} ${homeScore}–${awayScore} ${match.away}`, tag: `result-${match.id}`, url: "/" });
     if (preds) {
