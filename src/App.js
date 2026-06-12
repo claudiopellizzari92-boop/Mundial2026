@@ -1474,7 +1474,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   }
 
   async function generar(dateArg) {
-    const date = dateArg || selectedDate;
+    const date = (typeof dateArg === "string" ? dateArg : null) || selectedDate;
     if (!date) return;
     setGenerating(true); setError("");
     try {
@@ -1613,7 +1613,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
             <textarea value={ideas} onChange={e=>setIdeas(e.target.value)} placeholder={'Ej: "Cargá fuerte al que falló el comodín", "es el cumple del Colo", "tono más picante"...'} rows={3} style={{width:"100%",padding:"10px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:14,resize:"vertical",fontFamily:"inherit"}}/>
           </div>
           {error && <div style={{padding:"10px 14px",background:"rgba(220,60,60,.12)",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:13,color:"#ff8080"}}>{error}</div>}
-          <button onClick={generar} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
+          <button onClick={()=>generar()} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
             {generating ? "🪄 Generando con la IA..." : "🪄 Generar crónica"}
           </button>
         </div>
