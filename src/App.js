@@ -1363,13 +1363,20 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [editCuerpo, setEditCuerpo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const allDates = [...new Set(matches.map(m => m.match_date))].sort();
+  // Ordenar las fechas cronológicamente por el primer kickoff de cada día (no alfabéticamente por texto)
+  const dateFirstKickoff = {};
+  matches.forEach(m => {
+    const t = m.kickoff_at ? new Date(m.kickoff_at).getTime() : Number.MAX_SAFE_INTEGER;
+    if (dateFirstKickoff[m.match_date] === undefined || t < dateFirstKickoff[m.match_date]) dateFirstKickoff[m.match_date] = t;
+  });
+  const ordenFecha = (a, b) => (dateFirstKickoff[a] || 0) - (dateFirstKickoff[b] || 0);
+  const allDates = [...new Set(matches.map(m => m.match_date))].sort(ordenFecha);
   function jornadaLabel(d) {
     const i = allDates.indexOf(d);
     return i >= 0 ? `Fecha ${i + 1}` : d;
   }
   const hasScore = (m) => m.home_score !== null && m.home_score !== undefined && m.away_score !== null && m.away_score !== undefined;
-  const fechasFinished = [...new Set(matches.filter(hasScore).map(m => m.match_date))].sort().reverse();
+  const fechasFinished = [...new Set(matches.filter(hasScore).map(m => m.match_date))].sort(ordenFecha).reverse();
 
   async function loadChronicles() {
     setLoading(true);
@@ -1479,8 +1486,15 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     setGenerating(true); setError("");
     try {
       const resumen = await buildResumen(date);
+      // Crónicas anteriores (publicadas, cronológicamente previas) para dar continuidad
+      const idxActual = allDates.indexOf(date);
+      const historial = chronicles
+        .filter(c => c.published && c.match_date !== date && allDates.indexOf(c.match_date) > -1 && allDates.indexOf(c.match_date) < idxActual)
+        .sort((a, b) => allDates.indexOf(a.match_date) - allDates.indexOf(b.match_date))
+        .slice(-5)
+        .map(c => ({ jornada: jornadaLabel(c.match_date), titulo: c.titulo, cuerpo: c.cuerpo }));
       const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
-        body: { match_date: date, fecha_label: jornadaLabel(date), ideas, resumen },
+        body: { match_date: date, fecha_label: jornadaLabel(date), ideas, resumen, historial },
       });
       if (invErr) {
         let msg = invErr.message || "Error llamando a la función";
