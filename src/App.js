@@ -3104,10 +3104,14 @@ function Compare({ user, matches, allPredictions, profiles }) {
               if (!pa && !pb) return 0;
               if (!pa) return 1;
               if (!pb) return -1;
-              // Agrupar por resultado pronosticado: local desc, visitante asc
+              if (hasResult) {
+                // Partido terminado: por puntos (como antes)
+                return (pb.points || 0) - (pa.points || 0);
+              }
+              // Partido sin terminar: agrupar por resultado pronosticado (local desc, visitante asc)
               if (pb.home_score !== pa.home_score) return pb.home_score - pa.home_score;
               if (pa.away_score !== pb.away_score) return pa.away_score - pb.away_score;
-              return (pb.points || 0) - (pa.points || 0);
+              return 0;
             });
             const iPredicted = matchPreds.some(p => p.user_id === user.id);
             const canSee = iPredicted || matchPreds.length > 0;
