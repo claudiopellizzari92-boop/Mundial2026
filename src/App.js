@@ -1358,6 +1358,10 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [publishingId, setPublishingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editTitulo, setEditTitulo] = useState("");
+  const [editCuerpo, setEditCuerpo] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const allDates = [...new Set(matches.map(m => m.match_date))].sort();
   function jornadaLabel(d) {
@@ -1388,41 +1392,95 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
 
     const nameById = {};
     profiles.forEach(p => { nameById[p.id] = p.name; });
+    const matchById = {};
+    finished.forEach(m => { matchById[m.id] = m; });
+    const win = (h, a) => h > a ? "L" : a > h ? "V" : "E";
 
-    const partidos = finished.map(m => ({
-      local: m.home,
-      visitante: m.away,
-      resultado: `${m.home_score}-${m.away_score}`,
-      fase: m.group_name ? `Grupo ${m.group_name}` : (m.phase || ""),
-    }));
+    // Detalle por partido: quién clavó el exacto y quién erró más feo
+    const partidos = finished.map(m => {
+      const mp = allPredictions.filter(p => p.match_id === m.id && p.home_score != null && p.away_score != null);
+      const clavaron_exacto = mp
+        .filter(p => p.home_score === m.home_score && p.away_score === m.away_score)
+        .map(p => nameById[p.user_id]).filter(Boolean);
+      let peor = null, peorDist = -1;
+      mp.forEach(p => {
+        const dist = Math.abs(p.home_score - m.home_score) + Math.abs(p.away_score - m.away_score)
+          + (win(p.home_score, p.away_score) !== win(m.home_score, m.away_score) ? 3 : 0);
+        if (dist > peorDist) { peorDist = dist; peor = { nombre: nameById[p.user_id] || "?", pronostico: `${p.home_score}-${p.away_score}` }; }
+      });
+      return {
+        local: m.home, visitante: m.away,
+        resultado: `${m.home_score}-${m.away_score}`,
+        fase: m.group_name ? `Grupo ${m.group_name}` : (m.phase || ""),
+        clavaron_exacto, peor_pronostico: peor,
+      };
+    });
 
-    const fechaPreds = allPredictions.filter(p => matchIds.includes(p.match_id));
+    // Comodines de la fecha y cómo les fue
+    const comodines = (wcs || []).map(w => {
+      const m = matchById[w.match_id];
+      if (!m) return null;
+      const p = allPredictions.find(pr => pr.user_id === w.user_id && pr.match_id === w.match_id);
+      if (!p || p.home_score == null) return null;
+      const exact = p.home_score === m.home_score && p.away_score === m.away_score;
+      const winner = win(p.home_score, p.away_score) === win(m.home_score, m.away_score);
+      const goles = (p.home_score + p.away_score) === (m.home_score + m.away_score);
+      const salio = exact ? "exacto" : winner ? "ganador" : goles ? "goles" : "falló";
+      return {
+        nombre: nameById[w.user_id] || "?",
+        partido: `${m.home} ${m.home_score}-${m.away_score} ${m.away}`,
+        pronostico: `${p.home_score}-${p.away_score}`,
+        salio, puntos: p.points || 0,
+      };
+    }).filter(Boolean);
+
+    // Tabla de la fecha (exactos/ganadores/fallos calculados de verdad)
     const fechaMap = {};
-    fechaPreds.forEach(p => {
-      if (!fechaMap[p.user_id]) fechaMap[p.user_id] = { nombre: nameById[p.user_id] || "Desconocido", puntos_fecha: 0, exactos: 0, uso_comodin: false };
-      fechaMap[p.user_id].puntos_fecha += (p.points || 0);
-      if ((p.points || 0) >= 3) fechaMap[p.user_id].exactos += 1;
-      if (wcSet.has(`${p.user_id}:${p.match_id}`)) fechaMap[p.user_id].uso_comodin = true;
+    allPredictions.forEach(p => {
+      if (!matchIds.includes(p.match_id)) return;
+      const m = matchById[p.match_id];
+      if (!m || p.home_score == null) return;
+      if (!fechaMap[p.user_id]) fechaMap[p.user_id] = { nombre: nameById[p.user_id] || "Desconocido", puntos_fecha: 0, exactos: 0, ganadores: 0, fallos: 0, uso_comodin: false };
+      const e = fechaMap[p.user_id];
+      e.puntos_fecha += (p.points || 0);
+      if (p.home_score === m.home_score && p.away_score === m.away_score) e.exactos += 1;
+      else if (win(p.home_score, p.away_score) === win(m.home_score, m.away_score)) e.ganadores += 1;
+      else if ((p.points || 0) === 0) e.fallos += 1;
+      if (wcSet.has(`${p.user_id}:${p.match_id}`)) e.uso_comodin = true;
     });
     const tabla_fecha = Object.values(fechaMap).sort((a, b) => b.puntos_fecha - a.puntos_fecha);
+    const heroe_fecha = tabla_fecha[0] || null;
+    const papelon_fecha = tabla_fecha.length ? tabla_fecha[tabla_fecha.length - 1] : null;
 
+    // Tabla general
     const general = profiles.map(p => {
       const mPts = allPredictions.filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
       const pPts = (prePreds || []).filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
       return { nombre: p.name, puntos: mPts + pPts };
     }).sort((a, b) => b.puntos - a.puntos);
     const tabla_general = general.slice(0, 5).map((g, i) => ({ puesto: i + 1, nombre: g.nombre, puntos: g.puntos }));
+    const colista = general.length ? { puesto: general.length, nombre: general[general.length - 1].nombre, puntos: general[general.length - 1].puntos } : null;
 
-    return { jornada: jornadaLabel(matchDate), partidos, tabla_fecha, tabla_general, lider: tabla_general[0] || null };
+    const morosos = profiles.filter(p => p.is_debtor).map(p => p.name);
+    const eliminados = profiles.filter(p => p.is_eliminated).map(p => p.name);
+
+    return {
+      jornada: jornadaLabel(matchDate),
+      partidos, comodines, tabla_fecha,
+      heroe_fecha, papelon_fecha,
+      tabla_general, lider: tabla_general[0] || null, colista,
+      morosos, eliminados,
+    };
   }
 
-  async function generar() {
-    if (!selectedDate) return;
+  async function generar(dateArg) {
+    const date = dateArg || selectedDate;
+    if (!date) return;
     setGenerating(true); setError("");
     try {
-      const resumen = await buildResumen(selectedDate);
+      const resumen = await buildResumen(date);
       const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
-        body: { match_date: selectedDate, fecha_label: jornadaLabel(selectedDate), ideas, resumen },
+        body: { match_date: date, fecha_label: jornadaLabel(date), ideas, resumen },
       });
       if (invErr) {
         let msg = invErr.message || "Error llamando a la función";
@@ -1449,6 +1507,92 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   async function borrarBorrador(id) {
     if (!window.confirm("¿Eliminar este borrador?")) return;
     await sb.from("chronicles").delete().eq("id", id);
+    await loadChronicles();
+  }
+
+  async function descargarPDF(c) {
+    try {
+      if (!(window.jspdf && window.jspdf.jsPDF)) {
+        await new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+          s.onload = res;
+          s.onerror = () => rej(new Error("No se pudo cargar el generador de PDF"));
+          document.head.appendChild(s);
+        });
+      }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 48;
+      const maxW = pageW - margin * 2;
+      let y = margin;
+
+      const strip = (t) => (t || "")
+        .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]/gu, "")
+        .replace(/ {2,}/g, " ");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(184, 140, 30);
+      doc.text("QUINIELA MUNDIAL 2026  \u00b7  EL CRONISTA", margin, y);
+      y += 26;
+
+      doc.setFontSize(22);
+      doc.setTextColor(20, 20, 20);
+      const titulo = strip(c.titulo).trim() || "Crónica de la fecha";
+      const tLines = doc.splitTextToSize(titulo, maxW);
+      doc.text(tLines, margin, y);
+      y += tLines.length * 26 + 4;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(130, 130, 130);
+      const fecha = new Date(c.created_at).toLocaleDateString();
+      doc.text(`${jornadaLabel(c.match_date)}  \u00b7  ${fecha}`, margin, y);
+      y += 18;
+
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y, pageW - margin, y);
+      y += 24;
+
+      doc.setFontSize(12);
+      doc.setTextColor(40, 40, 40);
+      const lineH = 17;
+      const paras = strip(c.cuerpo).split(/\n\n+/);
+      for (const para of paras) {
+        const clean = para.trim();
+        if (!clean) continue;
+        const lines = doc.splitTextToSize(clean, maxW);
+        for (const line of lines) {
+          if (y > pageH - margin) { doc.addPage(); y = margin; }
+          doc.text(line, margin, y);
+          y += lineH;
+        }
+        y += Math.round(lineH * 0.6);
+      }
+
+      const safeLabel = jornadaLabel(c.match_date).replace(/[^\w\dáéíóúñ]+/gi, "-");
+      doc.save(`Cronica-${safeLabel}.pdf`);
+    } catch (e) {
+      window.alert("No se pudo generar el PDF: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  function startEdit(c) {
+    setEditingId(c.id);
+    setEditTitulo(c.titulo || "");
+    setEditCuerpo(c.cuerpo || "");
+  }
+  function cancelEdit() {
+    setEditingId(null); setEditTitulo(""); setEditCuerpo("");
+  }
+  async function saveEdit(c) {
+    setSavingEdit(true);
+    await sb.from("chronicles").update({ titulo: editTitulo, cuerpo: editCuerpo, updated_at: new Date().toISOString() }).eq("id", c.id);
+    setSavingEdit(false);
+    cancelEdit();
     await loadChronicles();
   }
 
@@ -1487,18 +1631,47 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
             {!c.published && (
               <div style={{display:"inline-block",fontSize:11,fontWeight:700,letterSpacing:.5,color:"var(--gold)",background:"rgba(245,183,49,.15)",padding:"3px 10px",borderRadius:20,marginBottom:12}}>BORRADOR · solo vos lo ves</div>
             )}
-            <div style={{fontFamily:"Bebas Neue",fontSize:26,color:"var(--gold)",letterSpacing:.5,lineHeight:1.1,marginBottom:6}}>{c.titulo}</div>
-            <div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
-            <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.cuerpo}</div>
-            {isAdmin && !c.published && (
-              <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
-                <button onClick={()=>publicar(c.match_date)} disabled={publishingId===c.match_date} style={{padding:"10px 18px",background:"var(--green)",color:"#0a0a0a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                  {publishingId===c.match_date ? "Publicando..." : "📢 Publicar para todos"}
-                </button>
-                <button onClick={()=>borrarBorrador(c.id)} style={{padding:"10px 16px",background:"transparent",color:"#ff8080",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                  🗑️ Eliminar
-                </button>
-              </div>
+            {editingId === c.id ? (
+              <>
+                <input value={editTitulo} onChange={e=>setEditTitulo(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:18,fontWeight:700,marginBottom:10}}/>
+                <div style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
+                <textarea value={editCuerpo} onChange={e=>setEditCuerpo(e.target.value)} rows={12} style={{width:"100%",padding:"12px 14px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:15,lineHeight:1.6,resize:"vertical",fontFamily:"inherit"}}/>
+                <div style={{display:"flex",gap:10,marginTop:14,flexWrap:"wrap"}}>
+                  <button onClick={()=>saveEdit(c)} disabled={savingEdit} style={{padding:"10px 18px",background:"var(--gold)",color:"#1a1a1a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>{savingEdit?"Guardando...":"💾 Guardar cambios"}</button>
+                  <button onClick={cancelEdit} style={{padding:"10px 16px",background:"transparent",color:"var(--muted)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{fontFamily:"Bebas Neue",fontSize:26,color:"var(--gold)",letterSpacing:.5,lineHeight:1.1,marginBottom:6}}>{c.titulo}</div>
+                <div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
+                <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.cuerpo}</div>
+                {isAdmin && (
+                  <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
+                    {!c.published && (
+                      <button onClick={()=>publicar(c.match_date)} disabled={publishingId===c.match_date} style={{padding:"10px 18px",background:"var(--green)",color:"#0a0a0a",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                        {publishingId===c.match_date ? "Publicando..." : "📢 Publicar para todos"}
+                      </button>
+                    )}
+                    <button onClick={()=>startEdit(c)} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                      ✏️ Editar
+                    </button>
+                    {!c.published && (
+                      <button onClick={()=>generar(c.match_date)} disabled={generating} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:generating?"default":"pointer"}}>
+                        {generating ? "🪄 Regenerando..." : "🔄 Regenerar"}
+                      </button>
+                    )}
+                    <button onClick={()=>descargarPDF(c)} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                      ⬇️ Descargar PDF
+                    </button>
+                    {!c.published && (
+                      <button onClick={()=>borrarBorrador(c.id)} style={{padding:"10px 16px",background:"transparent",color:"#ff8080",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                        🗑️ Eliminar
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ))}
