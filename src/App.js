@@ -794,15 +794,14 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
   const myWildcards = wildcards.filter(w => w.user_id === userId);
   const myPrePreds = prePreds.filter(p => p.user_id === userId);
   const finishedPreds = myPreds
-    .filter(p => p.points !== null && p.points !== undefined)
     .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
-    .filter(p => p.match)
+    .filter(p => p.match && p.match.home_score !== null && p.match.home_score !== undefined && p.match.away_score !== null && p.match.away_score !== undefined)
     .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
 
   const unlocked = new Set();
 
   // 🎯 Francotirador — 5 exactos
-  const exactCount = finishedPreds.filter(p => p.points >= 3).length;
+  const exactCount = finishedPreds.filter(p => p.home_score === p.match.home_score && p.away_score === p.match.away_score).length;
   if (exactCount >= 5) unlocked.add("sniper");
 
   // 🔮 Adivino — 10 exactos
@@ -883,7 +882,7 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
   // 💀 Sin suerte — racha 5 incorrectas
   let maxBadRacha = 0, curBadRacha = 0;
   for (const p of finishedPreds) {
-    if (p.points === 0) { curBadRacha++; maxBadRacha = Math.max(maxBadRacha, curBadRacha); }
+    if ((p.points || 0) <= 0) { curBadRacha++; maxBadRacha = Math.max(maxBadRacha, curBadRacha); }
     else curBadRacha = 0;
   }
   if (maxBadRacha >= 5) unlocked.add("unlucky");
