@@ -4074,14 +4074,14 @@ function PredReminderPopup({ reminder, onGo, onClose }) {
 }
 
 function PrediccionesTab({ user, matches, myPredictions, profiles, onSave }) {
-  const [subTab, setSubTab] = useState("pre");
+  const [subTab, setSubTab] = useState("matches");
   return (<>
     <div className="pre-tabs" style={{marginBottom:20}}>
-      <button className={`pre-tab ${subTab==="pre"?"active":""}`} onClick={()=>setSubTab("pre")}>📋 Pre-Torneo</button>
       <button className={`pre-tab ${subTab==="matches"?"active":""}`} onClick={()=>setSubTab("matches")}>⚽ Partidos</button>
+      <button className={`pre-tab ${subTab==="pre"?"active":""}`} onClick={()=>setSubTab("pre")}>📋 Pre-Torneo</button>
     </div>
-    {subTab==="pre"     && <PreTournament user={user}/>}
     {subTab==="matches" && <Matches user={user} matches={matches} predictions={myPredictions} onSave={onSave} profiles={profiles}/>}
+    {subTab==="pre"     && <PreTournament user={user}/>}
   </>);
 }
 
