@@ -2309,7 +2309,12 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
       🃏 <strong style={{color:"var(--gold)"}}>Comodín:</strong> Cuesta {wildcardCost} pt. Exacto <strong style={{color:"var(--gold)"}}>+8</strong> · Ganador <strong style={{color:"var(--gold)"}}>+5</strong> · Goles <strong style={{color:"var(--gold)"}}>+2</strong> · Falla <strong style={{color:"var(--red)"}}>0</strong>
     </div>
     <div className="matches-grid">
-      {matches.map(m => {
+      {[...matches].sort((a,b) => {
+        const la = isLocked(a.kickoff_at, matches, a.match_date) ? 1 : 0;
+        const lb = isLocked(b.kickoff_at, matches, b.match_date) ? 1 : 0;
+        if (la !== lb) return la - lb;               // no-iniciados primero, iniciados al final
+        return new Date(a.kickoff_at) - new Date(b.kickoff_at); // dentro de cada grupo, por hora
+      }).map(m => {
         const locked = isLocked(m.kickoff_at, matches, m.match_date) || isEliminated;
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
@@ -2317,9 +2322,15 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         const wasSaved = saved[m.id];
         const hasWildcard = !!wildcards.find(w => w.match_id === m.id);
         const canBuyWildcard = !locked && myPred && !hasWildcard && remainingWildcards > 0;
+        // Urgente: faltan <24h para el cierre de la jornada y NO cargué el pronóstico
+        const dKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10);
+        const sameDay = matches.filter(x => (x.match_date || new Date(x.kickoff_at).toISOString().slice(0,10)) === dKey);
+        const firstKick = Math.min(...sameDay.map(x => new Date(x.kickoff_at).getTime()));
+        const msToDeadline = (firstKick - 24*60*60*1000) - Date.now();
+        const isUrgent = !locked && !myPred && !wasSaved && msToDeadline > 0 && msToDeadline < 24*60*60*1000;
         return (
           <div key={m.id}>
-            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor: hasWildcard ? "var(--gold)" : undefined, borderWidth: hasWildcard ? 2 : undefined}}>
+            <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor: hasWildcard ? "var(--gold)" : isUrgent ? "var(--red)" : undefined, borderWidth: (hasWildcard||isUrgent) ? 2 : undefined}}>
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
                 <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
