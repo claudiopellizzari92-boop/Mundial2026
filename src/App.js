@@ -2200,6 +2200,7 @@ function Matches({ user, matches, predictions, onSave, profiles }) {
   const [history, setHistory] = useState({});
   const [showHistory, setShowHistory] = useState({});
   const [polls, setPolls] = useState({});
+  const [matchSub, setMatchSub] = useState("porcargar");
 
   useEffect(() => {
     const init = {};
@@ -2308,13 +2309,25 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
     <div style={{background:"rgba(245,183,49,.08)",border:"1px solid rgba(245,183,49,.2)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"var(--muted)"}}>
       🃏 <strong style={{color:"var(--gold)"}}>Comodín:</strong> Cuesta {wildcardCost} pt. Exacto <strong style={{color:"var(--gold)"}}>+8</strong> · Ganador <strong style={{color:"var(--gold)"}}>+5</strong> · Goles <strong style={{color:"var(--gold)"}}>+2</strong> · Falla <strong style={{color:"var(--red)"}}>0</strong>
     </div>
+    {(() => {
+      const porCargar = matches.filter(m => !isLocked(m.kickoff_at, matches, m.match_date));
+      const cargados  = matches.filter(m =>  isLocked(m.kickoff_at, matches, m.match_date));
+      return (
+        <div className="pre-tabs" style={{marginBottom:16}}>
+          <button className={`pre-tab ${matchSub==="porcargar"?"active":""}`} onClick={()=>setMatchSub("porcargar")}>⚽ Por cargar {porCargar.length>0?`(${porCargar.length})`:""}</button>
+          <button className={`pre-tab ${matchSub==="cargados"?"active":""}`} onClick={()=>setMatchSub("cargados")}>🔒 Cargados {cargados.length>0?`(${cargados.length})`:""}</button>
+        </div>
+      );
+    })()}
     <div className="matches-grid">
-      {[...matches].sort((a,b) => {
-        const la = isLocked(a.kickoff_at, matches, a.match_date) ? 1 : 0;
-        const lb = isLocked(b.kickoff_at, matches, b.match_date) ? 1 : 0;
-        if (la !== lb) return la - lb;               // no-iniciados primero, iniciados al final
-        return new Date(a.kickoff_at) - new Date(b.kickoff_at); // dentro de cada grupo, por hora
-      }).map(m => {
+      {matches
+        .filter(m => matchSub==="cargados"
+          ? isLocked(m.kickoff_at, matches, m.match_date)
+          : !isLocked(m.kickoff_at, matches, m.match_date))
+        .sort((a,b) => matchSub==="cargados"
+          ? new Date(b.kickoff_at) - new Date(a.kickoff_at)   // Cargados: más reciente primero
+          : new Date(a.kickoff_at) - new Date(b.kickoff_at))  // Por cargar: más próximo primero
+        .map(m => {
         const locked = isLocked(m.kickoff_at, matches, m.match_date) || isEliminated;
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
@@ -2418,6 +2431,11 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
           </div>
         );
       })}
+      {matches.filter(m => matchSub==="cargados" ? isLocked(m.kickoff_at, matches, m.match_date) : !isLocked(m.kickoff_at, matches, m.match_date)).length === 0 && (
+        <div style={{textAlign:"center",padding:"32px 16px",color:"var(--muted)",fontSize:13}}>
+          {matchSub==="cargados" ? "Todavía no empezó ningún partido." : "¡No te queda nada por cargar! 🎉"}
+        </div>
+      )}
     </div>
   </>);
 }
