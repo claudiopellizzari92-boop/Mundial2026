@@ -1673,8 +1673,20 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
             ) : (
               <>
                 <div style={{fontFamily:"Bebas Neue",fontSize:26,color:"var(--gold)",letterSpacing:.5,lineHeight:1.1,marginBottom:6}}>{c.titulo}</div>
-                <div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
-                <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{c.cuerpo}</div>
+                <div style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>{jornadaLabel(c.match_date)} · {new Date(c.created_at).toLocaleDateString()}</div>
+                {/* separador dorado bajo el subtítulo */}
+                <div style={{width:48,height:3,background:"var(--gold)",borderRadius:2,marginBottom:16}}/>
+                {(() => {
+                  const parrafos = (c.cuerpo || "").split(/\n\s*\n/);
+                  const bajada = parrafos[0] || "";
+                  const resto = parrafos.slice(1).join("\n\n");
+                  return (<>
+                    <div style={{fontSize:17,color:"var(--txt)",lineHeight:1.55,fontStyle:"italic",fontWeight:500,marginBottom:14}}>{bajada}</div>
+                    {resto && <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{resto}</div>}
+                  </>);
+                })()}
+                {/* firma del autor */}
+                <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid var(--border)",fontSize:13,color:"var(--gold)",fontStyle:"italic",letterSpacing:.3}}>✍️ El Cronista</div>
                 {isAdmin && (
                   <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
                     {!c.published && (
@@ -4095,13 +4107,50 @@ function PrediccionesTab({ user, matches, myPredictions, profiles, onSave }) {
 }
 
 // ── Pestaña Crónica (sale de Info a barra propia; conserva imagen patrocinantes) ──
+const PUBLICIDAD_FRANJAS = [
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/pub-oficiales.jpg",
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/pub-gold.jpg",
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/pub-silver.jpg",
+  "https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/Pub-aliados.jpg",
+];
+
+function PublicidadCarrusel() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setIdx(i => (i + 1) % PUBLICIDAD_FRANJAS.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
+      <div style={{position:"relative",width:"100%"}}>
+        {PUBLICIDAD_FRANJAS.map((url, i) => (
+          <img
+            key={url}
+            src={url}
+            alt="Patrocinantes"
+            style={{
+              width:"100%", display:"block",
+              ...(i === idx
+                ? { position:"relative", opacity:1, transition:"opacity .6s ease" }
+                : { position:"absolute", top:0, left:0, opacity:0, transition:"opacity .6s ease", pointerEvents:"none" }),
+            }}
+          />
+        ))}
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:6,padding:"8px 0",background:"var(--card)"}}>
+        {PUBLICIDAD_FRANJAS.map((_, i) => (
+          <span key={i} style={{width:7,height:7,borderRadius:"50%",background:i===idx?"var(--gold)":"var(--border)",transition:"background .3s"}}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CronicaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <div className="sec-hdr"><h2>📰 CRÓNICA</h2></div>
-      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
-        <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
-      </div>
+      <PublicidadCarrusel />
       <CronistaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />
     </div>
   );
