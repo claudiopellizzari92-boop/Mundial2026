@@ -1371,6 +1371,8 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [editCuerpo, setEditCuerpo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [cronSub, setCronSub] = useState("lista");
+  const [cronReactions, setCronReactions] = useState({});
+  const CRON_EMOJIS = ["😂","🔥","😭","❤️","👎"];
 
   // Ordenar las fechas cronológicamente por el primer kickoff de cada día (no alfabéticamente por texto)
   const dateFirstKickoff = {};
@@ -1393,7 +1395,31 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     setChronicles(data || []);
     setLoading(false);
   }
-  useEffect(() => { loadChronicles(); }, []);
+  async function loadCronReactions() {
+    const { data } = await sb.from("chronicle_reactions").select("*");
+    const byChron = {};
+    (data || []).forEach(r => { (byChron[r.chronicle_id] = byChron[r.chronicle_id] || []).push(r); });
+    setCronReactions(byChron);
+  }
+  async function toggleCronReaction(chronicleId, emoji) {
+    const mine = (cronReactions[chronicleId] || []).find(r => r.user_id === user.id);
+    if (mine) {
+      if (mine.emoji === emoji) {
+        await sb.from("chronicle_reactions").delete().eq("id", mine.id);
+      } else {
+        await sb.from("chronicle_reactions").update({ emoji }).eq("id", mine.id);
+      }
+    } else {
+      await sb.from("chronicle_reactions").insert({ user_id: user.id, chronicle_id: chronicleId, emoji });
+    }
+    await loadCronReactions();
+  }
+  function cronReactionCounts(chronicleId) {
+    const counts = {};
+    (cronReactions[chronicleId] || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+    return counts;
+  }
+  useEffect(() => { loadChronicles(); loadCronReactions(); }, []);
   useEffect(() => { if (!selectedDate && fechasFinished.length) setSelectedDate(fechasFinished[0]); }, [fechasFinished.length]);
 
   async function buildResumen(matchDate) {
@@ -1500,8 +1526,29 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
         .sort((a, b) => allDates.indexOf(a.match_date) - allDates.indexOf(b.match_date))
         .slice(-5)
         .map(c => ({ jornada: jornadaLabel(c.match_date), titulo: c.titulo, cuerpo: c.cuerpo }));
+      // Reacciones de la crónica anterior (la última publicada antes de esta fecha), con nombres
+      const previas = chronicles
+        .filter(c => c.published && allDates.indexOf(c.match_date) > -1 && allDates.indexOf(c.match_date) < idxActual)
+        .sort((a, b) => allDates.indexOf(b.match_date) - allDates.indexOf(a.match_date));
+      let reacciones_previas = null;
+      if (previas.length) {
+        const cronAnterior = previas[0];
+        const { data: reacs } = await sb.from("chronicle_reactions").select("*").eq("chronicle_id", cronAnterior.id);
+        if (reacs && reacs.length) {
+          const porEmoji = {};
+          reacs.forEach(r => {
+            const nombre = (profiles.find(p => p.id === r.user_id)?.name) || "alguien";
+            (porEmoji[r.emoji] = porEmoji[r.emoji] || []).push(nombre);
+          });
+          reacciones_previas = {
+            jornada: jornadaLabel(cronAnterior.match_date),
+            titulo: cronAnterior.titulo,
+            detalle: Object.entries(porEmoji).map(([emoji, nombres]) => ({ emoji, nombres })),
+          };
+        }
+      }
       const { data, error: invErr } = await sb.functions.invoke("generate-chronicle", {
-        body: { match_date: date, fecha_label: jornadaLabel(date), ideas, resumen, historial },
+        body: { match_date: date, fecha_label: jornadaLabel(date), ideas, resumen, historial, reacciones_previas },
       });
       if (invErr) {
         let msg = invErr.message || "Error llamando a la función";
@@ -1687,6 +1734,24 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
                 })()}
                 {/* firma del autor */}
                 <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid var(--border)",fontSize:13,color:"var(--gold)",fontStyle:"italic",letterSpacing:.3}}>✍️ El Cronista</div>
+                {c.published && (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:14}}>
+                    {CRON_EMOJIS.map(emoji => {
+                      const counts = cronReactionCounts(c.id);
+                      const count = counts[emoji] || 0;
+                      const mine = (cronReactions[c.id] || []).find(r => r.user_id === user.id && r.emoji === emoji);
+                      const reactors = (cronReactions[c.id] || []).filter(r => r.emoji === emoji).map(r => (profiles.find(p=>p.id===r.user_id)?.name) || "?");
+                      return (
+                        <div key={emoji} style={{position:"relative"}} className="reaction-wrap">
+                          <button onClick={()=>toggleCronReaction(c.id, emoji)} style={{padding:"5px 11px",borderRadius:20,border:"1px solid",borderColor:mine?"var(--gold)":"var(--border)",background:mine?"var(--gold-dim)":"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",gap:5}}>
+                            {emoji}{count>0 && <span style={{fontSize:12,color:"var(--muted)"}}>{count}</span>}
+                          </button>
+                          {count>0 && <div className="reaction-tooltip">{reactors.join(", ")}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {isAdmin && (
                   <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
                     {!c.published && (
