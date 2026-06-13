@@ -1265,23 +1265,13 @@ function HallOfFame({ profiles, predictions, matches, snapshots, allAchievements
 }
 // ── Info Tab ─────────────────────────────────────────────────────────────────
 function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
-  const [subTab, setSubTab] = useState("cronica");
+  const [subTab, setSubTab] = useState("rules");
   return (<>
     <div className="sec-hdr"><h2>📋 INFO</h2></div>
     <div className="pre-tabs" style={{marginBottom:20}}>
-      <button className={`pre-tab ${subTab==="cronica"?"active":""}`} onClick={()=>setSubTab("cronica")}>📰 Crónica</button>
       <button className={`pre-tab ${subTab==="rules"?"active":""}`} onClick={()=>setSubTab("rules")}>📜 Reglamento</button>
       <button className={`pre-tab ${subTab==="prizes"?"active":""}`} onClick={()=>setSubTab("prizes")}>🏆 Premios</button>
     </div>
-
-    {subTab === "cronica" && (
-      <div style={{display:"flex",flexDirection:"column",gap:20}}>
-        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
-          <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
-        </div>
-        <CronistaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />
-      </div>
-    )}
 
     {subTab === "rules" && (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -1529,7 +1519,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   async function publicar(matchDate) {
     setPublishingId(matchDate);
     await sb.from("chronicles").update({ published: true, updated_at: new Date().toISOString() }).eq("match_date", matchDate);
-    sendPushNotification("all", null, { title: "📰 Nueva crónica disponible", body: `Ya podés leer la crónica de ${jornadaLabel(matchDate)} en la pestaña Info`, tag: `cronica-${matchDate}`, url: "/" });
+    sendPushNotification("all", null, { title: "📰 Nueva crónica disponible", body: `Ya podés leer la crónica de ${jornadaLabel(matchDate)} en la pestaña Crónica 📰`, tag: `cronica-${matchDate}`, url: "/" });
     await loadChronicles();
     setPublishingId(null);
   }
@@ -2092,7 +2082,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
     {!locked && (
       <div style={{background:"var(--card)",border:"1px solid rgba(245,183,49,.3)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div><div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>📋 PREDICCIONES PRE-TORNEO</div><div style={{fontSize:13,color:"var(--muted)",marginTop:3}}>1ro y 2do de grupo + 8 terceros clasificados</div></div>
-        <button className="save-btn" onClick={() => onGoTab("pre")}>Completar →</button>
+        <button className="save-btn" onClick={() => onGoTab("predicciones")}>Completar →</button>
       </div>
     )}
     <AchievementsSection userId={user.id} achievements={achievements} equippedBadge={equippedBadge} onEquip={onEquip} />
@@ -4083,6 +4073,31 @@ function PredReminderPopup({ reminder, onGo, onClose }) {
   );
 }
 
+function PrediccionesTab({ user, matches, myPredictions, profiles, onSave }) {
+  const [subTab, setSubTab] = useState("pre");
+  return (<>
+    <div className="pre-tabs" style={{marginBottom:20}}>
+      <button className={`pre-tab ${subTab==="pre"?"active":""}`} onClick={()=>setSubTab("pre")}>📋 Pre-Torneo</button>
+      <button className={`pre-tab ${subTab==="matches"?"active":""}`} onClick={()=>setSubTab("matches")}>⚽ Partidos</button>
+    </div>
+    {subTab==="pre"     && <PreTournament user={user}/>}
+    {subTab==="matches" && <Matches user={user} matches={matches} predictions={myPredictions} onSave={onSave} profiles={profiles}/>}
+  </>);
+}
+
+// ── Pestaña Crónica (sale de Info a barra propia; conserva imagen patrocinantes) ──
+function CronicaTab({ user, isAdmin, matches, allPredictions, profiles }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      <div className="sec-hdr"><h2>📰 CRÓNICA</h2></div>
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",overflow:"hidden"}}>
+        <img src="https://bheziohaquiwnvbzrlio.supabase.co/storage/v1/object/public/info/WhatsApp%20Image%202026-06-10%20at%2022.01.48.jpeg" alt="Patrocinantes" style={{width:"100%",display:"block"}}/>
+      </div>
+      <CronistaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -4102,6 +4117,8 @@ export default function App() {
   const [showDebtorVideo, setShowDebtorVideo] = useState(false);
   const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
   const [showPredReminder, setShowPredReminder] = useState(false);
+  const [latestChronicleKey, setLatestChronicleKey] = useState(null); // identificador de la última crónica publicada
+  const [chronicaSeenKey, setChronicaSeenKey] = useState(() => localStorage.getItem("cronica-seen") || null);
 
   // Activar overlay solo si el usuario es moroso, cuando los profiles cargan
   useEffect(() => {
@@ -4123,7 +4140,15 @@ export default function App() {
   const [snapshots, setSnapshots] = useState([]);
   const [prePreds, setPrePreds] = useState([]);
 
-  function goTab(t) { setTab(t); setMenuOpen(false); }
+  const hasNewChronicle = !!latestChronicleKey && latestChronicleKey !== chronicaSeenKey;
+  function goTab(t) {
+    setTab(t);
+    setMenuOpen(false);
+    if (t === "cronica" && latestChronicleKey) {
+      setChronicaSeenKey(latestChronicleKey);
+      localStorage.setItem("cronica-seen", latestChronicleKey);
+    }
+  }
 
   function toggleTheme() {
     const next = !darkMode;
@@ -4333,6 +4358,11 @@ export default function App() {
     if (allPq.data) setAllPredictions(allPq.data);
     if (profq.data) setProfiles(profq.data);
     if (adminq.data) setIsAdmin(adminq.data.length>0);
+    // Última crónica publicada (para el puntito de aviso en la pestaña Crónica)
+    const { data: lastChron } = await sb.from("chronicles")
+      .select("id, updated_at").eq("published", true)
+      .order("updated_at", { ascending: false }).limit(1);
+    if (lastChron && lastChron.length) setLatestChronicleKey(String(lastChron[0].id));
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -4417,8 +4447,8 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
-            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
+          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
+            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
@@ -4439,8 +4469,8 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["pre","📋 Pre-Torneo"],["matches","⚽ Partidos"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
-          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)}>{l}</button>
+        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
+          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
@@ -4462,8 +4492,8 @@ export default function App() {
       <main className="main">
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
         {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/>}
-        {tab==="pre"       && <PreTournament user={user}/>}
-        {tab==="matches"   && <Matches user={user} matches={matches} predictions={myPredictions} onSave={loadData} profiles={profiles}/>}
+        {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} profiles={profiles} onSave={loadData}/>}
+        {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
         {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/></>}
@@ -4485,7 +4515,7 @@ export default function App() {
         )}
         {user && showPredReminder && (() => {
           const r = getPendingPredReminder(matches, allPredictions, user.id);
-          return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("matches"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} /> : null;
+          return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("predicciones"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} /> : null;
         })()}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
