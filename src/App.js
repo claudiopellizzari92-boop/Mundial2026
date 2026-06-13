@@ -2334,16 +2334,17 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
                     : <span className="no-pred">Sin predicción</span>
                 ) : (
                   <div className="score-inputs">
-                    <input className="score-input" value={sc.home??""} onChange={e=>setScore(m.id,"home",e.target.value)} placeholder="0"/>
+                    <input className="score-input" value={sc.home??""} onChange={e=>setScore(m.id,"home",e.target.value)} placeholder="–" inputMode="numeric"/>
                     <span className="score-sep">–</span>
-                    <input className="score-input" value={sc.away??""} onChange={e=>setScore(m.id,"away",e.target.value)} placeholder="0"/>
+                    <input className="score-input" value={sc.away??""} onChange={e=>setScore(m.id,"away",e.target.value)} placeholder="–" inputMode="numeric"/>
                   </div>
                 )}
                 {locked
                   ? <span className="locked-tag">🔒 Partido iniciado</span>
                   : hasScore
                     ? <button className="save-btn" onClick={()=>save(m)} disabled={saving[m.id]}>{saving[m.id]?"...":wasSaved?"✓ GUARDADO":myPred?"ACTUALIZAR":"GUARDAR"}</button>
-                    : myPred ? <span className="saved-tag">✓ Guardado</span> : null}
+                    : myPred ? <span className="saved-tag">✓ Guardado</span>
+                      : <span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic"}}>✏️ Cargá tu pronóstico</span>}
                 {!locked && myPred && (
                   <button
                     onClick={() => toggleWildcard(m)}
