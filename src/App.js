@@ -1370,6 +1370,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [editTitulo, setEditTitulo] = useState("");
   const [editCuerpo, setEditCuerpo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [cronSub, setCronSub] = useState("lista");
 
   // Ordenar las fechas cronológicamente por el primer kickoff de cada día (no alfabéticamente por texto)
   const dateFirstKickoff = {};
@@ -1618,8 +1619,15 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
 
   return (<>
     {isAdmin && (
+      <div className="pre-tabs" style={{marginBottom:20}}>
+        <button className={`pre-tab ${cronSub==="lista"?"active":""}`} onClick={()=>setCronSub("lista")}>📰 Crónica</button>
+        <button className={`pre-tab ${cronSub==="generar"?"active":""}`} onClick={()=>setCronSub("generar")}>⚙️ Generar</button>
+      </div>
+    )}
+
+    {isAdmin && cronSub==="generar" && (
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:20}}>
-        <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>✍️ GENERAR CRÓNICA (ADMIN)</div>
+        <div style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:1,marginBottom:16}}>✍️ GENERAR CRÓNICA</div>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div>
             <label style={{fontSize:12,color:"var(--muted)",display:"block",marginBottom:6}}>Jornada</label>
@@ -1636,11 +1644,12 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
           <button onClick={()=>generar()} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
             {generating ? "🪄 Generando con la IA..." : "🪄 Generar crónica"}
           </button>
+          <div style={{fontSize:12,color:"var(--muted)"}}>Las crónicas generadas aparecen como borrador en la solapa 📰 Crónica, donde podés revisarlas, editarlas y publicarlas.</div>
         </div>
       </div>
     )}
 
-    {loading ? (
+    {(!isAdmin || cronSub==="lista") && (loading ? (
       <div style={{textAlign:"center",padding:40,color:"var(--muted)"}}>Cargando crónicas...</div>
     ) : chronicles.length===0 ? (
       <div style={{textAlign:"center",padding:40,color:"var(--muted)"}}>Todavía no hay crónicas. {isAdmin ? "Generá la primera 👆" : "Pronto el cronista va a narrar la primera fecha."}</div>
@@ -1696,7 +1705,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
           </div>
         ))}
       </div>
-    )}
+    ))}
   </>);
 }
 
