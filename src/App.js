@@ -30,6 +30,23 @@ async function sendPushNotification(type, userIds, notification) {
   }
 }
 
+// Offset entre el reloj del servidor (Supabase) y el del dispositivo.
+// Si el teléfono está corrido, esto lo compensa: la app decide cierres con la hora real.
+let serverOffsetMs = 0;
+function nowMs() { return Date.now() + serverOffsetMs; }
+async function syncServerClock(client) {
+  try {
+    const t0 = Date.now();
+    const { data, error } = await client.rpc("server_now");
+    if (error || !data) return;
+    const t1 = Date.now();
+    const serverMs = new Date(data).getTime();
+    const rtt = t1 - t0;
+    // Estimar el "ahora" del servidor en el instante de respuesta (mitad del round-trip)
+    serverOffsetMs = serverMs - (t0 + rtt / 2);
+  } catch (_e) { /* si falla, queda 0 = usa hora local */ }
+}
+
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: localStorage.getItem("sb-remember") === "true" ? window.localStorage : window.sessionStorage,
@@ -81,6 +98,17 @@ function localTzName() {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const short = new Date().toLocaleTimeString("en", { timeZoneName: "short", timeZone: tz }).split(" ").pop();
   return short;
+}
+
+// Hora de cierre (deadline) formateada en la zona local de quien mira: "Jun 14, 10:00"
+function formatDeadline(deadlineMs) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const months = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const d = new Date(deadlineMs);
+  const local = new Date(d.toLocaleString("en", { timeZone: tz }));
+  const hh = String(local.getHours()).padStart(2,"0");
+  const mm = String(local.getMinutes()).padStart(2,"0");
+  return `${months[local.getMonth()]} ${local.getDate()}, ${hh}:${mm}`;
 }
 
 const css = `
@@ -433,10 +461,10 @@ function isLocked(kickoff, allMatches, matchDate) {
     const mDateKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
     return mDateKey === dateKey;
   });
-  if (sameDayMatches.length === 0) return new Date(kickoff) <= new Date();
+  if (sameDayMatches.length === 0) return new Date(kickoff).getTime() <= nowMs();
   const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
-  const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
-  return new Date() >= deadline;
+  const deadline = firstKickoff - 24 * 60 * 60 * 1000;
+  return nowMs() >= deadline;
 }
 
 // ── Resultado de un pronóstico vs el partido (fuente única de verdad) ──────────
@@ -724,6 +752,7 @@ function Confetti({ onDone }) {
 function MatchCountdown({ kickoff, matchDate, matches: allMatches }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [urgent, setUrgent] = useState(false);
+  const [deadlineMs, setDeadlineMs] = useState(null);
 
   useEffect(() => {
     function calc() {
@@ -733,8 +762,9 @@ function MatchCountdown({ kickoff, matchDate, matches: allMatches }) {
         return mKey === dateKey;
       });
       const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
-      const deadline = new Date(firstKickoff - 24 * 60 * 60 * 1000);
-      const diff = deadline - new Date();
+      const deadline = firstKickoff - 24 * 60 * 60 * 1000;
+      setDeadlineMs(deadline);
+      const diff = deadline - nowMs();
       if (diff <= 0) { setTimeLeft(null); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
@@ -759,6 +789,24 @@ function MatchCountdown({ kickoff, matchDate, matches: allMatches }) {
       fontFamily: "Bebas Neue", letterSpacing: .5,
       animation: urgent ? "popIn .3s ease" : "none",
     }}>⏱ {timeLeft}</span>
+  );
+}
+
+// Línea explícita de cierre en hora local (para que nadie se confíe con el huso)
+function DeadlineLabel({ kickoff, matchDate, matches: allMatches }) {
+  const dateKey = matchDate || new Date(kickoff).toISOString().slice(0, 10);
+  const sameDayMatches = (allMatches || []).filter(m => {
+    const mKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+    return mKey === dateKey;
+  });
+  if (!sameDayMatches.length) return null;
+  const firstKickoff = Math.min(...sameDayMatches.map(m => new Date(m.kickoff_at).getTime()));
+  const deadlineMs = firstKickoff - 24 * 60 * 60 * 1000;
+  if (deadlineMs - nowMs() <= 0) return null;
+  return (
+    <span style={{ fontSize: 10, color: "var(--muted)" }}>
+      ⏰ Cierra {formatDeadline(deadlineMs)} {localTzName()}
+    </span>
   );
 }
 
@@ -2339,7 +2387,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         const dKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10);
         const sameDay = matches.filter(x => (x.match_date || new Date(x.kickoff_at).toISOString().slice(0,10)) === dKey);
         const firstKick = Math.min(...sameDay.map(x => new Date(x.kickoff_at).getTime()));
-        const msToDeadline = (firstKick - 24*60*60*1000) - Date.now();
+        const msToDeadline = (firstKick - 24*60*60*1000) - nowMs();
         const isUrgent = !locked && !myPred && !wasSaved && msToDeadline > 0 && msToDeadline < 24*60*60*1000;
         return (
           <div key={m.id}>
@@ -2352,6 +2400,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
                   {hasWildcard && <span style={{fontSize:14}}>🃏</span>}
                   {!locked && <MatchCountdown kickoff={m.kickoff_at} matchDate={m.match_date} matches={matches} />}
                 </div>
+                {!locked && <div style={{textAlign:"center",marginTop:2}}><DeadlineLabel kickoff={m.kickoff_at} matchDate={m.match_date} matches={matches} /></div>}
                 {locked ? (
                   myPred
                     ? <div className="score-display"><span>{myPred.home_score}</span><span style={{color:"var(--muted)",fontSize:16}}>–</span><span>{myPred.away_score}</span></div>
@@ -4468,6 +4517,10 @@ export default function App() {
   }
 
   useEffect(() => {
+    // Sincronizar el reloj con el servidor al arrancar y cada 5 min (compensa teléfonos con la hora corrida)
+    syncServerClock(sb);
+    const clockTimer = setInterval(() => syncServerClock(sb), 5 * 60 * 1000);
+
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT") { setUser(null); setIsAdmin(false); setBooting(false); return; }
       if (event === "PASSWORD_RECOVERY") { setResettingPassword(true); setBooting(false); return; }
@@ -4486,7 +4539,7 @@ export default function App() {
       setBooting(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearInterval(clockTimer); };
   }, []);
 
   const loadData = useCallback(async () => {
