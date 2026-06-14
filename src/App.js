@@ -1460,6 +1460,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [cronSub, setCronSub] = useState("lista");
   const [cronReactions, setCronReactions] = useState({});
+  const [expandedChron, setExpandedChron] = useState({});
   const CRON_EMOJIS = ["😂","🔥","😭","❤️","👎"];
 
   // Ordenar las fechas cronológicamente por el primer kickoff de cada día (no alfabéticamente por texto)
@@ -1815,9 +1816,15 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
                   const parrafos = (c.cuerpo || "").split(/\n\s*\n/);
                   const bajada = parrafos[0] || "";
                   const resto = parrafos.slice(1).join("\n\n");
+                  const isExpanded = !!expandedChron[c.id];
                   return (<>
                     <div style={{fontSize:17,color:"var(--txt)",lineHeight:1.55,fontStyle:"italic",fontWeight:500,marginBottom:14}}>{bajada}</div>
-                    {resto && <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{resto}</div>}
+                    {resto && isExpanded && <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{resto}</div>}
+                    {resto && (
+                      <button onClick={()=>setExpandedChron(e=>({...e,[c.id]:!e[c.id]}))} style={{marginTop:10,background:"none",border:"none",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:5}}>
+                        {isExpanded ? "Mostrar menos ▴" : "Seguir leyendo ▾"}
+                      </button>
+                    )}
                   </>);
                 })()}
                 {/* firma del autor */}
