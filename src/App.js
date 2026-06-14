@@ -2428,7 +2428,12 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         .sort((a,b) => matchSub==="cargados"
           ? new Date(b.kickoff_at) - new Date(a.kickoff_at)   // Cargados: más reciente primero
           : new Date(a.kickoff_at) - new Date(b.kickoff_at))  // Por cargar: más próximo primero
-        .map(m => {
+        .map((m, _idx, _arr) => {
+        // Encabezado de fecha: se muestra cuando cambia el día respecto al partido anterior
+        const _dayKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10);
+        const _prev = _idx > 0 ? _arr[_idx-1] : null;
+        const _prevKey = _prev ? (_prev.match_date || new Date(_prev.kickoff_at).toISOString().slice(0,10)) : null;
+        const _showDateHeader = _dayKey !== _prevKey;
         const locked = isLocked(m.kickoff_at, matches, m.match_date) || isEliminated;
         const myPred = predictions.find(p => p.match_id === m.id);
         const sc = scores[m.id] || {};
@@ -2443,7 +2448,14 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         const msToDeadline = (firstKick - 24*60*60*1000) - nowMs();
         const isUrgent = !locked && !myPred && !wasSaved && msToDeadline > 0 && msToDeadline < 24*60*60*1000;
         return (
-          <div key={m.id}>
+          <React.Fragment key={m.id}>
+          {_showDateHeader && (
+            <div style={{gridColumn:"1 / -1",display:"flex",alignItems:"center",gap:8,margin:"6px 2px 2px"}}>
+              <span style={{fontFamily:"Bebas Neue",fontSize:15,color:"var(--gold)",letterSpacing:1}}>📅 {m.match_date}</span>
+              <div style={{flex:1,height:1,background:"var(--border)"}}/>
+            </div>
+          )}
+          <div>
             <div className={`match-card ${locked?"locked":(myPred||wasSaved)?"saved":""}`} style={{borderColor: hasWildcard ? "var(--gold)" : isUrgent ? "var(--red)" : undefined, borderWidth: (hasWildcard||isUrgent) ? 2 : undefined}}>
               <div className="team"><img className="team-flag" src={m.home_flag} alt={m.home}/><span className="team-name">{m.home}</span></div>
               <div className="match-center">
@@ -2531,6 +2543,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
               <div className="team away"><img className="team-flag" src={m.away_flag} alt={m.away}/><span className="team-name">{m.away}</span></div>
             </div>
           </div>
+          </React.Fragment>
         );
       })}
       {matches.filter(m => matchSub==="cargados" ? isLocked(m.kickoff_at, matches, m.match_date) : !isLocked(m.kickoff_at, matches, m.match_date)).length === 0 && (
