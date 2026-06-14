@@ -3270,6 +3270,15 @@ function Compare({ user, matches, allPredictions, profiles }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {dayMatches.map(m => {
             const matchPreds = allPredictions.filter(p => p.match_id === m.id);
+            // Pronóstico más popular (marcador más repetido)
+            const scoreTally = {};
+            matchPreds.forEach(p => {
+              if (p.home_score == null || p.away_score == null) return;
+              const k = `${p.home_score}-${p.away_score}`;
+              scoreTally[k] = (scoreTally[k] || 0) + 1;
+            });
+            let topScore = null, topCount = 0;
+            Object.entries(scoreTally).forEach(([k, c]) => { if (c > topCount) { topScore = k; topCount = c; } });
             const hasResult = m.home_score !== null && m.away_score !== null;
             const isOpen = expanded[m.id];
             const matchWildcardUsers = new Set(wildcards.filter(w => w.match_id === m.id).map(w => w.user_id));
@@ -3303,7 +3312,11 @@ function Compare({ user, matches, allPredictions, profiles }) {
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {hasResult ? <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)" }}>{m.home_score}–{m.away_score}</span> : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽</span>}
+                    {hasResult
+                      ? <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)" }}>{m.home_score}–{m.away_score}</span>
+                      : (topScore && topCount >= 2
+                          ? <span style={{ fontSize: 11, color: "var(--gold)", whiteSpace: "nowrap" }} title="Pronóstico más popular">🔥 {topScore} <span style={{ color: "var(--muted)" }}>({topCount})</span></span>
+                          : <span style={{ fontSize: 11, color: "var(--gold)" }}>⚽</span>)}
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>{matchPreds.length} pred.</span>
                     <span style={{ color: "var(--muted)", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
                   </div>
