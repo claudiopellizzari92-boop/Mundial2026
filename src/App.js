@@ -1332,9 +1332,9 @@ function HallOfFame({ profiles, predictions, matches, snapshots, allAchievements
     { label: "🎲 El más arriesgado", key: "riskyExact", unit: "goles en un exacto", winner: [...rows].sort((a,b) => b.riskyExact - a.riskyExact)[0], min: 1 },
   ];
 
-  return (
+  return (<>
+    <div className="sec-hdr"><h2>🏅 SALÓN DE LA FAMA</h2></div>
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
-      <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>🌟 HALL OF FAME</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {categories.filter(cat => cat.winner && cat.winner[cat.key] >= (cat.min || 0)).map(cat => (
           <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
@@ -1349,7 +1349,7 @@ function HallOfFame({ profiles, predictions, matches, snapshots, allAchievements
         ))}
       </div>
     </div>
-  );
+  </>);
 }
 // ── Info Tab ─────────────────────────────────────────────────────────────────
 function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
@@ -4730,7 +4730,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -4752,7 +4752,7 @@ export default function App() {
         </div>
       </nav>
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["shame","💀 Hall of Shame"],["info","📋 Info"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
@@ -4779,8 +4779,8 @@ export default function App() {
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
-        {tab==="stats"     && <><StatsDeep user={user} matches={matches} predictions={allPredictions}/><HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/></>}
-        {tab==="shame"     && <HallOfShame profiles={profiles} />}
+        {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions}/>}
+        {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
