@@ -940,7 +940,7 @@ function calcAchievements({ predictions, matches, wildcards, snapshots, prePreds
   for (const day of Object.keys(byDay)) {
     const dayTotal = allMatchesByDay[day]?.length || 0;
     const dayPreds = byDay[day];
-    if (dayTotal > 0 && dayPreds.length === dayTotal && dayPreds.every(p => p.points > 0))
+    if (dayTotal > 0 && dayPreds.length === dayTotal && dayPreds.every(p => predOutcome(p, p.match) === "exact"))
       unlocked.add("perfectday");
   }
 
