@@ -4313,6 +4313,7 @@ export default function App() {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
   const [notifDebug, setNotifDebug] = useState("");
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") !== "light");
   const [showDebtorOverlay, setShowDebtorOverlay] = useState(false);
@@ -4648,6 +4649,17 @@ export default function App() {
         <div style={{background:"rgba(180,40,40,0.95)",color:"#fff",padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:12,fontSize:13,position:"sticky",top:0,zIndex:200}}>
           <span>⚠️ Error de conexión: algunos datos no cargaron.</span>
           <button onClick={loadData} style={{background:"#fff",color:"#8a1f1f",border:"none",borderRadius:7,padding:"5px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}>Reintentar</button>
+        </div>
+      )}
+      {user && notifStatus !== "unsupported" && notifStatus !== "granted" && !notifBannerDismissed && (
+        <div style={{background:"linear-gradient(90deg, rgba(245,183,49,0.18), rgba(245,183,49,0.08))",borderBottom:"1px solid rgba(245,183,49,0.3)",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:13,flexWrap:"wrap"}}>
+          <span style={{color:"var(--txt)"}}>🔔 {notifStatus === "denied" ? "Tenés las notificaciones bloqueadas. Activalas en los ajustes del navegador para que te avisemos antes del cierre." : "Activá las notificaciones y te avisamos antes de que cierre cada jornada."}</span>
+          {notifStatus !== "denied" && (
+            <button onClick={enableNotifications} disabled={notifStatus === "requesting"} style={{background:"var(--gold)",color:"#1a1a1a",border:"none",borderRadius:7,padding:"6px 16px",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+              {notifStatus === "requesting" ? "Activando..." : "Activar"}
+            </button>
+          )}
+          <button onClick={()=>setNotifBannerDismissed(true)} style={{background:"none",border:"none",color:"var(--muted)",fontSize:18,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
         </div>
       )}
       <nav className="nav">
