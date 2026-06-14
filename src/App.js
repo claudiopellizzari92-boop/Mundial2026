@@ -2205,6 +2205,17 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   });
   const bestDay = Object.entries(ptsByDay).sort((a, b) => b[1] - a[1])[0];
 
+  // ── Tus pronósticos del próximo día (jornada más próxima por jugarse) ──
+  const upcoming = matches
+    .filter(m => new Date(m.kickoff_at).getTime() > nowMs())
+    .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
+  const nextDayKey = upcoming.length ? (upcoming[0].match_date || new Date(upcoming[0].kickoff_at).toISOString().slice(0,10)) : null;
+  const nextDayMatches = nextDayKey
+    ? matches
+        .filter(m => (m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10)) === nextDayKey)
+        .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at))
+    : [];
+
   return (<>
     <div className="banner">
       <h3>BIENVENIDO, {user.profile?.name?.toUpperCase() || "JUGADOR"} 👋</h3>
@@ -2221,6 +2232,29 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       <div className="stat-card"><span className="stat-label">Predicciones</span><span className="stat-value">{myPreds.length}</span><span className="stat-sub">de {matches.length} partidos</span></div>
       <div className="stat-card"><span className="stat-label">Pendientes</span><span className="stat-value" style={{color:pending>0?"var(--red)":"var(--green)"}}>{pending}</span><span className="stat-sub">{pending>0?"¡A predecir!":"Todo listo ✓"}</span></div>
     </div>
+
+    {nextDayMatches.length > 0 && (
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>⚽ TUS PRONÓSTICOS · {nextDayKey}</div>
+          <button onClick={()=>onGoTab && onGoTab("predicciones")} style={{background:"none",border:"none",color:"var(--gold)",fontSize:12,cursor:"pointer",fontWeight:600}}>Editar ›</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {nextDayMatches.map(m => {
+            const mp = myPreds.find(p => p.match_id === m.id);
+            return (
+              <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--surface)",borderRadius:8}}>
+                <span style={{flex:1,textAlign:"right",fontSize:13,color:"var(--txt)"}}>{m.home}</span>
+                {mp
+                  ? <span style={{fontFamily:"Bebas Neue",fontSize:18,color:"var(--gold)",minWidth:54,textAlign:"center"}}>{mp.home_score}–{mp.away_score}</span>
+                  : <span style={{fontSize:11,color:"var(--red)",minWidth:54,textAlign:"center"}}>sin cargar</span>}
+                <span style={{flex:1,textAlign:"left",fontSize:13,color:"var(--txt)"}}>{m.away}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
 
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
       <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1,marginBottom:14}}>📊 TUS ESTADÍSTICAS</div>
