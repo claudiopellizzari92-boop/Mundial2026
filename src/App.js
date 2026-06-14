@@ -1176,16 +1176,27 @@ function StatsDeep({ user, matches, predictions }) {
     .map(([name, s]) => ({ name, ...s, pct: Math.round(s.correct / s.total * 100) }))
     .sort((a, b) => b.pct - a.pct || b.total - a.total)[0];
 
-  // ── Mapa de calor por grupo ──────────────────────────────────────────────
-  const groupStats = {};
-  finished.forEach(p => {
-    const g = p.match.group_name;
-    if (!g) return;
-    if (!groupStats[g]) groupStats[g] = { correct: 0, total: 0 };
-    groupStats[g].total++;
-    if (p.points > 0) groupStats[g].correct++;
+  // ── Vos vs el grupo (% de acierto comparado con los demás) ────────────────
+  const finishedMatchIds = new Set(matches.filter(m => m.status === "finished").map(m => m.id));
+  const accByUser = {};
+  predictions.forEach(p => {
+    if (!finishedMatchIds.has(p.match_id)) return;
+    if (p.points === null) return;
+    if (!accByUser[p.user_id]) accByUser[p.user_id] = { correct: 0, total: 0 };
+    accByUser[p.user_id].total++;
+    if (p.points > 0) accByUser[p.user_id].correct++;
   });
-  const maxGroupPct = Math.max(...Object.values(groupStats).map(s => s.total > 0 ? s.correct / s.total : 0), 0.01);
+  const allPcts = Object.values(accByUser).filter(s => s.total > 0).map(s => s.correct / s.total);
+  const avgPct = allPcts.length ? allPcts.reduce((a, b) => a + b, 0) / allPcts.length : 0;
+  const myAcc = accByUser[user.id] || { correct: 0, total: 0 };
+  const myPct = myAcc.total > 0 ? myAcc.correct / myAcc.total : 0;
+  // Ranking por % de acierto (cuántos tienen mejor % que yo)
+  const sortedPcts = Object.entries(accByUser)
+    .filter(([, s]) => s.total > 0)
+    .map(([uid, s]) => ({ uid, pct: s.correct / s.total }))
+    .sort((a, b) => b.pct - a.pct);
+  const myRank = sortedPcts.findIndex(x => x.uid === user.id) + 1;
+  const totalPlayers = sortedPcts.length;
 
   // ── Pred vs Realidad (últimos 10) ────────────────────────────────────────
   const lastTen = finished.slice(-10);
@@ -1215,29 +1226,28 @@ function StatsDeep({ user, matches, predictions }) {
         </div>
       )}
 
-      {/* Mapa de calor por grupo */}
-      {Object.keys(groupStats).length > 0 && (
+      {/* Vos vs el grupo */}
+      {myAcc.total > 0 && (
         <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>🌡️ Mapa de calor por grupo</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-            {Object.entries(groupStats).sort().map(([g, s]) => {
-              const pct = s.total > 0 ? s.correct / s.total : 0;
-              const intensity = pct / maxGroupPct;
-              const bg = `rgba(${Math.round(245 - intensity * 200)},${Math.round(80 + intensity * 143)},${Math.round(49 + intensity * 24)},${0.2 + intensity * 0.6})`;
-              return (
-                <div key={g} style={{ background: bg, borderRadius: 8, padding: "8px 6px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--txt)" }}>G{g}</div>
-                  <div style={{ fontSize: 10, color: "var(--txt)", opacity: .8 }}>{s.correct}/{s.total}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--txt)" }}>{Math.round(pct * 100)}%</div>
-                </div>
-              );
-            })}
+          <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 12 }}>📊 Vos vs el grupo</div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 1, textAlign: "center", background: "var(--card)", borderRadius: 8, padding: "10px 6px" }}>
+              <div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: myPct >= avgPct ? "var(--green)" : "var(--gold)" }}>{Math.round(myPct * 100)}%</div>
+              <div style={{ fontSize: 10, color: "var(--muted)" }}>Tu acierto</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center", background: "var(--card)", borderRadius: 8, padding: "10px 6px" }}>
+              <div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--muted)" }}>{Math.round(avgPct * 100)}%</div>
+              <div style={{ fontSize: 10, color: "var(--muted)" }}>Promedio grupo</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center", background: "var(--card)", borderRadius: 8, padding: "10px 6px" }}>
+              <div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)" }}>{myRank}º</div>
+              <div style={{ fontSize: 10, color: "var(--muted)" }}>de {totalPlayers}</div>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", justifyContent: "center" }}>
-            <div style={{ background: "rgba(245,80,49,.3)", width: 14, height: 14, borderRadius: 3 }} />
-            <span style={{ fontSize: 10, color: "var(--muted)" }}>Bajo</span>
-            <div style={{ background: "rgba(45,223,73,.8)", width: 14, height: 14, borderRadius: 3 }} />
-            <span style={{ fontSize: 10, color: "var(--muted)" }}>Alto</span>
+          <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)" }}>
+            {myPct >= avgPct
+              ? <>Estás <strong style={{ color: "var(--green)" }}>por encima</strong> del promedio del grupo 🔥</>
+              : <>Estás <strong style={{ color: "var(--gold)" }}>por debajo</strong> del promedio — ¡a remontar! 💪</>}
           </div>
         </div>
       )}
