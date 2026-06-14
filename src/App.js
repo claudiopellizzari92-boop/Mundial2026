@@ -1200,6 +1200,14 @@ function StatsDeep({ user, matches, predictions }) {
 
   // ── Pred vs Realidad (últimos 10) ────────────────────────────────────────
   const lastTen = finished.slice(-10);
+  // Resumen de cómo le fue en esos últimos partidos
+  const lastTenSummary = lastTen.reduce((acc, p) => {
+    const o = predOutcome(p, p.match);
+    if (o === "exact") acc.exact++;
+    else if (o === "winner" || o === "goals") acc.correct++;
+    else acc.miss++;
+    return acc;
+  }, { exact: 0, correct: 0, miss: 0 });
 
   if (finished.length === 0) return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
@@ -1256,6 +1264,11 @@ function StatsDeep({ user, matches, predictions }) {
       {lastTen.length > 0 && (
         <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
           <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>🎯 Predicción vs Realidad (últimos {lastTen.length})</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+            <span style={{ color: "var(--gold)" }}>⭐ {lastTenSummary.exact} <span style={{ color: "var(--muted)", fontSize: 11 }}>exactos</span></span>
+            <span style={{ color: "var(--green)" }}>✓ {lastTenSummary.correct} <span style={{ color: "var(--muted)", fontSize: 11 }}>correctos</span></span>
+            <span style={{ color: "#ff8080" }}>✗ {lastTenSummary.miss} <span style={{ color: "var(--muted)", fontSize: 11 }}>fallos</span></span>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {lastTen.map((p, i) => {
               const m = p.match;
