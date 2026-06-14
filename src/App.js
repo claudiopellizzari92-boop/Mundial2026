@@ -3181,13 +3181,25 @@ function Compare({ user, matches, allPredictions, profiles }) {
   });
 
   const allDays = Object.keys(byDay);
-  const firstLockedDay = allDays.find(d => byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
+  // Última fecha jugada (la más reciente con partidos cerrados); si ninguna, la próxima a jugarse.
+  const lockedDays = allDays.filter(d => byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
+  const lastLockedDay = lockedDays.length ? lockedDays[lockedDays.length - 1] : null;
+  const firstUnlockedDay = allDays.find(d => !byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
+  const defaultDay = lastLockedDay || firstUnlockedDay || allDays[0];
   const [activeDay, setActiveDay] = useState(null);
+  const dayBarRef = React.useRef(null);
 
   useEffect(() => {
-    if (!activeDay && firstLockedDay) setActiveDay(firstLockedDay);
-    else if (!activeDay && allDays.length > 0) setActiveDay(allDays[0]);
+    if (!activeDay && defaultDay) setActiveDay(defaultDay);
   }, [matches]);
+
+  // Auto-scroll del selector hasta la fecha activa
+  useEffect(() => {
+    if (activeDay && dayBarRef.current) {
+      const btn = dayBarRef.current.querySelector(`[data-day="${activeDay}"]`);
+      if (btn) btn.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    }
+  }, [activeDay]);
 
   function toggleExpand(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
@@ -3230,11 +3242,11 @@ function Compare({ user, matches, allPredictions, profiles }) {
       ))}
     </div>
     {view === "partidos" && (<>
-    <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
+    <div ref={dayBarRef} style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 4 }}>
       {allDays.map(d => {
         const locked = byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date));
         return (
-          <button key={d} onClick={() => setActiveDay(d)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: activeDay === d ? "var(--gold)" : "var(--border)", background: activeDay === d ? "var(--gold-dim)" : "none", color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <button key={d} data-day={d} onClick={() => setActiveDay(d)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: activeDay === d ? "var(--gold)" : "var(--border)", background: activeDay === d ? "var(--gold-dim)" : "none", color: activeDay === d ? "var(--gold)" : locked ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {locked ? "✓ " : "🔒 "}{d}
           </button>
         );
