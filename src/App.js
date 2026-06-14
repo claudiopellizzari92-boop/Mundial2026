@@ -1509,6 +1509,12 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     return counts;
   }
   useEffect(() => { loadChronicles(); loadCronReactions(); }, []);
+  // Expandir por defecto la crónica más reciente (la primera del array ya viene ordenada desc)
+  useEffect(() => {
+    if (chronicles.length > 0) {
+      setExpandedChron(prev => (prev[chronicles[0].id] === undefined ? { ...prev, [chronicles[0].id]: true } : prev));
+    }
+  }, [chronicles]);
   useEffect(() => { if (!selectedDate && fechasFinished.length) setSelectedDate(fechasFinished[0]); }, [fechasFinished.length]);
 
   async function buildResumen(matchDate) {
