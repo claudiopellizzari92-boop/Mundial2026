@@ -1300,32 +1300,49 @@ function HallOfFame({ profiles, predictions, matches, snapshots, allAchievements
   const rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
     const pts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
-    const exact = preds.filter(pr => {
-      const m = (matches || []).find(mm => mm.id === pr.match_id);
-      return m && m.home_score != null && m.away_score != null && pr.home_score === m.home_score && pr.away_score === m.away_score;
-    }).length;
+    // Predicciones sobre partidos finalizados, ordenadas cronológicamente
+    const finishedPreds = preds
+      .map(pr => ({ pr, m: (matches || []).find(mm => mm.id === pr.match_id) }))
+      .filter(x => x.m && x.m.home_score != null && x.m.away_score != null)
+      .sort((a, b) => new Date(a.m.kickoff_at) - new Date(b.m.kickoff_at));
+    const exact = finishedPreds.filter(x => x.pr.home_score === x.m.home_score && x.pr.away_score === x.m.away_score).length;
     const userSnaps = (snapshots || []).filter(s => s.user_id === p.id);
     const daysFirst = userSnaps.filter(s => s.position === 1).length;
-    return { ...p, pts, exact, daysFirst };
+    // Racha máxima de exactos seguidos
+    let maxStreak = 0, curStreak = 0;
+    finishedPreds.forEach(x => {
+      if (x.pr.home_score === x.m.home_score && x.pr.away_score === x.m.away_score) { curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
+      else curStreak = 0;
+    });
+    // Mejor golpe (más puntos sacados en un solo partido — comodín exacto da 8)
+    const bestHit = finishedPreds.reduce((best, x) => (x.pr.points || 0) > best ? (x.pr.points || 0) : best, 0);
+    // El más arriesgado: exacto clavado con mayor cantidad de goles totales
+    const riskyExact = finishedPreds
+      .filter(x => x.pr.home_score === x.m.home_score && x.pr.away_score === x.m.away_score)
+      .reduce((max, x) => Math.max(max, x.m.home_score + x.m.away_score), 0);
+    return { ...p, pts, exact, daysFirst, maxStreak, bestHit, riskyExact };
   }).sort((a, b) => b.pts - a.pts);
 
   const categories = [
-    { label: "🏆 Más puntos", key: "pts", winner: [...rows].sort((a,b) => b.pts - a.pts)[0] },
-    { label: "⭐ Más exactos", key: "exact", winner: [...rows].sort((a,b) => b.exact - a.exact)[0] },
-    { label: "👑 Días en 1°", key: "daysFirst", winner: [...rows].sort((a,b) => b.daysFirst - a.daysFirst)[0] },
+    { label: "🏆 Más puntos", key: "pts", unit: "pts", winner: [...rows].sort((a,b) => b.pts - a.pts)[0] },
+    { label: "⭐ Más exactos", key: "exact", unit: "exactos", winner: [...rows].sort((a,b) => b.exact - a.exact)[0] },
+    { label: "👑 Días en 1°", key: "daysFirst", unit: "días", winner: [...rows].sort((a,b) => b.daysFirst - a.daysFirst)[0] },
+    { label: "🔥 Mejor racha", key: "maxStreak", unit: "exactos seguidos", winner: [...rows].sort((a,b) => b.maxStreak - a.maxStreak)[0], min: 2 },
+    { label: "💥 Mejor golpe", key: "bestHit", unit: "pts en un partido", winner: [...rows].sort((a,b) => b.bestHit - a.bestHit)[0], min: 1 },
+    { label: "🎲 El más arriesgado", key: "riskyExact", unit: "goles en un exacto", winner: [...rows].sort((a,b) => b.riskyExact - a.riskyExact)[0], min: 1 },
   ];
 
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
       <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>🌟 HALL OF FAME</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {categories.map(cat => cat.winner && (
+        {categories.filter(cat => cat.winner && cat.winner[cat.key] >= (cat.min || 0)).map(cat => (
           <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ fontFamily: "Bebas Neue", fontSize: 14, color: "var(--gold)", minWidth: 110 }}>{cat.label}</div>
             <Avatar profile={cat.winner} size="sm" />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.winner.name}</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>{cat.winner[cat.key]} {cat.key === "pts" ? "pts" : cat.key === "exact" ? "exactos" : "días"}</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>{cat.winner[cat.key]} {cat.unit}</div>
             </div>
             {cat.winner.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === cat.winner.equipped_badge); return a ? <span style={{ fontSize: 20 }}>{a.icon}</span> : null; })()}
           </div>
