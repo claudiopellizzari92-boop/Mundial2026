@@ -3759,6 +3759,7 @@ function CronistaPerfilesAdmin({ profiles, onRefresh }) {
   const [savingId, setSavingId] = useState(null);
   const [savedId, setSavedId] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [secOpen, setSecOpen] = useState(false);
 
   async function savePerfil(userId) {
     setSavingId(userId);
@@ -3771,8 +3772,8 @@ function CronistaPerfilesAdmin({ profiles, onRefresh }) {
 
   return (
     <div className="admin-section" style={{marginTop:20}}>
-      <div className="admin-section-hdr"><h3>🎭 PERFILES DEL CRONISTA</h3><span style={{fontSize:12,color:"var(--muted)"}}>munición secreta</span></div>
-      <div className="admin-section-body">
+      <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>setSecOpen(o=>!o)}><h3>🎭 PERFILES DEL CRONISTA {secOpen?"▴":"▾"}</h3><span style={{fontSize:12,color:"var(--muted)"}}>munición secreta</span></div>
+      {secOpen && <div className="admin-section-body">
         <div style={{fontSize:12,color:"var(--muted)",marginBottom:12,lineHeight:1.5}}>
           Datos jugosos de cada jugador para que el Cronista los cargue con onda (apodo, equipo, laburo, personalidad, anécdotas, rivalidades). <strong>No se muestran en la app</strong>, son solo para las crónicas. Cuanto más específico, más filosa la cargada.
         </div>
@@ -3812,7 +3813,7 @@ function CronistaPerfilesAdmin({ profiles, onRefresh }) {
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -3945,6 +3946,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [groupResultsMsg, setGroupResultsMsg] = useState(null);
   const [calculatingPts, setCalculatingPts] = useState(false);
   const [takingSnapshot, setTakingSnapshot] = useState(false);
+  const [openSec, setOpenSec] = useState(null);
+  const toggleSec = (k) => setOpenSec(prev => prev === k ? null : k);
 
   async function takeSnapshot() {
     setTakingSnapshot(true);
@@ -4372,8 +4375,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr"><h3>👥 GESTIÓN DE USUARIOS</h3><span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span></div>
-        <div className="admin-section-body">
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("usuarios")}><h3>👥 GESTIÓN DE USUARIOS {openSec==="usuarios"?"▴":"▾"}</h3><span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span></div>
+        {openSec==="usuarios" && <div className="admin-section-body">
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {profiles.map(prof => {
               const isAdminUser = adminList.includes(prof.id);
@@ -4428,7 +4431,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
               );
             })}
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* ── Títulos ── */}
