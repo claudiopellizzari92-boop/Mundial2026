@@ -3825,6 +3825,7 @@ function TitlesAdmin({ profiles, onRefresh }) {
   const [position, setPosition] = useState(1);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [secOpen, setSecOpen] = useState(false);
 
   async function addTitle() {
     if (!selectedUser) return;
@@ -3850,8 +3851,8 @@ function TitlesAdmin({ profiles, onRefresh }) {
 
   return (
     <div className="admin-section">
-      <div className="admin-section-hdr"><h3>🏆 TÍTULOS ANTERIORES</h3></div>
-      <div className="admin-section-body">
+      <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>setSecOpen(o=>!o)}><h3>🏆 TÍTULOS ANTERIORES {secOpen?"▴":"▾"}</h3></div>
+      {secOpen && <div className="admin-section-body">
         {/* Agregar título */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, marginBottom: 16, alignItems: "end" }}>
           <div>
@@ -3912,7 +3913,7 @@ function TitlesAdmin({ profiles, onRefresh }) {
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -4341,8 +4342,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr"><h3>⚙️ SISTEMA DE PUNTOS</h3><button className="btn-small" onClick={saveRules} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button></div>
-        <div className="admin-section-body">
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("puntos")}><h3>⚙️ SISTEMA DE PUNTOS {openSec==="puntos"?"▴":"▾"}</h3><button className="btn-small" onClick={(e)=>{e.stopPropagation();saveRules();}} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button></div>
+        {openSec==="puntos" && <div className="admin-section-body">
           <div className="rules-grid">
             {rules.map(r=>(
               <div key={r.rule_key} className="rule-card">
@@ -4351,12 +4352,12 @@ function AdminPanel({ matches, profiles, onRefresh }) {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr"><h3>🔗 CÓDIGOS DE INVITACIÓN</h3></div>
-        <div className="admin-section-body">
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("codigos")}><h3>🔗 CÓDIGOS DE INVITACIÓN {openSec==="codigos"?"▴":"▾"}</h3></div>
+        {openSec==="codigos" && <div className="admin-section-body">
           <div className="invite-list">
             {invites.map(inv=>(
               <div key={inv.code} className="invite-row">
@@ -4372,7 +4373,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             <input className="new-invite-input" value={newCode} onChange={e=>setNewCode(e.target.value)} placeholder="Nuevo código..." onKeyDown={e=>e.key==="Enter"&&addInvite()}/>
             <button className="btn-small" onClick={addInvite}>Agregar</button>
           </div>
-        </div>
+        </div>}
       </div>
 
       <div className="admin-section">
