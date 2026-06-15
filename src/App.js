@@ -1155,6 +1155,116 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
 }
 
 // ── Deep Stats (equipo favorito, mapa de calor, pred vs realidad) ─────────────
+// ── Gráfico de puntos por fecha (interactivo) ──
+function PuntosChart({ evolucion }) {
+  const [hover, setHover] = useState(null);
+  const W = 340, H = 160, padL = 26, padR = 14, padT = 16, padB = 26;
+  const maxY = Math.max(...evolucion.map(e => Math.max(e.mios, e.promedio)), 1);
+  const xAt = i => padL + (i / Math.max(evolucion.length - 1, 1)) * (W - padL - padR);
+  const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
+  const lineMios = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.mios)}`).join(" ");
+  const lineAvg = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.promedio)}`).join(" ");
+  const areaMios = `${lineMios} L${xAt(evolucion.length - 1)},${yAt(0)} L${xAt(0)},${yAt(0)} Z`;
+  const gridY = [0, 0.5, 1].map(f => f * maxY);
+
+  function handleMove(e) {
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const px = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W;
+    let best = 0, bestD = Infinity;
+    evolucion.forEach((_, i) => { const d = Math.abs(xAt(i) - px); if (d < bestD) { bestD = d; best = i; } });
+    setHover(best);
+  }
+
+  return (
+    <div style={{ background: "var(--surface)", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>📈 Puntos por fecha</div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>Vos</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--muted)", borderRadius: 2, opacity: .6 }} /><span style={{ color: "var(--muted)" }}>Promedio grupo</span></div>
+      </div>
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H, touchAction: "none" }}
+        onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
+        onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
+        <defs>
+          <linearGradient id="gradPuntos" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
+          </linearGradient>
+          <filter id="glowGold" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        {gridY.map((v, i) => <line key={i} x1={padL} y1={yAt(v)} x2={W - padR} y2={yAt(v)} stroke="var(--border)" strokeWidth="1" opacity="0.5" />)}
+        {gridY.map((v, i) => <text key={"gy" + i} x={padL - 6} y={yAt(v) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">{Math.round(v)}</text>)}
+        <path d={areaMios} fill="url(#gradPuntos)" />
+        <path d={lineAvg} fill="none" stroke="var(--muted)" strokeWidth="2" strokeDasharray="4 3" opacity="0.6" strokeLinejoin="round" />
+        <path d={lineMios} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glowGold)" />
+        {hover !== null && <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={H - padB} stroke="var(--gold)" strokeWidth="1" opacity="0.4" strokeDasharray="3 3" />}
+        {evolucion.map((e, i) => <circle key={i} cx={xAt(i)} cy={yAt(e.mios)} r={hover === i ? 5 : 3} fill="var(--gold)" stroke="var(--surface)" strokeWidth={hover === i ? 2 : 0} style={{ transition: "r .1s" }} />)}
+        {evolucion.map((e, i) => <text key={"x" + i} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize="9" fill={hover === i ? "var(--gold)" : "var(--muted)"} fontWeight={hover === i ? "bold" : "normal"}>{e.fecha.replace("Jun ", "").replace("Jul ", "J")}</text>)}
+        {hover !== null && (() => {
+          const e = evolucion[hover]; const tx = Math.max(padL, Math.min(W - padR - 78, xAt(hover) - 39));
+          return (<g>
+            <rect x={tx} y={padT - 2} width="78" height="34" rx="6" fill="var(--card)" stroke="var(--border)" strokeWidth="1" />
+            <text x={tx + 8} y={padT + 11} fontSize="9.5" fill="var(--gold)" fontWeight="bold">Vos: {e.mios} pts</text>
+            <text x={tx + 8} y={padT + 24} fontSize="9.5" fill="var(--muted)">Grupo: {e.promedio}</text>
+          </g>);
+        })()}
+      </svg>
+    </div>
+  );
+}
+
+// ── Gráfico de posición en el tiempo (interactivo) ──
+function PosicionChart({ misSnaps, totalJugadores }) {
+  const [hover, setHover] = useState(null);
+  const W = 340, H = 160, padL = 26, padR = 14, padT = 18, padB = 26;
+  const xAt = i => padL + (i / Math.max(misSnaps.length - 1, 1)) * (W - padL - padR);
+  const yAt = pos => padT + ((pos - 1) / Math.max(totalJugadores - 1, 1)) * (H - padT - padB);
+  const linePos = misSnaps.map((sn, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(sn.position)}`).join(" ");
+  const mejorPos = Math.min(...misSnaps.map(sn => sn.position));
+  const peorPos = Math.max(...misSnaps.map(sn => sn.position));
+  const step = Math.ceil(misSnaps.length / 6);
+
+  function handleMove(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W;
+    let best = 0, bestD = Infinity;
+    misSnaps.forEach((_, i) => { const d = Math.abs(xAt(i) - px); if (d < bestD) { bestD = d; best = i; } });
+    setHover(best);
+  }
+
+  return (
+    <div style={{ background: "var(--surface)", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Tu posición en el tiempo</div>
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H, touchAction: "none" }}
+        onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
+        onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
+        <defs>
+          <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <line x1={padL} y1={yAt(1)} x2={W - padR} y2={yAt(1)} stroke="var(--gold)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
+        <text x={W - padR} y={yAt(1) - 4} textAnchor="end" fontSize="8.5" fill="var(--gold)" opacity="0.7">1º</text>
+        {hover !== null && <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={H - padB} stroke="var(--blue)" strokeWidth="1" opacity="0.4" strokeDasharray="3 3" />}
+        <path d={linePos} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glowBlue)" />
+        {misSnaps.map((sn, i) => <circle key={i} cx={xAt(i)} cy={yAt(sn.position)} r={hover === i ? 5 : 3} fill={sn.position === mejorPos ? "var(--gold)" : "var(--blue)"} stroke="var(--surface)" strokeWidth={hover === i ? 2 : 0} style={{ transition: "r .1s" }} />)}
+        {misSnaps.map((sn, i) => (i % step === 0 || i === misSnaps.length - 1) && <text key={"x" + i} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize="9" fill={hover === i ? "var(--blue)" : "var(--muted)"} fontWeight={hover === i ? "bold" : "normal"}>{sn.snapshot_date.slice(5)}</text>)}
+        {hover !== null && (() => {
+          const sn = misSnaps[hover]; const tx = Math.max(padL, Math.min(W - padR - 66, xAt(hover) - 33));
+          return (<g>
+            <rect x={tx} y={Math.max(2, yAt(sn.position) - 32)} width="66" height="24" rx="6" fill="var(--card)" stroke="var(--border)" strokeWidth="1" />
+            <text x={tx + 33} y={Math.max(2, yAt(sn.position) - 32) + 15} textAnchor="middle" fontSize="10" fill="var(--blue)" fontWeight="bold">{sn.position}º · {sn.snapshot_date.slice(5)}</text>
+          </g>);
+        })()}
+      </svg>
+      <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>Mejor: <strong style={{ color: "var(--gold)" }}>{mejorPos}º</strong> · Peor: {peorPos}º</div>
+    </div>
+  );
+}
+
 function StatsDeep({ user, matches, predictions, snapshots, profiles }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const finished = myPreds
@@ -1250,55 +1360,9 @@ function StatsDeep({ user, matches, predictions, snapshots, profiles }) {
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
       <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>📊 ANÁLISIS DETALLADO</div>
 
-      {/* ── Gráfico: evolución de puntos por fecha ── */}
-      {evolucion.length >= 2 && (() => {
-        const W = 320, H = 150, padL = 24, padR = 10, padT = 12, padB = 22;
-        const maxY = Math.max(...evolucion.map(e => Math.max(e.mios, e.promedio)), 1);
-        const xAt = i => padL + (i / (evolucion.length - 1)) * (W - padL - padR);
-        const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
-        const pathMios = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.mios)}`).join(" ");
-        const pathAvg = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.promedio)}`).join(" ");
-        return (
-          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>📈 Puntos por fecha</div>
-            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>Vos</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--muted)", borderRadius: 2, opacity: .7 }} /><span style={{ color: "var(--muted)" }}>Promedio grupo</span></div>
-            </div>
-            <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H }}>
-              <path d={pathAvg} fill="none" stroke="var(--muted)" strokeWidth="2" strokeDasharray="4 3" opacity="0.7" strokeLinejoin="round" />
-              <path d={pathMios} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />
-              {evolucion.map((e, i) => <circle key={i} cx={xAt(i)} cy={yAt(e.mios)} r="3" fill="var(--gold)" />)}
-              {evolucion.map((e, i) => <text key={"x" + i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--muted)">{e.fecha.replace("Jun ", "").replace("Jul ", "")}</text>)}
-              <text x={padL - 6} y={yAt(maxY) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">{maxY}</text>
-              <text x={padL - 6} y={yAt(0) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">0</text>
-            </svg>
-          </div>
-        );
-      })()}
-
-      {/* ── Gráfico: evolución de posición ── */}
-      {misSnaps.length >= 2 && (() => {
-        const W = 320, H = 150, padL = 24, padR = 10, padT = 12, padB = 22;
-        const xAt = i => padL + (i / (misSnaps.length - 1)) * (W - padL - padR);
-        // posición 1 arriba, totalJugadores abajo
-        const yAt = pos => padT + ((pos - 1) / Math.max(totalJugadores - 1, 1)) * (H - padT - padB);
-        const pathPos = misSnaps.map((sn, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(sn.position)}`).join(" ");
-        const mejorPos = Math.min(...misSnaps.map(sn => sn.position));
-        const peorPos = Math.max(...misSnaps.map(sn => sn.position));
-        return (
-          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Tu posición en el tiempo</div>
-            <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H }}>
-              <path d={pathPos} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" />
-              {misSnaps.map((sn, i) => <circle key={i} cx={xAt(i)} cy={yAt(sn.position)} r="3" fill="var(--blue)" />)}
-              {misSnaps.map((sn, i) => (i === 0 || i === misSnaps.length - 1 || sn.position === mejorPos) && <text key={"p" + i} x={xAt(i)} y={yAt(sn.position) - 7} textAnchor="middle" fontSize="9" fill="var(--blue)" fontWeight="bold">{sn.position}º</text>)}
-              {misSnaps.map((sn, i) => (i % Math.ceil(misSnaps.length / 6) === 0 || i === misSnaps.length - 1) && <text key={"x" + i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--muted)">{sn.snapshot_date.slice(5)}</text>)}
-            </svg>
-            <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>Mejor: {mejorPos}º · Peor: {peorPos}º</div>
-          </div>
-        );
-      })()}
+      {/* ── Gráficos de evolución ── */}
+      {evolucion.length >= 2 && <PuntosChart evolucion={evolucion} />}
+      {misSnaps.length >= 2 && <PosicionChart misSnaps={misSnaps} totalJugadores={totalJugadores} />}
 
 
       {/* Equipo favorito */}
