@@ -1155,7 +1155,7 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
 }
 
 // ── Deep Stats (equipo favorito, mapa de calor, pred vs realidad) ─────────────
-function StatsDeep({ user, matches, predictions }) {
+function StatsDeep({ user, matches, predictions, snapshots, profiles }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const finished = myPreds
     .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
@@ -1209,7 +1209,37 @@ function StatsDeep({ user, matches, predictions }) {
     return acc;
   }, { exact: 0, correct: 0, miss: 0 });
 
-  if (finished.length === 0) return (
+  // ── Datos para gráficos de evolución ──
+  // Fechas finalizadas en orden cronológico
+  const finishedDates = [...new Set(matches.filter(m => m.status === "finished").map(m => m.match_date))]
+    .sort((a, b) => {
+      const ka = Math.min(...matches.filter(m => m.match_date === a).map(m => new Date(m.kickoff_at).getTime()));
+      const kb = Math.min(...matches.filter(m => m.match_date === b).map(m => new Date(m.kickoff_at).getTime()));
+      return ka - kb;
+    });
+  // Puntos por fecha: míos y promedio del grupo
+  const evolucion = finishedDates.map(d => {
+    const ids = matches.filter(m => m.match_date === d && m.status === "finished").map(m => m.id);
+    const mine = predictions.filter(p => p.user_id === user.id && ids.includes(p.match_id))
+      .reduce((sum, p) => sum + (p.points || 0), 0);
+    // promedio del grupo: suma de puntos de cada usuario en esa fecha / nº usuarios que jugaron
+    const byUser = {};
+    predictions.forEach(p => {
+      if (!ids.includes(p.match_id)) return;
+      byUser[p.user_id] = (byUser[p.user_id] || 0) + (p.points || 0);
+    });
+    const vals = Object.values(byUser);
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    return { fecha: d, mios: mine, promedio: Math.round(avg * 10) / 10 };
+  });
+
+  // Evolución de posición (desde snapshots)
+  const misSnaps = (snapshots || [])
+    .filter(sn => sn.user_id === user.id)
+    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  const totalJugadores = (profiles || []).length || 1;
+
+    if (finished.length === 0) return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
       <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>📊 ANÁLISIS DETALLADO</div>
       <div style={{ fontSize: 13, color: "var(--muted)" }}>Disponible cuando haya partidos finalizados con tus predicciones.</div>
@@ -1219,6 +1249,57 @@ function StatsDeep({ user, matches, predictions }) {
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20 }}>
       <div style={{ fontFamily: "Bebas Neue", fontSize: 17, color: "var(--gold)", letterSpacing: 1, marginBottom: 16 }}>📊 ANÁLISIS DETALLADO</div>
+
+      {/* ── Gráfico: evolución de puntos por fecha ── */}
+      {evolucion.length >= 2 && (() => {
+        const W = 320, H = 150, padL = 24, padR = 10, padT = 12, padB = 22;
+        const maxY = Math.max(...evolucion.map(e => Math.max(e.mios, e.promedio)), 1);
+        const xAt = i => padL + (i / (evolucion.length - 1)) * (W - padL - padR);
+        const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
+        const pathMios = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.mios)}`).join(" ");
+        const pathAvg = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.promedio)}`).join(" ");
+        return (
+          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>📈 Puntos por fecha</div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>Vos</span></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--muted)", borderRadius: 2, opacity: .7 }} /><span style={{ color: "var(--muted)" }}>Promedio grupo</span></div>
+            </div>
+            <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H }}>
+              <path d={pathAvg} fill="none" stroke="var(--muted)" strokeWidth="2" strokeDasharray="4 3" opacity="0.7" strokeLinejoin="round" />
+              <path d={pathMios} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" />
+              {evolucion.map((e, i) => <circle key={i} cx={xAt(i)} cy={yAt(e.mios)} r="3" fill="var(--gold)" />)}
+              {evolucion.map((e, i) => <text key={"x" + i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--muted)">{e.fecha.replace("Jun ", "").replace("Jul ", "")}</text>)}
+              <text x={padL - 6} y={yAt(maxY) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">{maxY}</text>
+              <text x={padL - 6} y={yAt(0) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">0</text>
+            </svg>
+          </div>
+        );
+      })()}
+
+      {/* ── Gráfico: evolución de posición ── */}
+      {misSnaps.length >= 2 && (() => {
+        const W = 320, H = 150, padL = 24, padR = 10, padT = 12, padB = 22;
+        const xAt = i => padL + (i / (misSnaps.length - 1)) * (W - padL - padR);
+        // posición 1 arriba, totalJugadores abajo
+        const yAt = pos => padT + ((pos - 1) / Math.max(totalJugadores - 1, 1)) * (H - padT - padB);
+        const pathPos = misSnaps.map((sn, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(sn.position)}`).join(" ");
+        const mejorPos = Math.min(...misSnaps.map(sn => sn.position));
+        const peorPos = Math.max(...misSnaps.map(sn => sn.position));
+        return (
+          <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Tu posición en el tiempo</div>
+            <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H }}>
+              <path d={pathPos} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" />
+              {misSnaps.map((sn, i) => <circle key={i} cx={xAt(i)} cy={yAt(sn.position)} r="3" fill="var(--blue)" />)}
+              {misSnaps.map((sn, i) => (i === 0 || i === misSnaps.length - 1 || sn.position === mejorPos) && <text key={"p" + i} x={xAt(i)} y={yAt(sn.position) - 7} textAnchor="middle" fontSize="9" fill="var(--blue)" fontWeight="bold">{sn.position}º</text>)}
+              {misSnaps.map((sn, i) => (i % Math.ceil(misSnaps.length / 6) === 0 || i === misSnaps.length - 1) && <text key={"x" + i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--muted)">{sn.snapshot_date.slice(5)}</text>)}
+            </svg>
+            <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>Mejor: {mejorPos}º · Peor: {peorPos}º</div>
+          </div>
+        );
+      })()}
+
 
       {/* Equipo favorito */}
       {bestTeam && (
@@ -4997,7 +5078,7 @@ export default function App() {
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
-        {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions}/>}
+        {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
