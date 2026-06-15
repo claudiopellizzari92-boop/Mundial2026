@@ -1159,11 +1159,11 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
 function PuntosChart({ evolucion }) {
   const [hover, setHover] = useState(null);
   const W = 340, H = 160, padL = 26, padR = 24, padT = 16, padB = 26;
-  const maxY = Math.max(...evolucion.map(e => Math.max(e.mios, e.promedio)), 1);
+  const maxY = Math.max(...evolucion.map(e => Math.max(e.miosAcum, e.promedioAcum)), 1);
   const xAt = i => padL + (i / Math.max(evolucion.length - 1, 1)) * (W - padL - padR);
   const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
-  const lineMios = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.mios)}`).join(" ");
-  const lineAvg = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.promedio)}`).join(" ");
+  const lineMios = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.miosAcum)}`).join(" ");
+  const lineAvg = evolucion.map((e, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(e.promedioAcum)}`).join(" ");
   const areaMios = `${lineMios} L${xAt(evolucion.length - 1)},${yAt(0)} L${xAt(0)},${yAt(0)} Z`;
   const gridY = [0, 0.5, 1].map(f => f * maxY);
 
@@ -1202,14 +1202,15 @@ function PuntosChart({ evolucion }) {
         <path d={lineAvg} fill="none" stroke="var(--muted)" strokeWidth="2" strokeDasharray="4 3" opacity="0.6" strokeLinejoin="round" />
         <path d={lineMios} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glowGold)" />
         {hover !== null && <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={H - padB} stroke="var(--gold)" strokeWidth="1" opacity="0.4" strokeDasharray="3 3" />}
-        {evolucion.map((e, i) => <circle key={i} cx={xAt(i)} cy={yAt(e.mios)} r={hover === i ? 5 : 3} fill="var(--gold)" stroke="var(--surface)" strokeWidth={hover === i ? 2 : 0} style={{ transition: "r .1s" }} />)}
+        {evolucion.map((e, i) => <circle key={i} cx={xAt(i)} cy={yAt(e.miosAcum)} r={hover === i ? 5 : 3} fill="var(--gold)" stroke="var(--surface)" strokeWidth={hover === i ? 2 : 0} style={{ transition: "r .1s" }} />)}
         {evolucion.map((e, i) => <text key={"x" + i} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize="9" fill={hover === i ? "var(--gold)" : "var(--muted)"} fontWeight={hover === i ? "bold" : "normal"}>{e.fecha.replace("Jun ", "").replace("Jul ", "J")}</text>)}
         {hover !== null && (() => {
-          const e = evolucion[hover]; const tx = Math.max(padL, Math.min(W - padR - 78, xAt(hover) - 39));
+          const e = evolucion[hover]; const tx = Math.max(2, Math.min(W - 116, xAt(hover) - 58));
           return (<g>
-            <rect x={tx} y={padT - 2} width="78" height="34" rx="6" fill="var(--card)" stroke="var(--border)" strokeWidth="1" />
-            <text x={tx + 8} y={padT + 11} fontSize="9.5" fill="var(--gold)" fontWeight="bold">Vos: {e.mios} pts</text>
-            <text x={tx + 8} y={padT + 24} fontSize="9.5" fill="var(--muted)">Grupo: {e.promedio}</text>
+            <rect x={tx} y={padT - 4} width="114" height="46" rx="6" fill="var(--card)" stroke="var(--border)" strokeWidth="1" />
+            <text x={tx + 8} y={padT + 9} fontSize="9.5" fill="var(--gold)" fontWeight="bold">Total: {e.miosAcum} pts</text>
+            <text x={tx + 8} y={padT + 22} fontSize="9" fill="var(--txt)">Esta fecha: +{e.mios}</text>
+            <text x={tx + 8} y={padT + 35} fontSize="9" fill="var(--muted)">Grupo: {e.promedioAcum} (+{e.promedio})</text>
           </g>);
         })()}
       </svg>
@@ -1343,6 +1344,12 @@ function StatsDeep({ user, matches, predictions, snapshots, profiles }) {
     const vals = Object.values(byUser);
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     return { fecha: d, mios: mine, promedio: Math.round(avg * 10) / 10 };
+  });
+  let accMios = 0, accAvg = 0;
+  evolucion.forEach(e => {
+    accMios += e.mios; accAvg += e.promedio;
+    e.miosAcum = accMios;
+    e.promedioAcum = Math.round(accAvg * 10) / 10;
   });
 
   // Evolución de posición (desde snapshots)
