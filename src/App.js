@@ -1221,13 +1221,16 @@ function PuntosChart({ evolucion }) {
 // ── Gráfico de posición en el tiempo (interactivo) ──
 function PosicionChart({ misSnaps, totalJugadores }) {
   const [hover, setHover] = useState(null);
-  const W = 340, H = 160, padL = 26, padR = 24, padT = 18, padB = 26;
+  const W = 340, H = 170, padL = 28, padR = 26, padT = 20, padB = 26;
   const xAt = i => padL + (i / Math.max(misSnaps.length - 1, 1)) * (W - padL - padR);
   const yAt = pos => padT + ((pos - 1) / Math.max(totalJugadores - 1, 1)) * (H - padT - padB);
   const linePos = misSnaps.map((sn, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(sn.position)}`).join(" ");
+  const areaPos = `${linePos} L${xAt(misSnaps.length - 1)},${yAt(totalJugadores)} L${xAt(0)},${yAt(totalJugadores)} Z`;
   const mejorPos = Math.min(...misSnaps.map(sn => sn.position));
   const peorPos = Math.max(...misSnaps.map(sn => sn.position));
+  const mejorIdx = misSnaps.findIndex(sn => sn.position === mejorPos);
   const step = Math.ceil(misSnaps.length / 6);
+  const podioY = yAt(3); // límite inferior de la zona de podio (top 3)
 
   function handleMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1239,27 +1242,61 @@ function PosicionChart({ misSnaps, totalJugadores }) {
 
   return (
     <div style={{ background: "var(--surface)", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
-      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Tu posición en el tiempo</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>🏆 Tu posición en el tiempo</div>
+        <div style={{ fontSize: 10, color: "var(--gold)", background: "var(--gold-dim)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>Mejor: {mejorPos}º</div>
+      </div>
       <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ width: "100%", height: H, touchAction: "none" }}
         onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
         onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
         <defs>
-          <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <linearGradient id="gradPos" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--blue)" stopOpacity="0.30" />
+            <stop offset="100%" stopColor="var(--blue)" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="gradPodio" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
+          </linearGradient>
+          <filter id="glowBlue2" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
         <rect x="0" y="0" width={W} height={H} fill="transparent" />
-        <line x1={padL} y1={yAt(1)} x2={W - padR} y2={yAt(1)} stroke="var(--gold)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-        <text x={W - padR} y={yAt(1) - 4} textAnchor="end" fontSize="8.5" fill="var(--gold)" opacity="0.7">1º</text>
+
+        {/* Zona podio (top 3) */}
+        <rect x={padL} y={padT} width={W - padL - padR} height={Math.max(0, podioY - padT)} fill="url(#gradPodio)" />
+        <line x1={padL} y1={podioY} x2={W - padR} y2={podioY} stroke="var(--gold)" strokeWidth="1" opacity="0.25" strokeDasharray="2 3" />
+        <text x={padL + 3} y={podioY - 3} fontSize="7.5" fill="var(--gold)" opacity="0.6">PODIO</text>
+
+        {/* Grilla de referencia */}
+        <line x1={padL} y1={yAt(1)} x2={W - padR} y2={yAt(1)} stroke="var(--border)" strokeWidth="1" opacity="0.4" />
+        <text x={padL - 6} y={yAt(1) + 3} textAnchor="end" fontSize="8.5" fill="var(--gold)" opacity="0.8">1º</text>
+        <text x={padL - 6} y={yAt(totalJugadores) + 3} textAnchor="end" fontSize="8.5" fill="var(--muted)">{totalJugadores}º</text>
+
+        {/* Guía de hover */}
         {hover !== null && <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={H - padB} stroke="var(--blue)" strokeWidth="1" opacity="0.4" strokeDasharray="3 3" />}
-        <path d={linePos} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glowBlue)" />
-        {misSnaps.map((sn, i) => <circle key={i} cx={xAt(i)} cy={yAt(sn.position)} r={hover === i ? 5 : 3} fill={sn.position === mejorPos ? "var(--gold)" : "var(--blue)"} stroke="var(--surface)" strokeWidth={hover === i ? 2 : 0} style={{ transition: "r .1s" }} />)}
+
+        {/* Área + línea */}
+        <path d={areaPos} fill="url(#gradPos)" />
+        <path d={linePos} fill="none" stroke="var(--blue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glowBlue2)" />
+
+        {/* Anillo dorado en la mejor posición */}
+        {mejorIdx >= 0 && <circle cx={xAt(mejorIdx)} cy={yAt(mejorPos)} r="7" fill="none" stroke="var(--gold)" strokeWidth="1.5" opacity="0.6" />}
+
+        {/* Puntos */}
+        {misSnaps.map((sn, i) => <circle key={i} cx={xAt(i)} cy={yAt(sn.position)} r={hover === i ? 5 : 3.2} fill={sn.position === mejorPos ? "var(--gold)" : "var(--blue)"} stroke="var(--surface)" strokeWidth={hover === i ? 2 : 1} style={{ transition: "r .1s" }} />)}
+
+        {/* Etiquetas eje X */}
         {misSnaps.map((sn, i) => (i % step === 0 || i === misSnaps.length - 1) && <text key={"x" + i} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize="9" fill={hover === i ? "var(--blue)" : "var(--muted)"} fontWeight={hover === i ? "bold" : "normal"}>{sn.snapshot_date.slice(5)}</text>)}
+
+        {/* Tooltip */}
         {hover !== null && (() => {
-          const sn = misSnaps[hover]; const tx = Math.max(padL, Math.min(W - padR - 66, xAt(hover) - 33));
+          const sn = misSnaps[hover]; const tx = Math.max(2, Math.min(W - 72, xAt(hover) - 36));
+          const ty = Math.max(2, yAt(sn.position) - 34);
           return (<g>
-            <rect x={tx} y={Math.max(2, yAt(sn.position) - 32)} width="66" height="24" rx="6" fill="var(--card)" stroke="var(--border)" strokeWidth="1" />
-            <text x={tx + 33} y={Math.max(2, yAt(sn.position) - 32) + 15} textAnchor="middle" fontSize="10" fill="var(--blue)" fontWeight="bold">{sn.position}º · {sn.snapshot_date.slice(5)}</text>
+            <rect x={tx} y={ty} width="72" height="26" rx="6" fill="var(--card)" stroke="var(--blue)" strokeWidth="1" opacity="0.97" />
+            <text x={tx + 36} y={ty + 16} textAnchor="middle" fontSize="10" fill="var(--blue)" fontWeight="bold">{sn.position}º · {sn.snapshot_date.slice(5)}</text>
           </g>);
         })()}
       </svg>
@@ -1267,7 +1304,6 @@ function PosicionChart({ misSnaps, totalJugadores }) {
     </div>
   );
 }
-
 function StatsDeep({ user, matches, predictions, snapshots, profiles }) {
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const finished = myPreds
