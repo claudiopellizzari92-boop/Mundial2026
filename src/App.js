@@ -1526,6 +1526,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     const wcSet = new Set((wcs || []).map(w => `${w.user_id}:${w.match_id}`));
 
     const { data: prePreds } = await sb.from("pretournament_predictions").select("*");
+    const { data: snaps } = await sb.from("ranking_snapshots").select("*").order("snapshot_date");
 
     const nameById = {};
     profiles.forEach(p => { nameById[p.id] = p.name; });
@@ -1599,10 +1600,64 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     const morosos = profiles.filter(p => p.is_debtor).map(p => p.name);
     const eliminados = profiles.filter(p => p.is_eliminated).map(p => p.name);
 
+    // ── Datos jugosos para el Cronista ──
+    const datesOrder = [...new Set(matches.filter(hasScore).map(m => m.match_date))]
+      .sort((a, b) => {
+        const ka = Math.min(...matches.filter(m => m.match_date === a).map(m => new Date(m.kickoff_at).getTime()));
+        const kb = Math.min(...matches.filter(m => m.match_date === b).map(m => new Date(m.kickoff_at).getTime()));
+        return ka - kb;
+      });
+    const idxHasta = datesOrder.indexOf(matchDate);
+    const datesHasta = idxHasta >= 0 ? datesOrder.slice(0, idxHasta + 1) : datesOrder;
+    function rachaDe(userId) {
+      let aciertoStreak = 0, falloStreak = 0, corte = false;
+      for (let i = datesHasta.length - 1; i >= 0 && !corte; i--) {
+        const d = datesHasta[i];
+        const ids = matches.filter(m => m.match_date === d && hasScore(m)).map(m => m.id);
+        const preds = allPredictions.filter(p => ids.includes(p.match_id) && p.home_score != null && p.user_id === userId);
+        if (!preds.length) continue;
+        const acertoAlgo = preds.some(p => (p.points || 0) > 0);
+        if (i === datesHasta.length - 1) {
+          if (acertoAlgo) aciertoStreak = 1; else falloStreak = 1;
+        } else {
+          if (aciertoStreak > 0 && acertoAlgo) aciertoStreak++;
+          else if (falloStreak > 0 && !acertoAlgo) falloStreak++;
+          else corte = true;
+        }
+      }
+      if (aciertoStreak >= 2) return { tipo: "acertando", fechas: aciertoStreak };
+      if (falloStreak >= 2) return { tipo: "sin_acertar", fechas: falloStreak };
+      return null;
+    }
+    const uidByName = {};
+    Object.keys(fechaMap).forEach(uid => { uidByName[fechaMap[uid].nombre] = uid; });
+    const heroe_racha = heroe_fecha ? rachaDe(uidByName[heroe_fecha.nombre]) : null;
+    const papelon_racha = papelon_fecha ? rachaDe(uidByName[papelon_fecha.nombre]) : null;
+
+    let escalador = null, desplomado = null;
+    if (Array.isArray(snaps) && snaps.length) {
+      const snapDates = [...new Set(snaps.map(s => s.snapshot_date))].sort();
+      if (snapDates.length >= 2) {
+        const hoy = snapDates[snapDates.length - 1];
+        const ayer = snapDates[snapDates.length - 2];
+        const posHoy = {}, posAyer = {};
+        snaps.forEach(s => { if (s.snapshot_date === hoy) posHoy[s.user_id] = s.position; if (s.snapshot_date === ayer) posAyer[s.user_id] = s.position; });
+        let maxSube = 0, maxBaja = 0;
+        Object.keys(posHoy).forEach(uid => {
+          if (posAyer[uid] == null) return;
+          const delta = posAyer[uid] - posHoy[uid];
+          if (delta > maxSube) { maxSube = delta; escalador = { nombre: nameById[uid] || "?", subio: delta, de: posAyer[uid], a: posHoy[uid] }; }
+          if (-delta > maxBaja) { maxBaja = -delta; desplomado = { nombre: nameById[uid] || "?", bajo: -delta, de: posAyer[uid], a: posHoy[uid] }; }
+        });
+      }
+    }
+
     return {
       jornada: jornadaLabel(matchDate),
       partidos, comodines, tabla_fecha,
       heroe_fecha, papelon_fecha,
+      heroe_racha, papelon_racha,
+      escalador, desplomado,
       tabla_general, lider: tabla_general[0] || null, colista,
       morosos, eliminados,
     };
