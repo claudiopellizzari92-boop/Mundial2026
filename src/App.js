@@ -3595,6 +3595,7 @@ function DebtorAdmin({ profiles, onRefresh }) {
   const [intervalSecs, setIntervalSecs] = useState(120);
   const [savingInterval, setSavingInterval] = useState(false);
   const [intervalSaved, setIntervalSaved] = useState(false);
+  const [secOpen, setSecOpen] = useState(false);
 
   useEffect(() => {
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "debtor_video_interval").single()
@@ -3653,9 +3654,9 @@ function DebtorAdmin({ profiles, onRefresh }) {
 
   return (
     <div className="admin-section">
-      <div className="admin-section-hdr" style={{ flexWrap: "wrap", gap: 8 }}>
-        <h3>💸 MOROSOS</h3>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+      <div className="admin-section-hdr" style={{ flexWrap: "wrap", gap: 8, cursor: "pointer" }} onClick={()=>setSecOpen(o=>!o)}>
+        <h3>💸 MOROSOS {secOpen?"▴":"▾"}</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }} onClick={e=>e.stopPropagation()}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>📺 Video cada</span>
           <input
             type="number" min="10" max="3600" value={intervalSecs}
@@ -3670,7 +3671,7 @@ function DebtorAdmin({ profiles, onRefresh }) {
           <span style={{ fontSize: 12, color: "var(--red)" }}>{debtors.length} en deuda</span>
         </div>
       </div>
-      <div className="admin-section-body">
+      {secOpen && <div className="admin-section-body">
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {profiles.map(prof => {
             const isDebtor = prof.is_debtor;
@@ -3742,7 +3743,7 @@ function DebtorAdmin({ profiles, onRefresh }) {
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -4306,15 +4307,15 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       </div>
 
       <div className="admin-section">
-        <div className="admin-section-hdr">
-          <h3>🏆 CLASIFICADOS DE GRUPOS</h3>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("clasificados")}>
+          <h3>🏆 CLASIFICADOS DE GRUPOS {openSec==="clasificados"?"▴":"▾"}</h3>
+          <div style={{display:"flex",gap:8,alignItems:"center"}} onClick={e=>e.stopPropagation()}>
             {groupResultsMsg && <span style={{fontSize:12,color:groupResultsMsg.type==="ok"?"var(--green)":"var(--red)"}}>{groupResultsMsg.text}</span>}
             <button className="btn-small" onClick={saveGroupResults} disabled={savingGroupResults}>{savingGroupResults?"...":"Guardar"}</button>
             <button className="btn-small" onClick={calculatePreTournamentPoints} disabled={calculatingPts} style={{background:"var(--green-dim)",borderColor:"var(--green)",color:"var(--green)"}}>{calculatingPts?"Calculando...":"🧮 Calcular puntos"}</button>
           </div>
         </div>
-        <div className="admin-section-body">
+        {openSec==="clasificados" && <div className="admin-section-body">
           <p style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Ingresa quién quedó 1ro y 2do de cada grupo. Para los <strong style={{color:"var(--gold)"}}>3eros clasificados</strong>: ingresa <strong style={{color:"var(--gold)"}}>solo los 8 mejores terceros</strong> que clasificaron a octavos — deja vacío los 4 que no clasificaron.</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
             {["A","B","C","D","E","F","G","H","I","J","K","L"].map(group => {
@@ -4336,7 +4337,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
               );
             })}
           </div>
-        </div>
+        </div>}
       </div>
 
       <div className="admin-section">
