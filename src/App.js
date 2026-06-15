@@ -1451,6 +1451,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
   const [ideas, setIdeas] = useState("");
+  const [usarReacciones, setUsarReacciones] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [publishingId, setPublishingId] = useState(null);
@@ -1681,7 +1682,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
         .filter(c => c.published && allDates.indexOf(c.match_date) > -1 && allDates.indexOf(c.match_date) < idxActual)
         .sort((a, b) => allDates.indexOf(b.match_date) - allDates.indexOf(a.match_date));
       let reacciones_previas = null;
-      if (previas.length) {
+      if (usarReacciones && previas.length) {
         const cronAnterior = previas[0];
         const { data: reacs } = await sb.from("chronicle_reactions").select("*").eq("chronicle_id", cronAnterior.id);
         if (reacs && reacs.length) {
@@ -1836,6 +1837,10 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
           <div>
             <label style={{fontSize:12,color:"var(--muted)",display:"block",marginBottom:6}}>💡 Ideas para esta crónica (opcional)</label>
             <textarea value={ideas} onChange={e=>setIdeas(e.target.value)} placeholder={'Ej: "Cargá fuerte al que falló el comodín", "es el cumple del Colo", "tono más picante"...'} rows={3} style={{width:"100%",padding:"10px 12px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt)",fontSize:14,resize:"vertical",fontFamily:"inherit"}}/>
+            <label style={{display:"flex",alignItems:"center",gap:8,marginTop:12,cursor:"pointer",fontSize:13,color:"var(--txt)"}}>
+              <input type="checkbox" checked={usarReacciones} onChange={e=>setUsarReacciones(e.target.checked)} style={{width:16,height:16,accentColor:"var(--gold)",cursor:"pointer"}}/>
+              <span>👍👎 Tomar en cuenta las reacciones del público a la crónica anterior</span>
+            </label>
           </div>
           {error && <div style={{padding:"10px 14px",background:"rgba(220,60,60,.12)",border:"1px solid rgba(220,60,60,.3)",borderRadius:10,fontSize:13,color:"#ff8080"}}>{error}</div>}
           <button onClick={()=>generar()} disabled={generating||!selectedDate} style={{padding:"12px 16px",background:generating?"var(--surface)":"var(--gold)",color:generating?"var(--muted)":"#1a1a1a",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:generating?"default":"pointer"}}>
