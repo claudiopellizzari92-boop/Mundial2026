@@ -1170,7 +1170,7 @@ function PuntosChart({ evolucion }) {
   function handleMove(e) {
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
-    const px = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W;
+    const px = Math.max(0, Math.min(W, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W));
     let best = 0, bestD = Infinity;
     evolucion.forEach((_, i) => { const d = Math.abs(xAt(i) - px); if (d < bestD) { bestD = d; best = i; } });
     setHover(best);
@@ -1183,7 +1183,7 @@ function PuntosChart({ evolucion }) {
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>Vos</span></div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--muted)", borderRadius: 2, opacity: .6 }} /><span style={{ color: "var(--muted)" }}>Promedio grupo</span></div>
       </div>
-      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H, touchAction: "none" }}
+      <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ width: "100%", height: H, touchAction: "none" }}
         onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
         onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
         <defs>
@@ -1231,7 +1231,7 @@ function PosicionChart({ misSnaps, totalJugadores }) {
 
   function handleMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const px = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W;
+    const px = Math.max(0, Math.min(W, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width * W));
     let best = 0, bestD = Infinity;
     misSnaps.forEach((_, i) => { const d = Math.abs(xAt(i) - px); if (d < bestD) { bestD = d; best = i; } });
     setHover(best);
@@ -1240,7 +1240,7 @@ function PosicionChart({ misSnaps, totalJugadores }) {
   return (
     <div style={{ background: "var(--surface)", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
       <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>🏆 Tu posición en el tiempo</div>
-      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: H, touchAction: "none" }}
+      <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ width: "100%", height: H, touchAction: "none" }}
         onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
         onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
         <defs>
