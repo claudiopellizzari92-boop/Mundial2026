@@ -1183,7 +1183,7 @@ function PuntosChart({ evolucion }) {
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--gold)", borderRadius: 2 }} /><span style={{ color: "var(--muted)" }}>Vos</span></div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}><div style={{ width: 16, height: 3, background: "var(--muted)", borderRadius: 2, opacity: .6 }} /><span style={{ color: "var(--muted)" }}>Promedio grupo</span></div>
       </div>
-      <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ width: "100%", height: H, touchAction: "none" }}
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto", display: "block", touchAction: "none" }}
         onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
         onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
         <defs>
@@ -1246,7 +1246,7 @@ function PosicionChart({ misSnaps, totalJugadores }) {
         <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>🏆 Tu posición en el tiempo</div>
         <div style={{ fontSize: 10, color: "var(--gold)", background: "var(--gold-dim)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>Mejor: {mejorPos}º</div>
       </div>
-      <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ width: "100%", height: H, touchAction: "none" }}
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto", display: "block", touchAction: "none" }}
         onMouseMove={handleMove} onMouseLeave={() => setHover(null)}
         onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={() => setHover(null)}>
         <defs>
