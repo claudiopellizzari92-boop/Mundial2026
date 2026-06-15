@@ -1718,7 +1718,18 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   async function publicar(matchDate) {
     setPublishingId(matchDate);
     await sb.from("chronicles").update({ published: true, updated_at: new Date().toISOString() }).eq("match_date", matchDate);
-    sendPushNotification("all", null, { title: "📰 Nueva crónica disponible", body: `Ya podés leer la crónica de ${jornadaLabel(matchDate)} en la pestaña Crónica 📰`, tag: `cronica-${matchDate}`, url: "/" });
+    // Teaser para el push: usa el título real de la crónica como gancho + un arranque que varía
+    const cronPub = chronicles.find(c => c.match_date === matchDate);
+    const titulo = cronPub?.titulo || `Crónica de ${jornadaLabel(matchDate)}`;
+    const ganchos = [
+      "📰 ¡Salió la crónica! 👀",
+      "🔥 La crónica de la fecha ya está",
+      "✍️ El Cronista habló 👀",
+      "📰 Nueva crónica caliente",
+      "🍿 Salió la crónica, agarrá los pochoclos",
+    ];
+    const gancho = ganchos[Math.floor(Math.random() * ganchos.length)];
+    sendPushNotification("all", null, { title: gancho, body: `"${titulo}" — leela en la pestaña Crónica antes de que te la spoileen 😏`, tag: `cronica-${matchDate}`, url: "/" });
     await loadChronicles();
     setPublishingId(null);
   }
