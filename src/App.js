@@ -4341,40 +4341,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         </div>}
       </div>
 
-      <div className="admin-section">
-        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("puntos")}><h3>⚙️ SISTEMA DE PUNTOS {openSec==="puntos"?"▴":"▾"}</h3><button className="btn-small" onClick={(e)=>{e.stopPropagation();saveRules();}} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button></div>
-        {openSec==="puntos" && <div className="admin-section-body">
-          <div className="rules-grid">
-            {rules.map(r=>(
-              <div key={r.rule_key} className="rule-card">
-                <span className="rule-label">{r.description || ruleLabels[r.rule_key] || r.rule_key}</span>
-                <input className="rule-input" value={ruleVals[r.rule_key]??r.rule_value} onChange={e=>setRuleVals(v=>({...v,[r.rule_key]:e.target.value}))}/>
-              </div>
-            ))}
-          </div>
-        </div>}
-      </div>
-
-      <div className="admin-section">
-        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("codigos")}><h3>🔗 CÓDIGOS DE INVITACIÓN {openSec==="codigos"?"▴":"▾"}</h3></div>
-        {openSec==="codigos" && <div className="admin-section-body">
-          <div className="invite-list">
-            {invites.map(inv=>(
-              <div key={inv.code} className="invite-row">
-                <span className="invite-code">{inv.code}</span>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <span className={`invite-status ${inv.active?"active":"inactive"}`}>{inv.active?"Activo":"Inactivo"}</span>
-                  <button className={`btn-small ${inv.active?"red":""}`} onClick={()=>toggleInvite(inv.code,inv.active)}>{inv.active?"Desactivar":"Activar"}</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="new-invite-row">
-            <input className="new-invite-input" value={newCode} onChange={e=>setNewCode(e.target.value)} placeholder="Nuevo código..." onKeyDown={e=>e.key==="Enter"&&addInvite()}/>
-            <button className="btn-small" onClick={addInvite}>Agregar</button>
-          </div>
-        </div>}
-      </div>
+      <CronistaPerfilesAdmin profiles={profiles} onRefresh={onRefresh} />
 
       <div className="admin-section">
         <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("usuarios")}><h3>👥 GESTIÓN DE USUARIOS {openSec==="usuarios"?"▴":"▾"}</h3><span style={{fontSize:12,color:"var(--muted)"}}>{profiles.length} participantes</span></div>
@@ -4436,10 +4403,45 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         </div>}
       </div>
 
-      {/* ── Títulos ── */}
+      <div className="admin-section">
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("puntos")}><h3>⚙️ SISTEMA DE PUNTOS {openSec==="puntos"?"▴":"▾"}</h3><button className="btn-small" onClick={(e)=>{e.stopPropagation();saveRules();}} disabled={savingRules}>{rulesSaved?"✓ Guardado":savingRules?"...":"Guardar"}</button></div>
+        {openSec==="puntos" && <div className="admin-section-body">
+          <div className="rules-grid">
+            {rules.map(r=>(
+              <div key={r.rule_key} className="rule-card">
+                <span className="rule-label">{r.description || ruleLabels[r.rule_key] || r.rule_key}</span>
+                <input className="rule-input" value={ruleVals[r.rule_key]??r.rule_value} onChange={e=>setRuleVals(v=>({...v,[r.rule_key]:e.target.value}))}/>
+              </div>
+            ))}
+          </div>
+        </div>}
+      </div>
+
       <TitlesAdmin profiles={profiles} onRefresh={onRefresh} />
+
       <DebtorAdmin profiles={profiles} onRefresh={onRefresh} />
-      <CronistaPerfilesAdmin profiles={profiles} onRefresh={onRefresh} />
+
+      <div className="admin-section">
+        <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("codigos")}><h3>🔗 CÓDIGOS DE INVITACIÓN {openSec==="codigos"?"▴":"▾"}</h3></div>
+        {openSec==="codigos" && <div className="admin-section-body">
+          <div className="invite-list">
+            {invites.map(inv=>(
+              <div key={inv.code} className="invite-row">
+                <span className="invite-code">{inv.code}</span>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span className={`invite-status ${inv.active?"active":"inactive"}`}>{inv.active?"Activo":"Inactivo"}</span>
+                  <button className={`btn-small ${inv.active?"red":""}`} onClick={()=>toggleInvite(inv.code,inv.active)}>{inv.active?"Desactivar":"Activar"}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="new-invite-row">
+            <input className="new-invite-input" value={newCode} onChange={e=>setNewCode(e.target.value)} placeholder="Nuevo código..." onKeyDown={e=>e.key==="Enter"&&addInvite()}/>
+            <button className="btn-small" onClick={addInvite}>Agregar</button>
+          </div>
+        </div>}
+      </div>
+
 
     </div>
   );
