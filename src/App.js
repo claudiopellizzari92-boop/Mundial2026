@@ -1653,6 +1653,11 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
       }
     }
 
+    // Perfiles secretos de los jugadores (munición para el Cronista)
+    const perfiles_jugadores = profiles
+      .filter(p => (p.cronista_perfil || "").trim().length > 0)
+      .map(p => ({ nombre: p.name, perfil: p.cronista_perfil.trim() }));
+
     return {
       jornada: jornadaLabel(matchDate),
       partidos, comodines, tabla_fecha,
@@ -1661,6 +1666,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
       escalador, desplomado,
       tabla_general, lider: tabla_general[0] || null, colista,
       morosos, eliminados,
+      perfiles_jugadores,
     };
   }
 
@@ -3744,6 +3750,73 @@ function DebtorAdmin({ profiles, onRefresh }) {
 // ── Titles Admin ─────────────────────────────────────────────────────────────
 const TOURNAMENTS = ["Qatar 2022", "Copa América & Euro 2024", "Champions 2024", "Mundial de Clubes 2025", "Primer Campeón"];
 
+function CronistaPerfilesAdmin({ profiles, onRefresh }) {
+  const [drafts, setDrafts] = useState(() => {
+    const d = {};
+    profiles.forEach(p => { d[p.id] = p.cronista_perfil || ""; });
+    return d;
+  });
+  const [savingId, setSavingId] = useState(null);
+  const [savedId, setSavedId] = useState(null);
+  const [openId, setOpenId] = useState(null);
+
+  async function savePerfil(userId) {
+    setSavingId(userId);
+    await sb.from("profiles").update({ cronista_perfil: drafts[userId] || null }).eq("id", userId);
+    setSavingId(null);
+    setSavedId(userId);
+    setTimeout(() => setSavedId(null), 1500);
+    onRefresh && onRefresh();
+  }
+
+  return (
+    <div className="admin-section" style={{marginTop:20}}>
+      <div className="admin-section-hdr"><h3>🎭 PERFILES DEL CRONISTA</h3><span style={{fontSize:12,color:"var(--muted)"}}>munición secreta</span></div>
+      <div className="admin-section-body">
+        <div style={{fontSize:12,color:"var(--muted)",marginBottom:12,lineHeight:1.5}}>
+          Datos jugosos de cada jugador para que el Cronista los cargue con onda (apodo, equipo, laburo, personalidad, anécdotas, rivalidades). <strong>No se muestran en la app</strong>, son solo para las crónicas. Cuanto más específico, más filosa la cargada.
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {profiles.map(prof => {
+            const isOpen = openId === prof.id;
+            const tienePerfil = (prof.cronista_perfil || "").trim().length > 0;
+            return (
+              <div key={prof.id} style={{background:"var(--surface)",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden"}}>
+                <div onClick={()=>setOpenId(isOpen?null:prof.id)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <Avatar profile={prof} size="sm" />
+                    <span style={{fontSize:14,fontWeight:500}}>{prof.name}</span>
+                    {tienePerfil
+                      ? <span style={{fontSize:10,padding:"1px 7px",borderRadius:20,background:"var(--green-dim)",color:"var(--green)"}}>✓ perfil</span>
+                      : <span style={{fontSize:10,padding:"1px 7px",borderRadius:20,background:"var(--border)",color:"var(--muted)"}}>sin perfil</span>}
+                  </div>
+                  <span style={{color:"var(--muted)",fontSize:13}}>{isOpen?"▴":"▾"}</span>
+                </div>
+                {isOpen && (
+                  <div style={{padding:"0 14px 12px"}}>
+                    <textarea
+                      value={drafts[prof.id] || ""}
+                      onChange={e=>setDrafts(d=>({...d,[prof.id]:e.target.value}))}
+                      placeholder={'Ej: Le dicen "El Bocina". Taxista, fanático de Boca. Se la pasa explicando fútbol pero nunca acierta. Agrandado. Rival del Hipster.'}
+                      rows={4}
+                      style={{width:"100%",padding:"10px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--txt)",fontSize:13,resize:"vertical",fontFamily:"inherit",outline:"none",marginBottom:8}}
+                    />
+                    <div style={{display:"flex",justifyContent:"flex-end"}}>
+                      <button className="btn-small" onClick={()=>savePerfil(prof.id)} disabled={savingId===prof.id}>
+                        {savingId===prof.id?"...":savedId===prof.id?"✓ Guardado":"Guardar perfil"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TitlesAdmin({ profiles, onRefresh }) {
   const [selectedUser, setSelectedUser] = useState("");
   const [tournament, setTournament] = useState(TOURNAMENTS[0]);
@@ -4361,6 +4434,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       {/* ── Títulos ── */}
       <TitlesAdmin profiles={profiles} onRefresh={onRefresh} />
       <DebtorAdmin profiles={profiles} onRefresh={onRefresh} />
+      <CronistaPerfilesAdmin profiles={profiles} onRefresh={onRefresh} />
 
     </div>
   );
