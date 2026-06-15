@@ -1158,7 +1158,7 @@ function AchievementsSection({ userId, achievements: unlocked, equippedBadge, on
 // ── Gráfico de puntos por fecha (interactivo) ──
 function PuntosChart({ evolucion }) {
   const [hover, setHover] = useState(null);
-  const W = 340, H = 160, padL = 26, padR = 14, padT = 16, padB = 26;
+  const W = 340, H = 160, padL = 26, padR = 24, padT = 16, padB = 26;
   const maxY = Math.max(...evolucion.map(e => Math.max(e.mios, e.promedio)), 1);
   const xAt = i => padL + (i / Math.max(evolucion.length - 1, 1)) * (W - padL - padR);
   const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
@@ -1195,6 +1195,7 @@ function PuntosChart({ evolucion }) {
             <feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
+        <rect x="0" y="0" width={W} height={H} fill="transparent" />
         {gridY.map((v, i) => <line key={i} x1={padL} y1={yAt(v)} x2={W - padR} y2={yAt(v)} stroke="var(--border)" strokeWidth="1" opacity="0.5" />)}
         {gridY.map((v, i) => <text key={"gy" + i} x={padL - 6} y={yAt(v) + 3} textAnchor="end" fontSize="9" fill="var(--muted)">{Math.round(v)}</text>)}
         <path d={areaMios} fill="url(#gradPuntos)" />
@@ -1219,7 +1220,7 @@ function PuntosChart({ evolucion }) {
 // ── Gráfico de posición en el tiempo (interactivo) ──
 function PosicionChart({ misSnaps, totalJugadores }) {
   const [hover, setHover] = useState(null);
-  const W = 340, H = 160, padL = 26, padR = 14, padT = 18, padB = 26;
+  const W = 340, H = 160, padL = 26, padR = 24, padT = 18, padB = 26;
   const xAt = i => padL + (i / Math.max(misSnaps.length - 1, 1)) * (W - padL - padR);
   const yAt = pos => padT + ((pos - 1) / Math.max(totalJugadores - 1, 1)) * (H - padT - padB);
   const linePos = misSnaps.map((sn, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(sn.position)}`).join(" ");
@@ -1246,6 +1247,7 @@ function PosicionChart({ misSnaps, totalJugadores }) {
             <feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
+        <rect x="0" y="0" width={W} height={H} fill="transparent" />
         <line x1={padL} y1={yAt(1)} x2={W - padR} y2={yAt(1)} stroke="var(--gold)" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
         <text x={W - padR} y={yAt(1) - 4} textAnchor="end" fontSize="8.5" fill="var(--gold)" opacity="0.7">1º</text>
         {hover !== null && <line x1={xAt(hover)} y1={padT} x2={xAt(hover)} y2={H - padB} stroke="var(--blue)" strokeWidth="1" opacity="0.4" strokeDasharray="3 3" />}
