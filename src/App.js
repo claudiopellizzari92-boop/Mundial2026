@@ -2863,7 +2863,7 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
-function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, allAchievements }) {
+function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, allAchievements, autoOpenUserId, onAutoOpened }) {
   const [prePreds, setPrePreds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [historyUser, setHistoryUser] = useState(null);
