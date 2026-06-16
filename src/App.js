@@ -2878,6 +2878,8 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
   const [userAchievements, setUserAchievements] = useState({});
   const [h2hUser, setH2hUser] = useState(null);
   const [showH2hPicker, setShowH2hPicker] = useState(false);
+  const [showAllAchs, setShowAllAchs] = useState(false);
+  const [showPerfil, setShowPerfil] = useState(false);
   const [h2hMatchData, setH2hMatchData] = useState([]);
   const [loadingH2h, setLoadingH2h] = useState(false);
 
@@ -2906,6 +2908,14 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
     setUserAchievements(byUser);
     setLoadingSnaps(false);
   }
+
+  useEffect(() => {
+    if (autoOpenUserId) {
+      const prof = profiles.find(p => p.id === autoOpenUserId);
+      if (prof) openHistory(prof);
+      onAutoOpened && onAutoOpened();
+    }
+  }, [autoOpenUserId]);
 
   async function openH2h(opponent) {
     setShowH2hPicker(false);
@@ -3157,20 +3167,27 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
             </div>
           )}
 
-          {/* Logros desbloqueados */}
+          {/* Logros desbloqueados (colapsable a 1 fila) */}
           {unlockedAchs.length > 0 && (
             <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>
-                🏅 Logros ({unlockedAchs.length}/{ACHIEVEMENTS.length})
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .5 }}>
+                  🏅 Logros ({unlockedAchs.length}/{ACHIEVEMENTS.length})
+                </div>
+                {unlockedAchs.length > 3 && (
+                  <button onClick={() => setShowAllAchs(v => !v)} style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11, cursor: "pointer", padding: 0 }}>
+                    {showAllAchs ? "Ver menos ▴" : "Ver todos ▾"}
+                  </button>
+                )}
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {unlockedAchs.map(a => {
+              <div style={{ display: "flex", flexWrap: showAllAchs ? "wrap" : "nowrap", gap: 6, overflow: showAllAchs ? "visible" : "hidden" }}>
+                {(showAllAchs ? unlockedAchs : unlockedAchs.slice(0, 3)).map(a => {
                   const tier = TIER_COLORS[a.tier];
                   const isEquipped = prof.equipped_badge === a.key;
                   return (
                     <div key={a.key} title={a.name + " — " + a.desc} style={{
                       display: "flex", alignItems: "center", gap: 4,
-                      padding: "3px 8px", borderRadius: 20,
+                      padding: "3px 8px", borderRadius: 20, flexShrink: 0,
                       background: tier.bg, border: `1px solid ${tier.border}`,
                       fontSize: 12, color: tier.color,
                       boxShadow: isEquipped ? `0 0 8px ${tier.border}` : "none",
@@ -3181,7 +3198,23 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                     </div>
                   );
                 })}
+                {!showAllAchs && unlockedAchs.length > 3 && (
+                  <div onClick={() => setShowAllAchs(true)} style={{ display: "flex", alignItems: "center", padding: "3px 8px", borderRadius: 20, background: "var(--card)", border: "1px solid var(--border)", fontSize: 10, color: "var(--muted)", flexShrink: 0, cursor: "pointer" }}>+{unlockedAchs.length - 3}</div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* Perfil del participante (cronista_perfil, visible para todos) */}
+          {(prof.cronista_perfil || "").trim().length > 0 && (
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, border: "1px solid rgba(139,92,246,.25)" }}>
+              <button onClick={() => setShowPerfil(v => !v)} style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, color: "#a78bfa", textTransform: "uppercase", letterSpacing: .5, fontWeight: 600 }}>🎭 Perfil del participante</span>
+                <span style={{ color: "#a78bfa", fontSize: 13 }}>{showPerfil ? "▴" : "▾"}</span>
+              </button>
+              {showPerfil && (
+                <div style={{ fontSize: 13, color: "var(--txt)", lineHeight: 1.55, marginTop: 10, whiteSpace: "pre-wrap" }}>{prof.cronista_perfil}</div>
+              )}
             </div>
           )}
 
@@ -4785,6 +4818,8 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileToOpen, setProfileToOpen] = useState(null);
+  function openMyProfile() { setProfileToOpen(user.id); goTab("standings"); }
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
   const [notifDebug, setNotifDebug] = useState("");
@@ -5144,7 +5179,9 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
-          <Avatar profile={user.profile} />
+          <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
+            <Avatar profile={user.profile} />
+          </div>
           <span style={{fontSize:13}} className="desktop-only">{user.profile?.name||user.email}</span>
           <button className="theme-toggle desktop-only" onClick={toggleTheme} title={darkMode ? "Modo claro" : "Modo oscuro"}>{darkMode ? "☀️" : "🌙"}</button>
           <button className="btn-logout desktop-only" onClick={handleLogout}>Salir</button>
@@ -5186,7 +5223,7 @@ export default function App() {
         {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements}/>}
+        {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements} autoOpenUserId={profileToOpen} onAutoOpened={()=>setProfileToOpen(null)}/>}
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
