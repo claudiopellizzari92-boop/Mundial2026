@@ -2515,9 +2515,12 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
                   <span style={{textAlign:"right"}}>{m.home}</span>
                   <img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2,flexShrink:0}}/>
                 </div>
-                {mp
-                  ? <span style={{fontFamily:"Bebas Neue",fontSize:18,color:"var(--gold)",minWidth:54,textAlign:"center"}}>{mp.home_score}–{mp.away_score}</span>
-                  : <span style={{fontSize:11,color:"var(--red)",minWidth:54,textAlign:"center"}}>sin cargar</span>}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
+                  {mp
+                    ? <span style={{fontFamily:"Bebas Neue",fontSize:18,color:"var(--gold)",textAlign:"center"}}>{mp.home_score}–{mp.away_score}</span>
+                    : <span style={{fontSize:11,color:"var(--red)",textAlign:"center"}}>sin cargar</span>}
+                  <span style={{fontSize:10,color:"var(--muted)",marginTop:2}}>🕐 {localTime(m.kickoff_at)}</span>
+                </div>
                 <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"flex-start",gap:6,fontSize:13,color:"var(--txt)"}}>
                   <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2,flexShrink:0}}/>
                   <span style={{textAlign:"left"}}>{m.away}</span>
