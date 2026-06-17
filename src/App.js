@@ -2738,10 +2738,11 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         <div className="pre-tabs" style={{marginBottom:16}}>
           <button className={`pre-tab ${matchSub==="porcargar"?"active":""}`} onClick={()=>setMatchSub("porcargar")}>⚽ Por cargar {porCargar.length>0?`(${porCargar.length})`:""}</button>
           <button className={`pre-tab ${matchSub==="cargados"?"active":""}`} onClick={()=>setMatchSub("cargados")}>🔒 Cargados {cargados.length>0?`(${cargados.length})`:""}</button>
+          <button className={`pre-tab ${matchSub==="puntos"?"active":""}`} onClick={()=>setMatchSub("puntos")}>🏆 Tus puntos</button>
         </div>
       );
     })()}
-    <div className="matches-grid">
+    {matchSub!=="puntos" && <div className="matches-grid">
       {matches
         .filter(m => matchSub==="cargados"
           ? isLocked(m.kickoff_at, matches, m.match_date)
@@ -2872,8 +2873,75 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
           {matchSub==="cargados" ? "Todavía no empezó ningún partido." : "¡No te queda nada por cargar! 🎉"}
         </div>
       )}
-    </div>
+    </div>}
+    {matchSub==="puntos" && <TusPuntosView matches={matches} predictions={predictions} userId={user.id} wildcards={wildcards} />}
   </>);
+}
+
+
+// ── Vista "Tus puntos": partidos finalizados con los puntos del usuario ──
+function TusPuntosView({ matches, predictions, userId, wildcards }) {
+  const finished = matches
+    .filter(m => m.status === "finished" && m.home_score != null && m.away_score != null)
+    .sort((a, b) => new Date(b.kickoff_at) - new Date(a.kickoff_at));
+
+  const rows = finished.map(m => {
+    const pred = predictions.find(p => p.user_id === userId && p.match_id === m.id);
+    const wc = wildcards.find(w => w.match_id === m.id);
+    return { m, pred, wc };
+  });
+
+  const totalPts = rows.reduce((s, r) => s + (r.pred?.points || 0), 0);
+
+  if (finished.length === 0) {
+    return <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--muted)", fontSize: 13 }}>Todavía no hay partidos finalizados.</div>;
+  }
+
+  // Agrupar por fecha
+  let lastDay = null;
+
+  return (
+    <div className="matches-grid">
+      <div style={{ background: "linear-gradient(90deg, rgba(245,197,24,.12), rgba(245,197,24,.02))", border: "1px solid rgba(245,197,24,.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, color: "var(--muted)" }}>Total acumulado en partidos jugados</span>
+        <span style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)" }}>{totalPts} pts</span>
+      </div>
+      {rows.map((r, idx) => {
+        const { m, pred, wc } = r;
+        const dayKey = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+        const showHeader = dayKey !== lastDay;
+        lastDay = dayKey;
+        const pts = pred?.points || 0;
+        const outcome = pred ? predOutcome(pred, m) : null;
+        const color = outcome === "exact" ? "var(--gold)" : outcome === "winner" ? "var(--green)" : outcome === "goals" ? "var(--blue)" : "var(--muted)";
+        const label = !pred ? "Sin predicción" : outcome === "exact" ? "¡Exacto!" : outcome === "winner" ? "Ganador" : outcome === "goals" ? "Goles" : "Sin acierto";
+        return (
+          <React.Fragment key={m.id}>
+            {showHeader && <div style={{ display: "flex", alignItems: "center", gap: 8, margin: idx === 0 ? "0 0 10px" : "18px 0 10px" }}><span style={{ fontSize: 12 }}>📅</span><span style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--gold)", letterSpacing: 1 }}>{m.match_date}</span></div>}
+            <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderLeft: `3px solid ${color}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600 }}>
+                    <span>{m.home_flag} {m.home}</span>
+                    <span style={{ color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 17 }}>{m.home_score}-{m.away_score}</span>
+                    <span>{m.away} {m.away_flag}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                    {pred ? <>Tu pronóstico: <strong style={{ color: "var(--txt)" }}>{pred.home_score}-{pred.away_score}</strong></> : <span style={{ color: "var(--red)" }}>No cargaste pronóstico</span>}
+                    {wc && <span style={{ marginLeft: 8, color: "var(--gold)" }}>🃏 Comodín</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "center", flexShrink: 0, minWidth: 64 }}>
+                  <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color, lineHeight: 1 }}>{pts > 0 ? "+" + pts : pts}</div>
+                  <div style={{ fontSize: 10, color, marginTop: 2 }}>{label}</div>
+                </div>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Standings ────────────────────────────────────────────────────────────────
