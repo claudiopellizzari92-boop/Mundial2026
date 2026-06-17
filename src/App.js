@@ -2557,6 +2557,8 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
     .filter(p => p.match && p.match.home_score !== null && p.match.home_score !== undefined && p.match.away_score !== null && p.match.away_score !== undefined);
   const exact = played.filter(p => isExactPred(p, p.match));
   const correct = played.filter(p => isCorrectSign(p, p.match));
+  const goles = played.filter(p => predOutcome(p, p.match) === "goals");
+  const pctGoles = played.length > 0 ? Math.round(goles.length / played.length * 100) : 0;
   const pctExact = played.length > 0 ? Math.round(exact.length / played.length * 100) : 0;
   const pctCorrect = played.length > 0 ? Math.round(correct.length / played.length * 100) : 0;
 
@@ -2690,9 +2692,9 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
           <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
         </div>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
-          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Racha actual</div>
-          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:racha>0?"var(--green)":"var(--muted)"}}>{racha} <span style={{fontSize:14,color:"var(--muted)"}}>partido{racha!==1?"s":""}</span></div>
-          <div style={{fontSize:11,color:"var(--muted)"}}>{racha>0?"✓ consecutivos acertados":"Sin racha activa"}</div>
+          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Goles exactos</div>
+          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--blue)"}}>{goles.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctGoles}%)</span></div>
+          <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
         </div>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
           <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Mejor jornada</div>
