@@ -2611,7 +2611,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
 }
 
 // ── Matches ──────────────────────────────────────────────────────────────────
-function Matches({ user, matches, predictions, onSave, profiles }) {
+function Matches({ user, matches, predictions, allPredictions, onSave, profiles }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
@@ -2874,13 +2874,13 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
         </div>
       )}
     </div>}
-    {matchSub==="puntos" && <TusPuntosView matches={matches} predictions={predictions} userId={user.id} wildcards={wildcards} />}
+    {matchSub==="puntos" && <TusPuntosView matches={matches} predictions={predictions} allPredictions={allPredictions} profiles={profiles} userId={user.id} wildcards={wildcards} />}
   </>);
 }
 
 
 // ── Vista "Tus puntos": partidos finalizados con los puntos del usuario ──
-function TusPuntosView({ matches, predictions, userId, wildcards }) {
+function TusPuntosView({ matches, predictions, allPredictions, profiles, userId, wildcards }) {
   const finished = matches
     .filter(m => m.status === "finished" && m.home_score != null && m.away_score != null)
     .sort((a, b) => new Date(b.kickoff_at) - new Date(a.kickoff_at));
@@ -2893,6 +2893,25 @@ function TusPuntosView({ matches, predictions, userId, wildcards }) {
 
   const totalPts = rows.reduce((s, r) => s + (r.pred?.points || 0), 0);
 
+  // Posición en la tabla (por puntos totales de partidos)
+  const allP = allPredictions || [];
+  const ptsByUser = {};
+  allP.forEach(p => { ptsByUser[p.user_id] = (ptsByUser[p.user_id] || 0) + (p.points || 0); });
+  const ranking = Object.entries(ptsByUser).sort((a, b) => b[1] - a[1]);
+  const miPos = ranking.findIndex(([uid]) => uid === userId) + 1;
+  const totalJug = (profiles || []).length || ranking.length;
+
+  // Resumen de aciertos
+  let nExact = 0, nWinner = 0, nGoals = 0, nFail = 0;
+  rows.forEach(r => {
+    if (!r.pred) return;
+    const o = predOutcome(r.pred, r.m);
+    if (o === "exact") nExact++;
+    else if (o === "winner") nWinner++;
+    else if (o === "goals") nGoals++;
+    else nFail++;
+  });
+
   if (finished.length === 0) {
     return <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--muted)", fontSize: 13 }}>Todavía no hay partidos finalizados.</div>;
   }
@@ -2902,9 +2921,20 @@ function TusPuntosView({ matches, predictions, userId, wildcards }) {
 
   return (
     <div className="matches-grid">
-      <div style={{ background: "linear-gradient(90deg, rgba(245,197,24,.12), rgba(245,197,24,.02))", border: "1px solid rgba(245,197,24,.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>Total acumulado en partidos jugados</span>
-        <span style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)" }}>{totalPts} pts</span>
+      <div style={{ background: "linear-gradient(90deg, rgba(245,197,24,.12), rgba(245,197,24,.02))", border: "1px solid rgba(245,197,24,.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>Total en partidos jugados</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            {miPos > 0 && <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: "var(--txt)" }}>#{miPos}<span style={{ fontSize: 12, color: "var(--muted)" }}> de {totalJug}</span></span>}
+            <span style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)" }}>{totalPts} pts</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 14, marginTop: 8, fontSize: 12, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--gold)" }}>⭐ {nExact} exactos</span>
+          <span style={{ color: "var(--green)" }}>✓ {nWinner} ganador</span>
+          <span style={{ color: "var(--blue)" }}>◐ {nGoals} goles</span>
+          <span style={{ color: "var(--muted)" }}>✗ {nFail} fallos</span>
+        </div>
       </div>
       {rows.map((r, idx) => {
         const { m, pred, wc } = r;
@@ -4871,14 +4901,14 @@ function PredReminderPopup({ reminder, onGo, onClose }) {
   );
 }
 
-function PrediccionesTab({ user, matches, myPredictions, profiles, onSave }) {
+function PrediccionesTab({ user, matches, myPredictions, allPredictions, profiles, onSave }) {
   const [subTab, setSubTab] = useState("matches");
   return (<>
     <div className="pre-tabs" style={{marginBottom:20}}>
       <button className={`pre-tab ${subTab==="matches"?"active":""}`} onClick={()=>setSubTab("matches")}>⚽ Partidos</button>
       <button className={`pre-tab ${subTab==="pre"?"active":""}`} onClick={()=>setSubTab("pre")}>📋 Pre-Torneo</button>
     </div>
-    {subTab==="matches" && <Matches user={user} matches={matches} predictions={myPredictions} onSave={onSave} profiles={profiles}/>}
+    {subTab==="matches" && <Matches user={user} matches={matches} predictions={myPredictions} allPredictions={allPredictions} onSave={onSave} profiles={profiles}/>}
     {subTab==="pre"     && <PreTournament user={user}/>}
   </>);
 }
@@ -5347,7 +5377,7 @@ export default function App() {
       <main className="main">
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
         {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/>}
-        {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} profiles={profiles} onSave={loadData}/>}
+        {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements} autoOpenUserId={profileToOpen} onAutoOpened={()=>setProfileToOpen(null)}/>}
