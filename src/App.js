@@ -2962,25 +2962,6 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
   const prevPosByUser = {};
   if (prevSnapDate) (snapshots || []).forEach(s => { if (s.snapshot_date === prevSnapDate) prevPosByUser[s.user_id] = s.position; });
 
-  // Racha: fechas finalizadas en orden, para ver si viene acertando seguido
-  const finishedDatesOrd = [...new Set((matches || []).filter(m => m.status === "finished").map(m => m.match_date))]
-    .sort((a, b) => {
-      const ka = Math.min(...(matches || []).filter(m => m.match_date === a).map(m => new Date(m.kickoff_at).getTime()));
-      const kb = Math.min(...(matches || []).filter(m => m.match_date === b).map(m => new Date(m.kickoff_at).getTime()));
-      return ka - kb;
-    });
-  function rachaDe(userId) {
-    let streak = 0;
-    for (let i = finishedDatesOrd.length - 1; i >= 0; i--) {
-      const ids = (matches || []).filter(m => m.match_date === finishedDatesOrd[i] && m.status === "finished").map(m => m.id);
-      const preds = predictions.filter(pr => pr.user_id === userId && ids.includes(pr.match_id));
-      if (!preds.length) continue;
-      const acerto = preds.some(pr => (pr.points || 0) > 0);
-      if (acerto) streak++; else break;
-    }
-    return streak;
-  }
-
   let rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
     const matchPts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
@@ -2996,7 +2977,7 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       else if (o === "winner") winner++;
       else if (o === "goals") goals++;
     }
-    return { ...p, pts, exact, winner, goals, played, racha: rachaDe(p.id) };
+    return { ...p, pts, exact, winner, goals, played };
   }).sort((a, b) => b.pts - a.pts || b.exact - a.exact);
 
   // Posición "real" por puntos (para movimiento y dif con líder), ANTES de reordenar por columna
@@ -3400,9 +3381,6 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
               </td>
               <td className="sticky2">
                 <div className="user-cell">
-                  {row.racha >= 2
-                    ? <span title={row.racha + " fechas seguidas acertando"} style={{ fontSize: 11, color: "#ff8c42", fontWeight: 700, minWidth: 22, textAlign: "center", flexShrink: 0 }}>🔥{row.racha}</span>
-                    : <span style={{ minWidth: 22, flexShrink: 0 }} />}
                   <Avatar profile={row} size="sm" />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
