@@ -3387,12 +3387,10 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer", background: row.id === user.id ? "rgba(245,197,24,.07)" : (row.posReal <= 3 && sortBy === "pts" ? "rgba(245,197,24,.025)" : "transparent"), boxShadow: row.id === user.id ? "inset 3px 0 0 var(--gold)" : "none" }}>
+            <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer", background: row.id === user.id ? "rgba(245,197,24,.07)" : (sortBy === "pts" && row.posReal === 1 ? "linear-gradient(90deg, rgba(245,197,24,.16), rgba(245,197,24,.02))" : sortBy === "pts" && row.posReal === 2 ? "linear-gradient(90deg, rgba(176,188,208,.16), rgba(176,188,208,.02))" : sortBy === "pts" && row.posReal === 3 ? "linear-gradient(90deg, rgba(205,127,50,.16), rgba(205,127,50,.02))" : "transparent"), boxShadow: row.id === user.id ? "inset 3px 0 0 var(--gold)" : "none" }}>
               <td className="sticky">
                 <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  {sortBy === "pts" && row.posReal <= 3
-                    ? <span style={{ fontSize: 17 }}>{row.posReal === 1 ? "🥇" : row.posReal === 2 ? "🥈" : "🥉"}</span>
-                    : <span className={"rank-num rank-" + row.posReal}>{row.posReal}</span>}
+                  <span className={"rank-num rank-" + row.posReal}>{row.posReal}</span>
                   {sortBy === "pts" && row.mov !== 0 && (
                     <span style={{ fontSize: 9, fontWeight: 700, color: row.mov > 0 ? "var(--green)" : "var(--red)", lineHeight: 1 }}>
                       {row.mov > 0 ? "▲" : "▼"}{Math.abs(row.mov)}
@@ -3402,13 +3400,15 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
               </td>
               <td className="sticky2">
                 <div className="user-cell">
+                  {row.racha >= 2
+                    ? <span title={row.racha + " fechas seguidas acertando"} style={{ fontSize: 11, color: "#ff8c42", fontWeight: 700, minWidth: 22, textAlign: "center", flexShrink: 0 }}>🔥{row.racha}</span>
+                    : <span style={{ minWidth: 22, flexShrink: 0 }} />}
                   <Avatar profile={row} size="sm" />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                       <ChampionName profile={row} name={row.name} style={row.is_eliminated ? {textDecoration:"line-through",opacity:.5} : {}} />
                       <TitleBadges profile={row} size={13} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
-                      {row.racha >= 2 && <span title={row.racha + " fechas seguidas acertando"} style={{ fontSize: 11, color: "#ff8c42" }}>🔥{row.racha}</span>}
                       {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
                     {row.is_eliminated && (
