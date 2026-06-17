@@ -2625,17 +2625,28 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {nextDayMatches.map(m => {
             const mp = myPreds.find(p => p.match_id === m.id);
+            const finished = m.home_score != null && m.away_score != null;
+            const pts = mp?.points || 0;
+            const ptsColor = pts > 0 ? "var(--green)" : pts < 0 ? "var(--red)" : "var(--muted)";
+            const ptsBg = pts > 0 ? "var(--green-dim)" : pts < 0 ? "var(--red-dim)" : "var(--surface)";
             return (
               <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--surface)",borderRadius:8}}>
                 <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"flex-end",gap:6,fontSize:13,color:"var(--txt)"}}>
                   <span style={{textAlign:"right"}}>{m.home}</span>
                   <img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2,flexShrink:0}}/>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:60}}>
                   {mp
                     ? <span style={{fontFamily:"Bebas Neue",fontSize:18,color:"var(--gold)",textAlign:"center"}}>{mp.home_score}–{mp.away_score}</span>
                     : <span style={{fontSize:11,color:"var(--red)",textAlign:"center"}}>sin cargar</span>}
-                  <span style={{fontSize:10,color:"var(--muted)",marginTop:2}}>🕐 {localTime(m.kickoff_at)}</span>
+                  {finished
+                    ? <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,marginTop:2}}>
+                        <span style={{fontSize:10,color:"var(--muted)"}}>Final <strong style={{color:"var(--txt)"}}>{m.home_score}–{m.away_score}</strong></span>
+                        {mp
+                          ? <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,background:ptsBg,color:ptsColor,whiteSpace:"nowrap"}}>{pts>0?"+":""}{pts} pts</span>
+                          : <span style={{fontSize:10,color:"var(--muted)"}}>sin pts</span>}
+                      </div>
+                    : <span style={{fontSize:10,color:"var(--muted)",marginTop:2}}>🕐 {localTime(m.kickoff_at)}</span>}
                 </div>
                 <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"flex-start",gap:6,fontSize:13,color:"var(--txt)"}}>
                   <img src={m.away_flag} alt={m.away} style={{width:20,height:15,objectFit:"cover",borderRadius:2,flexShrink:0}}/>
