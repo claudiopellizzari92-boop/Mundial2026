@@ -2436,6 +2436,11 @@ function PreTournament({ user }) {
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
+  const [ultimaCronica, setUltimaCronica] = useState(null);
+  useEffect(() => {
+    sb.from("chronicles").select("titulo,match_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(1)
+      .then(({ data }) => { if (data && data.length) setUltimaCronica(data[0]); });
+  }, []);
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
   const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches, m.match_date)).length;
@@ -2486,12 +2491,18 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   return (<>
     <div className="banner">
       <h3>BIENVENIDO, {user.profile?.name?.toUpperCase() || "JUGADOR"} 👋</h3>
-      <p>{!locked
-        ? <>⏰ <strong style={{color:"var(--gold)"}}>¡El torneo arranca el 11 de junio!</strong> Completa tus predicciones pre-torneo antes de que cierren.</>
-        : pending > 0
-          ? <><strong style={{color:"var(--gold)"}}>{pending} partido{pending!==1?"s":""} pendiente{pending!==1?"s":""}</strong> de predecir. Se bloquean al inicio de cada partido.</>
-          : <>¡Todo al día! Sigue de cerca la tabla de posiciones.</>}
-      </p>
+      {!locked
+        ? <p>⏰ <strong style={{color:"var(--gold)"}}>¡El torneo arranca el 11 de junio!</strong> Completa tus predicciones pre-torneo antes de que cierren.</p>
+        : ultimaCronica
+          ? <div onClick={()=>onGoTab && onGoTab("cronica")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8,marginTop:4,background:"rgba(245,197,24,.06)",border:"1px solid rgba(245,197,24,.2)",borderRadius:10,padding:"8px 12px"}}>
+              <span style={{fontSize:16}}>📰</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Última crónica</div>
+                <div style={{fontSize:13,color:"var(--txt)",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ultimaCronica.titulo}</div>
+              </div>
+              <span style={{color:"var(--gold)",fontSize:12,fontWeight:600,flexShrink:0}}>Leer ›</span>
+            </div>
+          : <p>¡Bienvenido! Seguí de cerca la tabla de posiciones.</p>}
     </div>
 
     <div className="dash-grid">
