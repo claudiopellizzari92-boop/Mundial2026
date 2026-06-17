@@ -4989,9 +4989,36 @@ function getPendingPredReminder(matches, allPredictions, userId) {
   return best;
 }
 
-function PredReminderPopup({ reminder, onGo, onClose }) {
+// Snooze del recordatorio por bandas de tiempo restante (12h / 6h / 3h).
+const PRED_SNOOZE_KEY = (date) => "predrem-snooze-" + date;
+function predReminderSnoozed(date) {
+  const until = parseInt(localStorage.getItem(PRED_SNOOZE_KEY(date)) || "0", 10);
+  return until > Date.now();
+}
+function snoozePredReminder(date, untilMs) {
+  localStorage.setItem(PRED_SNOOZE_KEY(date), String(Math.round(untilMs)));
+}
+// Próxima banda a la que postergar según las horas que faltan (null = sin snooze)
+function nextSnoozeBand(msToClose) {
+  const h = msToClose / 3600000;
+  if (h > 12) return 12;
+  if (h > 6) return 6;
+  if (h > 3) return 3;
+  return null;
+}
+
+function PredReminderPopup({ reminder, onGo, onClose, onSnooze }) {
   const hours = Math.floor(reminder.msToClose / 3600000);
   const mins = Math.floor((reminder.msToClose % 3600000) / 60000);
+  const band = nextSnoozeBand(reminder.msToClose);
+  const handleLater = () => {
+    if (band != null && onSnooze) {
+      // postergar hasta que falten `band` horas para el cierre
+      onSnooze(reminder.date, Date.now() + reminder.msToClose - band * 3600000);
+    } else {
+      onClose();
+    }
+  };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
@@ -5000,7 +5027,7 @@ function PredReminderPopup({ reminder, onGo, onClose }) {
         <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Te faltan <strong style={{ color: "var(--gold)" }}>{reminder.missing}</strong> de {reminder.total} pronósticos de la próxima jornada.</p>
         <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Cierran en <strong style={{ color: "var(--red)" }}>{hours}h {mins}m</strong>. ¡Después no se pueden cargar!</p>
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Más tarde</button>
+          <button onClick={handleLater} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>{band != null ? `⏰ Faltando ${band}h` : "Más tarde"}</button>
           <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cargar ahora ⚽</button>
         </div>
       </div>
@@ -5286,7 +5313,10 @@ export default function App() {
   // Recordatorio de predicciones pendientes — cada PRED_REMINDER_MINUTES min mientras falte <24h para cerrar
   useEffect(() => {
     if (!user || !matches.length) return;
-    const check = () => { if (getPendingPredReminder(matches, allPredictions, user.id)) setShowPredReminder(true); };
+    const check = () => {
+      const r = getPendingPredReminder(matches, allPredictions, user.id);
+      if (r && !predReminderSnoozed(r.date)) setShowPredReminder(true);
+    };
     check();
     const interval = setInterval(check, PRED_REMINDER_MINUTES * 60 * 1000);
     return () => clearInterval(interval);
@@ -5665,7 +5695,7 @@ export default function App() {
         )}
         {user && showPredReminder && (() => {
           const r = getPendingPredReminder(matches, allPredictions, user.id);
-          return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("predicciones"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} /> : null;
+          return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("predicciones"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} onSnooze={(date, until) => { snoozePredReminder(date, until); setShowPredReminder(false); }} /> : null;
         })()}
         {user && showNews && !showDebtorOverlay && (
           <BreakingNewsPopup news={breakingNews} onClose={dismissNews} />
