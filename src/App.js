@@ -5190,6 +5190,15 @@ function GroupStandings({ matches }) {
     return { g, rows, jugados };
   });
 
+  // Los 8 mejores terceros entre los 12 grupos (ranking por pts → DG → GF).
+  // Solo se resaltan una vez que arrancó el torneo (si no, serían 8 ceros arbitrarios).
+  const anyPlayed = groupsData.some(gd => gd.jugados);
+  const terceros = groupsData
+    .map(gd => gd.rows[2] ? { ...gd.rows[2], g: gd.g } : null)
+    .filter(Boolean)
+    .sort((x, y) => y.pts - x.pts || y.dg - x.dg || y.gf - x.gf || x.g.localeCompare(y.g));
+  const qualifyingThirds = anyPlayed ? new Set(terceros.slice(0, 8).map(t => t.name)) : new Set();
+
   const thNum = { textAlign: "center", padding: "5px 3px", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 };
   const tdNum = { padding: "7px 3px", textAlign: "center", color: "var(--muted)", fontSize: 12 };
 
@@ -5222,10 +5231,13 @@ function GroupStandings({ matches }) {
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
-                    const clasifica = i < 2;
+                    const directo = i < 2;
+                    const mejorTercero = i === 2 && qualifyingThirds.has(r.name);
+                    const bg = directo ? "var(--green-dim)" : mejorTercero ? "rgba(74,158,255,.12)" : "transparent";
+                    const posColor = directo ? "var(--green)" : mejorTercero ? "var(--blue)" : "var(--muted)";
                     return (
-                      <tr key={r.name} style={{ borderTop: "1px solid var(--border)", background: clasifica ? "var(--green-dim)" : "transparent" }}>
-                        <td style={{ padding: "7px 4px", textAlign: "center", fontFamily: "Bebas Neue", fontSize: 14, color: clasifica ? "var(--green)" : "var(--muted)" }}>{i + 1}</td>
+                      <tr key={r.name} style={{ borderTop: "1px solid var(--border)", background: bg }}>
+                        <td style={{ padding: "7px 4px", textAlign: "center", fontFamily: "Bebas Neue", fontSize: 14, color: posColor }}>{i + 1}</td>
                         <td style={{ padding: "7px 4px" }}>
                           <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                             <img src={r.flag} alt="" style={{ width: 18, height: 13, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
@@ -5247,8 +5259,13 @@ function GroupStandings({ matches }) {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--green-dim)", border: "1px solid rgba(42,223,122,.4)", display: "inline-block" }} /> Puestos de clasificación directa (1° y 2°)
+      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 12, display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--green-dim)", border: "1px solid rgba(42,223,122,.4)", display: "inline-block" }} /> Clasificación directa (1° y 2°)
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(74,158,255,.12)", border: "1px solid rgba(74,158,255,.45)", display: "inline-block" }} /> 8 mejores terceros (provisorio)
+        </span>
       </div>
     </div>
   );
