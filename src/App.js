@@ -5166,15 +5166,105 @@ function BreakingNewsAdmin({ onRefresh }) {
   );
 }
 
+// ── Tabla de grupos / clasificación del Mundial (en vivo desde resultados) ─────
+function GroupStandings({ matches }) {
+  const tieneScore = (m) => m.home_score != null && m.away_score != null;
+  const groupsData = Object.entries(GROUPS).map(([g, teams]) => {
+    const stats = {};
+    teams.forEach(t => { stats[t.name] = { name: t.name, flag: t.flag, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0 }; });
+    (matches || []).forEach(m => {
+      if (m.group_name !== g || !tieneScore(m)) return;
+      const h = stats[m.home], a = stats[m.away];
+      if (!h || !a) return;
+      h.pj++; a.pj++;
+      h.gf += m.home_score; h.gc += m.away_score;
+      a.gf += m.away_score; a.gc += m.home_score;
+      if (m.home_score > m.away_score) { h.g++; a.p++; }
+      else if (m.home_score < m.away_score) { a.g++; h.p++; }
+      else { h.e++; a.e++; }
+    });
+    const rows = Object.values(stats)
+      .map(s => ({ ...s, dg: s.gf - s.gc, pts: s.g * 3 + s.e }))
+      .sort((x, y) => y.pts - x.pts || y.dg - x.dg || y.gf - x.gf || x.name.localeCompare(y.name));
+    const jugados = rows.reduce((sum, r) => sum + r.pj, 0) > 0;
+    return { g, rows, jugados };
+  });
+
+  const thNum = { textAlign: "center", padding: "5px 3px", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 };
+  const tdNum = { padding: "7px 3px", textAlign: "center", color: "var(--muted)", fontSize: 12 };
+
+  return (
+    <div>
+      <div className="sec-hdr" style={{ marginBottom: 12 }}><h2>📊 GRUPOS Y CLASIFICACIÓN</h2></div>
+      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
+        Clasificación en vivo de la fase de grupos, calculada con cada resultado cargado. Los <strong style={{ color: "var(--green)" }}>2 primeros</strong> de cada grupo clasifican (más los 8 mejores terceros).
+      </div>
+      <div className="groups-grid">
+        {groupsData.map(({ g, rows, jugados }) => (
+          <div key={g} className="group-card">
+            <div className="group-card-hdr">
+              <h4>GRUPO {g}</h4>
+              {!jugados && <span style={{ fontSize: 10, color: "var(--muted)" }}>sin jugar</span>}
+            </div>
+            <div style={{ padding: "2px 8px 8px", overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thNum, width: 18 }}></th>
+                    <th style={{ textAlign: "left", padding: "5px 4px", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Equipo</th>
+                    <th style={thNum}>PJ</th>
+                    <th style={thNum} className="desktop-col">G</th>
+                    <th style={thNum} className="desktop-col">E</th>
+                    <th style={thNum} className="desktop-col">P</th>
+                    <th style={thNum}>DG</th>
+                    <th style={{ ...thNum, color: "var(--gold)" }}>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const clasifica = i < 2;
+                    return (
+                      <tr key={r.name} style={{ borderTop: "1px solid var(--border)", background: clasifica ? "var(--green-dim)" : "transparent" }}>
+                        <td style={{ padding: "7px 4px", textAlign: "center", fontFamily: "Bebas Neue", fontSize: 14, color: clasifica ? "var(--green)" : "var(--muted)" }}>{i + 1}</td>
+                        <td style={{ padding: "7px 4px" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            <img src={r.flag} alt="" style={{ width: 18, height: 13, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                          </span>
+                        </td>
+                        <td style={tdNum}>{r.pj}</td>
+                        <td style={tdNum} className="desktop-col">{r.g}</td>
+                        <td style={tdNum} className="desktop-col">{r.e}</td>
+                        <td style={tdNum} className="desktop-col">{r.p}</td>
+                        <td style={{ ...tdNum, color: r.dg > 0 ? "var(--green)" : r.dg < 0 ? "var(--red)" : "var(--muted)" }}>{r.dg > 0 ? "+" + r.dg : r.dg}</td>
+                        <td style={{ padding: "7px 4px", textAlign: "center", fontFamily: "Bebas Neue", fontSize: 16, color: "var(--gold)" }}>{r.pts}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--green-dim)", border: "1px solid rgba(42,223,122,.4)", display: "inline-block" }} /> Puestos de clasificación directa (1° y 2°)
+      </div>
+    </div>
+  );
+}
+
 function PrediccionesTab({ user, matches, myPredictions, allPredictions, profiles, onSave }) {
   const [subTab, setSubTab] = useState("matches");
   return (<>
     <div className="pre-tabs" style={{marginBottom:20}}>
       <button className={`pre-tab ${subTab==="matches"?"active":""}`} onClick={()=>setSubTab("matches")}>⚽ Partidos</button>
       <button className={`pre-tab ${subTab==="pre"?"active":""}`} onClick={()=>setSubTab("pre")}>📋 Pre-Torneo</button>
+      <button className={`pre-tab ${subTab==="grupos"?"active":""}`} onClick={()=>setSubTab("grupos")}>📊 Grupos y clasificación</button>
     </div>
     {subTab==="matches" && <Matches user={user} matches={matches} predictions={myPredictions} allPredictions={allPredictions} onSave={onSave} profiles={profiles}/>}
     {subTab==="pre"     && <PreTournament user={user}/>}
+    {subTab==="grupos"  && <GroupStandings matches={matches}/>}
   </>);
 }
 
