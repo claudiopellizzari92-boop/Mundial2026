@@ -2875,9 +2875,11 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
   useEffect(() => {
     sb.from("wildcards").select("*").then(({ data }) => setAllWildcards(data || []));
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWild(data.rule_value); });
+    sb.from("ranking_snapshots").select("*").order("snapshot_date").then(({ data }) => setSnapshots(data || []));
   }, []);
   const [snapshots, setSnapshots] = useState([]);
   const [loadingSnaps, setLoadingSnaps] = useState(false);
+  const [sortBy, setSortBy] = useState("pts"); // pts | exact | winner | goals
   const [userAchievements, setUserAchievements] = useState({});
   const [h2hUser, setH2hUser] = useState(null);
   const [showH2hPicker, setShowH2hPicker] = useState(false);
@@ -2954,7 +2956,32 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
     setRefreshing(false);
   }
 
-  const rows = profiles.map(p => {
+  // Movimiento de posición: comparar posición actual vs snapshot anterior
+  const snapDates = [...new Set((snapshots || []).map(s => s.snapshot_date))].sort();
+  const prevSnapDate = snapDates.length >= 1 ? snapDates[snapDates.length - 1] : null;
+  const prevPosByUser = {};
+  if (prevSnapDate) (snapshots || []).forEach(s => { if (s.snapshot_date === prevSnapDate) prevPosByUser[s.user_id] = s.position; });
+
+  // Racha: fechas finalizadas en orden, para ver si viene acertando seguido
+  const finishedDatesOrd = [...new Set((matches || []).filter(m => m.status === "finished").map(m => m.match_date))]
+    .sort((a, b) => {
+      const ka = Math.min(...(matches || []).filter(m => m.match_date === a).map(m => new Date(m.kickoff_at).getTime()));
+      const kb = Math.min(...(matches || []).filter(m => m.match_date === b).map(m => new Date(m.kickoff_at).getTime()));
+      return ka - kb;
+    });
+  function rachaDe(userId) {
+    let streak = 0;
+    for (let i = finishedDatesOrd.length - 1; i >= 0; i--) {
+      const ids = (matches || []).filter(m => m.match_date === finishedDatesOrd[i] && m.status === "finished").map(m => m.id);
+      const preds = predictions.filter(pr => pr.user_id === userId && ids.includes(pr.match_id));
+      if (!preds.length) continue;
+      const acerto = preds.some(pr => (pr.points || 0) > 0);
+      if (acerto) streak++; else break;
+    }
+    return streak;
+  }
+
+  let rows = profiles.map(p => {
     const preds = predictions.filter(pr => pr.user_id === p.id);
     const matchPts = preds.reduce((s, pr) => s + (pr.points || 0), 0);
     const prePts = prePreds.filter(pr => pr.user_id === p.id).reduce((s, pr) => s + (pr.points || 0), 0);
@@ -2965,15 +2992,26 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       if (!m || m.home_score == null || m.away_score == null) continue;
       played++;
       const o = predOutcome(pr, m);
-      const isExact = o === "exact";
-      const isWinner = o === "winner";
-      const isGoals = o === "goals";
-      if (isExact) exact++;
-      else if (isWinner) winner++;
-      else if (isGoals) goals++;
+      if (o === "exact") exact++;
+      else if (o === "winner") winner++;
+      else if (o === "goals") goals++;
     }
-    return { ...p, pts, exact, winner, goals, played };
+    return { ...p, pts, exact, winner, goals, played, racha: rachaDe(p.id) };
   }).sort((a, b) => b.pts - a.pts || b.exact - a.exact);
+
+  // Posición "real" por puntos (para movimiento y dif con líder), ANTES de reordenar por columna
+  const liderPts = rows.length ? rows[0].pts : 0;
+  rows.forEach((r, idx) => {
+    r.posReal = idx + 1;
+    r.difLider = r.pts - liderPts; // 0 o negativo
+    const prev = prevPosByUser[r.id];
+    r.mov = (prev != null) ? (prev - (idx + 1)) : 0; // positivo = subió
+  });
+
+  // Orden configurable por columna (sin perder la posición real ya calculada)
+  if (sortBy !== "pts") {
+    rows = [...rows].sort((a, b) => (b[sortBy] - a[sortBy]) || (b.pts - a.pts));
+  }
 
   function renderH2h() {
     const uA = historyUser;
@@ -3335,22 +3373,33 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
           <tr>
             <th className="sticky" style={{minWidth:30}}>#</th>
             <th className="sticky2" style={{minWidth:140}}>Jugador</th>
-            <th className="c desktop-col">PTS</th>
-            <th className="c desktop-col">Exactos</th>
-            <th className="c desktop-col">Ganador</th>
-            <th className="c desktop-col">Goles</th>
+            <th className="c desktop-col" style={{cursor:"pointer"}} onClick={()=>setSortBy("pts")}>PTS{sortBy==="pts"?" ▾":""}</th>
+            <th className="c desktop-col" style={{cursor:"pointer"}} onClick={()=>setSortBy("exact")}>Exactos{sortBy==="exact"?" ▾":""}</th>
+            <th className="c desktop-col" style={{cursor:"pointer"}} onClick={()=>setSortBy("winner")}>Ganador{sortBy==="winner"?" ▾":""}</th>
+            <th className="c desktop-col" style={{cursor:"pointer"}} onClick={()=>setSortBy("goals")}>Goles{sortBy==="goals"?" ▾":""}</th>
             <th className="c desktop-col">Partidos</th>
-            <th className="c mobile-col">PTS</th>
-            <th className="c mobile-col">Ext</th>
-            <th className="c mobile-col">Gan</th>
-            <th className="c mobile-col">Gols</th>
+            <th className="c mobile-col" onClick={()=>setSortBy("pts")}>PTS{sortBy==="pts"?"▾":""}</th>
+            <th className="c mobile-col" onClick={()=>setSortBy("exact")}>Ext{sortBy==="exact"?"▾":""}</th>
+            <th className="c mobile-col" onClick={()=>setSortBy("winner")}>Gan{sortBy==="winner"?"▾":""}</th>
+            <th className="c mobile-col" onClick={()=>setSortBy("goals")}>Gols{sortBy==="goals"?"▾":""}</th>
             <th className="c mobile-col">Part</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer" }}>
-              <td className="sticky"><span className={"rank-num rank-" + (i + 1)}>{i + 1}</span></td>
+            <tr key={row.id} onClick={() => openHistory(row)} style={{ cursor: "pointer", background: row.id === user.id ? "rgba(245,197,24,.07)" : (row.posReal <= 3 && sortBy === "pts" ? "rgba(245,197,24,.025)" : "transparent"), boxShadow: row.id === user.id ? "inset 3px 0 0 var(--gold)" : "none" }}>
+              <td className="sticky">
+                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  {sortBy === "pts" && row.posReal <= 3
+                    ? <span style={{ fontSize: 17 }}>{row.posReal === 1 ? "🥇" : row.posReal === 2 ? "🥈" : "🥉"}</span>
+                    : <span className={"rank-num rank-" + row.posReal}>{row.posReal}</span>}
+                  {sortBy === "pts" && row.mov !== 0 && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: row.mov > 0 ? "var(--green)" : "var(--red)", lineHeight: 1 }}>
+                      {row.mov > 0 ? "▲" : "▼"}{Math.abs(row.mov)}
+                    </span>
+                  )}
+                </div>
+              </td>
               <td className="sticky2">
                 <div className="user-cell">
                   <Avatar profile={row} size="sm" />
@@ -3359,6 +3408,7 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                       <ChampionName profile={row} name={row.name} style={row.is_eliminated ? {textDecoration:"line-through",opacity:.5} : {}} />
                       <TitleBadges profile={row} size={13} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
+                      {row.racha >= 2 && <span title={row.racha + " fechas seguidas acertando"} style={{ fontSize: 11, color: "#ff8c42" }}>🔥{row.racha}</span>}
                       {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
                     {row.is_eliminated && (
@@ -3377,7 +3427,10 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                       <span className="pts-big" style={{ color: "var(--muted)", textDecoration: "line-through", opacity: .5 }}>{row.pts}</span>
                       <span style={{ fontSize: 14 }}>❌</span>
                     </div>
-                  : <span className="pts-big">{row.pts}</span>}
+                  : <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <span className="pts-big">{row.pts}</span>
+                      {row.difLider < 0 && <span style={{ fontSize: 9, color: "var(--muted)" }}>{row.difLider}</span>}
+                    </div>}
               </td>
               <td className="c desktop-col"><span className="pill">{row.exact}</span></td>
               <td className="c desktop-col"><span className="pill">{row.winner}</span></td>
