@@ -2494,13 +2494,13 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       {!locked
         ? <p>⏰ <strong style={{color:"var(--gold)"}}>¡El torneo arranca el 11 de junio!</strong> Completa tus predicciones pre-torneo antes de que cierren.</p>
         : ultimaCronica
-          ? <div onClick={()=>onGoTab && onGoTab("cronica")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8,marginTop:4,background:"rgba(245,197,24,.06)",border:"1px solid rgba(245,197,24,.2)",borderRadius:10,padding:"8px 12px"}}>
-              <span style={{fontSize:16}}>📰</span>
+          ? <div onClick={()=>onGoTab && onGoTab("cronica")} style={{cursor:"pointer",display:"flex",alignItems:"flex-start",gap:8,marginTop:4,background:"rgba(245,197,24,.06)",border:"1px solid rgba(245,197,24,.2)",borderRadius:10,padding:"8px 12px"}}>
+              <span style={{fontSize:16,flexShrink:0}}>📰</span>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Última crónica</div>
-                <div style={{fontSize:13,color:"var(--txt)",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ultimaCronica.titulo}</div>
+                <div style={{fontSize:13,color:"var(--txt)",fontWeight:600,lineHeight:1.3}}>{ultimaCronica.titulo}</div>
               </div>
-              <span style={{color:"var(--gold)",fontSize:12,fontWeight:600,flexShrink:0}}>Leer ›</span>
+              <span style={{color:"var(--gold)",fontSize:12,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>Leer ›</span>
             </div>
           : <p>¡Bienvenido! Seguí de cerca la tabla de posiciones.</p>}
     </div>
