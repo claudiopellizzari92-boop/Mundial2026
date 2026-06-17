@@ -4906,6 +4906,8 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
       <DebtorAdmin profiles={profiles} onRefresh={onRefresh} />
 
+      <BreakingNewsAdmin onRefresh={onRefresh} />
+
       <div className="admin-section">
         <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("codigos")}><h3>🔗 CÓDIGOS DE INVITACIÓN {openSec==="codigos"?"▴":"▾"}</h3></div>
         {openSec==="codigos" && <div className="admin-section-body">
@@ -5006,6 +5008,137 @@ function PredReminderPopup({ reminder, onGo, onClose }) {
   );
 }
 
+// ── Última hora: popup que muestra una imagen a pantalla completa ──────────────
+function BreakingNewsPopup({ news, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.92)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <button onClick={onClose} style={{ position: "absolute", top: 14, right: 16, zIndex: 2, width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,.55)", border: "1px solid rgba(255,255,255,.25)", color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+      {news.title && (
+        <div style={{ position: "absolute", top: 16, left: 16, zIndex: 2, fontFamily: "Bebas Neue", fontSize: 18, color: "var(--gold)", letterSpacing: 1, background: "rgba(0,0,0,.5)", padding: "4px 12px", borderRadius: 20, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>⚡ {news.title}</div>
+      )}
+      <img onClick={e => e.stopPropagation()} src={news.image_url} alt={news.title || "Última hora"} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+    </div>
+  );
+}
+
+// Sección admin para subir/gestionar las noticias de última hora
+function BreakingNewsAdmin({ onRefresh }) {
+  const [list, setList] = useState([]);
+  const [title, setTitle] = useState("");
+  const [showCount, setShowCount] = useState("3");
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [secOpen, setSecOpen] = useState(false);
+
+  async function load() {
+    const { data } = await sb.from("breaking_news").select("*").order("created_at", { ascending: false });
+    setList(data || []);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function publish() {
+    if (!file) { setMsg({ type: "err", text: "Elegí una imagen primero" }); return; }
+    const veces = Math.max(1, parseInt(showCount) || 1);
+    setUploading(true); setMsg(null);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `news-${Date.now()}.${ext}`;
+      const up = await sb.storage.from("news").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      if (up.error) { setMsg({ type: "err", text: "Error subiendo imagen: " + up.error.message }); setUploading(false); return; }
+      const { data: pub } = sb.storage.from("news").getPublicUrl(path);
+      const { error } = await sb.from("breaking_news").insert({ title: title.trim() || null, image_url: pub.publicUrl, image_path: path, show_count: veces, active: true });
+      if (error) { setMsg({ type: "err", text: "Error guardando: " + error.message }); setUploading(false); return; }
+      setTitle(""); setFile(null); setShowCount("3");
+      setMsg({ type: "ok", text: "✅ Noticia publicada" });
+      await load(); onRefresh && onRefresh();
+      setTimeout(() => setMsg(null), 2500);
+    } catch (e) {
+      setMsg({ type: "err", text: "Error: " + (e && e.message ? e.message : e) });
+    }
+    setUploading(false);
+  }
+
+  async function toggleActive(n) {
+    await sb.from("breaking_news").update({ active: !n.active }).eq("id", n.id);
+    await load(); onRefresh && onRefresh();
+  }
+  async function changeCount(n, veces) {
+    const v = Math.max(1, parseInt(veces) || 1);
+    await sb.from("breaking_news").update({ show_count: v }).eq("id", n.id);
+    await load(); onRefresh && onRefresh();
+  }
+  async function remove(n) {
+    if (!window.confirm("¿Eliminar esta noticia?")) return;
+    if (n.image_path) await sb.storage.from("news").remove([n.image_path]);
+    await sb.from("breaking_news").delete().eq("id", n.id);
+    await load(); onRefresh && onRefresh();
+  }
+
+  const activas = list.filter(n => n.active).length;
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-hdr" style={{ cursor: "pointer" }} onClick={() => setSecOpen(o => !o)}>
+        <h3>⚡ ÚLTIMA HORA {secOpen ? "▴" : "▾"}</h3>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>{activas} activa{activas !== 1 ? "s" : ""}</span>
+      </div>
+      {secOpen && <div className="admin-section-body">
+        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.5 }}>
+          Subí una imagen (JPG/PNG) y se mostrará a pantalla completa como popup al abrir la app. En <strong style={{ color: "var(--gold)" }}>"Veces"</strong> ponés cuántas veces se le muestra a cada jugador; después de esa cantidad deja de aparecerle.
+        </div>
+        {/* Crear */}
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título (opcional, ej: 🚨 Cambio de horario Fecha 7)" style={{ width: "100%", padding: "9px 12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <label style={{ flex: 1, minWidth: 140, padding: "9px 12px", background: "var(--card)", border: "1px dashed var(--border)", borderRadius: 7, color: file ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {file ? "🖼️ " + file.name : "📎 Elegir imagen"}
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => setFile(e.target.files[0] || null)} />
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Veces</span>
+              <input type="number" min="1" max="99" value={showCount} onChange={e => setShowCount(e.target.value)} style={{ width: 56, padding: "9px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 18, textAlign: "center", outline: "none" }} />
+            </div>
+            <button className="btn-small" onClick={publish} disabled={uploading} style={{ background: "var(--gold-dim)", borderColor: "var(--gold)", color: "var(--gold)" }}>{uploading ? "Subiendo..." : "Publicar"}</button>
+          </div>
+          {msg && <div style={{ fontSize: 12, color: msg.type === "ok" ? "var(--green)" : "var(--red)" }}>{msg.text}</div>}
+        </div>
+        {/* Lista */}
+        {list.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>No hay noticias cargadas.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {list.map(n => (
+              <div key={n.id} style={{ background: "var(--surface)", border: `1px solid ${n.active ? "rgba(245,183,49,.4)" : "var(--border)"}`, borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                  <a href={n.image_url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
+                    <img src={n.image_url} alt="" style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }} />
+                  </a>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>{n.active ? "🟢" : "⚪"}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--txt)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title || "Sin título"}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{new Date(n.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {n.show_count} vez{n.show_count !== 1 ? "es" : ""}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>Veces</span>
+                    <input type="number" min="1" max="99" defaultValue={n.show_count} onBlur={e => { if (parseInt(e.target.value) !== n.show_count) changeCount(n, e.target.value); }} style={{ width: 46, padding: "5px 6px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 15, textAlign: "center", outline: "none" }} />
+                  </div>
+                  <button className={`btn-small ${n.active ? "red" : ""}`} onClick={() => toggleActive(n)}>{n.active ? "Desactivar" : "Activar"}</button>
+                  <button className="btn-small red" onClick={() => remove(n)}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>}
+    </div>
+  );
+}
+
 function PrediccionesTab({ user, matches, myPredictions, allPredictions, profiles, onSave }) {
   const [subTab, setSubTab] = useState("matches");
   return (<>
@@ -5090,6 +5223,9 @@ export default function App() {
   const [showDebtorVideo, setShowDebtorVideo] = useState(false);
   const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
   const [showPredReminder, setShowPredReminder] = useState(false);
+  const [breakingNews, setBreakingNews] = useState(null);       // noticia activa (o null)
+  const [showNews, setShowNews] = useState(false);
+  const newsHandledRef = React.useRef(null);                     // id de noticia ya procesada en esta sesión
   const [latestChronicleKey, setLatestChronicleKey] = useState(null); // identificador de la última crónica publicada
   const [chronicaSeenKey, setChronicaSeenKey] = useState(() => localStorage.getItem("cronica-seen") || null);
 
@@ -5340,6 +5476,11 @@ export default function App() {
       .select("id, updated_at").eq("published", true)
       .order("updated_at", { ascending: false }).limit(1);
     if (lastChron && lastChron.length) setLatestChronicleKey(String(lastChron[0].id));
+    // Noticia de última hora activa (la más reciente)
+    const { data: news } = await sb.from("breaking_news")
+      .select("*").eq("active", true)
+      .order("created_at", { ascending: false }).limit(1);
+    setBreakingNews(news && news.length ? news[0] : null);
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -5407,6 +5548,25 @@ export default function App() {
   }
 
   async function handleLogout() { await sb.auth.signOut(); setUser(null); }
+
+  // Decide si mostrar el popup de última hora: a cada jugador se le muestra
+  // show_count veces (contador guardado en su dispositivo). Se procesa una vez
+  // por sesión y por noticia, así un refresh de datos no lo vuelve a disparar.
+  useEffect(() => {
+    if (!breakingNews) { setShowNews(false); return; }
+    if (newsHandledRef.current === breakingNews.id) return;
+    newsHandledRef.current = breakingNews.id;
+    const key = "news-count-" + breakingNews.id;
+    const shown = parseInt(localStorage.getItem(key) || "0", 10);
+    const max = breakingNews.show_count == null ? Infinity : Number(breakingNews.show_count);
+    if (shown < max) {
+      localStorage.setItem(key, String(shown + 1));
+      setShowNews(true);
+    } else {
+      setShowNews(false);
+    }
+  }, [breakingNews]);
+  function dismissNews() { setShowNews(false); }
 
   if (booting) return (<><style>{css}</style><div className="spinner"><div className="spin"/><span>Cargando...</span></div></>);
   if (resettingPassword) return (<><style>{css}</style><ResetPasswordScreen onDone={() => setResettingPassword(false)}/></>);
@@ -5507,6 +5667,9 @@ export default function App() {
           const r = getPendingPredReminder(matches, allPredictions, user.id);
           return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("predicciones"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} /> : null;
         })()}
+        {user && showNews && !showDebtorOverlay && (
+          <BreakingNewsPopup news={breakingNews} onClose={dismissNews} />
+        )}
         {tab==="admin"     && isAdmin && <AdminPanel matches={matches} profiles={profiles} onRefresh={loadData}/>}
       </main>
     </div>
