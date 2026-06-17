@@ -2542,6 +2542,7 @@ function PreTournament({ user }) {
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
   const [ultimaCronica, setUltimaCronica] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null); // día elegido en el bloque "Tus pronósticos"
   useEffect(() => {
     sb.from("chronicles").select("titulo,match_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(1)
       .then(({ data }) => { if (data && data.length) setUltimaCronica(data[0]); });
@@ -2582,15 +2583,24 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   });
   const bestDay = Object.entries(ptsByDay).sort((a, b) => b[1] - a[1])[0];
 
-  // ── Tus pronósticos del próximo día (jornada más próxima por jugarse) ──
+  // ── Tus pronósticos por jornada, con navegación entre fechas ──
+  const dayKeyOf = (m) => m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10);
+  const dayFirstKick = {};
+  matches.forEach(m => {
+    const k = dayKeyOf(m);
+    const t = new Date(m.kickoff_at).getTime();
+    if (dayFirstKick[k] === undefined || t < dayFirstKick[k]) dayFirstKick[k] = t;
+  });
+  const allDays = [...new Set(matches.map(dayKeyOf))].sort((a, b) => (dayFirstKick[a] || 0) - (dayFirstKick[b] || 0));
+  // Día por defecto: la próxima jornada por jugarse (o la última si ya terminó todo)
   const upcoming = matches
     .filter(m => new Date(m.kickoff_at).getTime() > nowMs())
     .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
-  const nextDayKey = upcoming.length ? (upcoming[0].match_date || new Date(upcoming[0].kickoff_at).toISOString().slice(0,10)) : null;
-  const nextDayMatches = nextDayKey
-    ? matches
-        .filter(m => (m.match_date || new Date(m.kickoff_at).toISOString().slice(0,10)) === nextDayKey)
-        .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at))
+  const defaultDayKey = upcoming.length ? dayKeyOf(upcoming[0]) : (allDays.length ? allDays[allDays.length - 1] : null);
+  const activeDay = (selectedDay && allDays.includes(selectedDay)) ? selectedDay : defaultDayKey;
+  const dayIdx = activeDay ? allDays.indexOf(activeDay) : -1;
+  const dayMatches = activeDay
+    ? matches.filter(m => dayKeyOf(m) === activeDay).sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at))
     : [];
 
   return (<>
@@ -2616,14 +2626,21 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       <div className="stat-card"><span className="stat-label">Pendientes</span><span className="stat-value" style={{color:pending>0?"var(--red)":"var(--green)"}}>{pending}</span><span className="stat-sub">{pending>0?"¡A predecir!":"Todo listo ✓"}</span></div>
     </div>
 
-    {nextDayMatches.length > 0 && (
+    {allDays.length > 0 && (
       <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-          <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>⚽ TUS PRONÓSTICOS · {nextDayKey}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:8,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+            <span style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>⚽ TUS PRONÓSTICOS</span>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <button onClick={()=>{ if (dayIdx>0) setSelectedDay(allDays[dayIdx-1]); }} disabled={dayIdx<=0} title="Día anterior" style={{width:26,height:26,borderRadius:7,border:"1px solid var(--border)",background:"var(--surface)",color:dayIdx<=0?"var(--muted)":"var(--gold)",fontSize:16,cursor:dayIdx<=0?"default":"pointer",lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",opacity:dayIdx<=0?0.4:1,flexShrink:0}}>‹</button>
+              <span style={{fontFamily:"Bebas Neue",fontSize:15,color:"var(--txt)",minWidth:54,textAlign:"center",letterSpacing:.5}}>{activeDay}</span>
+              <button onClick={()=>{ if (dayIdx<allDays.length-1) setSelectedDay(allDays[dayIdx+1]); }} disabled={dayIdx>=allDays.length-1} title="Día siguiente" style={{width:26,height:26,borderRadius:7,border:"1px solid var(--border)",background:"var(--surface)",color:dayIdx>=allDays.length-1?"var(--muted)":"var(--gold)",fontSize:16,cursor:dayIdx>=allDays.length-1?"default":"pointer",lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",opacity:dayIdx>=allDays.length-1?0.4:1,flexShrink:0}}>›</button>
+            </div>
+          </div>
           <button onClick={()=>onGoTab && onGoTab("predicciones")} style={{background:"none",border:"none",color:"var(--gold)",fontSize:12,cursor:"pointer",fontWeight:600}}>Editar ›</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {nextDayMatches.map(m => {
+          {dayMatches.map(m => {
             const mp = myPreds.find(p => p.match_id === m.id);
             const finished = m.home_score != null && m.away_score != null;
             const pts = mp?.points || 0;
