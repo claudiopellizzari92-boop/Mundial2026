@@ -2543,10 +2543,16 @@ function PreTournament({ user }) {
 function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
   const [ultimaCronica, setUltimaCronica] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // día elegido en el bloque "Tus pronósticos"
+  const [myWc, setMyWc] = useState([]);
+  const [maxWc, setMaxWc] = useState(5);
   useEffect(() => {
     sb.from("chronicles").select("titulo,match_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(1)
       .then(({ data }) => { if (data && data.length) setUltimaCronica(data[0]); });
   }, []);
+  useEffect(() => {
+    sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => setMyWc(data || []));
+    sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWc(data.rule_value); });
+  }, [user.id]);
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
   const pending = matches.filter(m => !myPreds.find(p => p.match_id === m.id) && !isLocked(m.kickoff_at, matches, m.match_date)).length;
@@ -2556,11 +2562,21 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
     .map(p => ({ ...p, match: matches.find(m => m.id === p.match_id) }))
     .filter(p => p.match && p.match.home_score !== null && p.match.home_score !== undefined && p.match.away_score !== null && p.match.away_score !== undefined);
   const exact = played.filter(p => isExactPred(p, p.match));
-  const correct = played.filter(p => isCorrectSign(p, p.match));
+  const winner = played.filter(p => predOutcome(p, p.match) === "winner");
   const goles = played.filter(p => predOutcome(p, p.match) === "goals");
-  const pctGoles = played.length > 0 ? Math.round(goles.length / played.length * 100) : 0;
-  const pctExact = played.length > 0 ? Math.round(exact.length / played.length * 100) : 0;
-  const pctCorrect = played.length > 0 ? Math.round(correct.length / played.length * 100) : 0;
+  const pctExact  = played.length > 0 ? Math.round(exact.length  / played.length * 100) : 0;
+  const pctWinner = played.length > 0 ? Math.round(winner.length / played.length * 100) : 0;
+  const pctGoles  = played.length > 0 ? Math.round(goles.length  / played.length * 100) : 0;
+  // Puntos por bucket disjunto (exacto/ganador/goles) + comodín suman el total
+  const sumPts = (arr) => arr.reduce((s, p) => s + (p.points || 0), 0);
+  const ptsExact  = sumPts(exact);
+  const ptsWinner = sumPts(winner);
+  const ptsGoles  = sumPts(goles);
+  // Comodines: usados/máximo y puntos en los partidos donde se usó comodín
+  const usedWc = myWc.length;
+  const remainingWc = Math.max(0, (maxWc || 0) - usedWc);
+  const wcMatchIds = new Set(myWc.map(w => w.match_id));
+  const ptsWc = myPreds.filter(p => wcMatchIds.has(p.match_id)).reduce((s, p) => s + (p.points || 0), 0);
 
   const allUserIds = [...new Set(predictions.map(p => p.user_id))];
   const avgPts = allUserIds.length > 0
@@ -2682,24 +2698,36 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
       <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1,marginBottom:14}}>📊 TUS ESTADÍSTICAS</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
-          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Exactos</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:4}}>
+            <span style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Exactos</span>
+            <span style={{fontFamily:"Bebas Neue",fontSize:15,letterSpacing:.5,color:"var(--gold)",background:"var(--gold-dim)",padding:"1px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{ptsExact} pts</span>
+          </div>
           <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{exact.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctExact}%)</span></div>
           <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
         </div>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
-          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Ganador correcto</div>
-          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--green)"}}>{correct.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctCorrect}%)</span></div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:4}}>
+            <span style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Ganador correcto</span>
+            <span style={{fontFamily:"Bebas Neue",fontSize:15,letterSpacing:.5,color:"var(--green)",background:"var(--green-dim)",padding:"1px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{ptsWinner} pts</span>
+          </div>
+          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--green)"}}>{winner.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctWinner}%)</span></div>
           <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
         </div>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
-          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Goles exactos</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:4}}>
+            <span style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Goles exactos</span>
+            <span style={{fontFamily:"Bebas Neue",fontSize:15,letterSpacing:.5,color:"var(--blue)",background:"rgba(74,158,255,.12)",padding:"1px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{ptsGoles} pts</span>
+          </div>
           <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--blue)"}}>{goles.length} <span style={{fontSize:14,color:"var(--muted)"}}>({pctGoles}%)</span></div>
           <div style={{fontSize:11,color:"var(--muted)"}}>de {played.length} jugados</div>
         </div>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
-          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Mejor jornada</div>
-          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{bestDay ? bestDay[1] : 0} <span style={{fontSize:14,color:"var(--muted)"}}>pts</span></div>
-          <div style={{fontSize:11,color:"var(--muted)"}}>{bestDay ? bestDay[0] : "—"}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:4}}>
+            <span style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5}}>Comodines</span>
+            <span style={{fontFamily:"Bebas Neue",fontSize:15,letterSpacing:.5,whiteSpace:"nowrap",padding:"1px 8px",borderRadius:20,color:ptsWc>0?"var(--green)":ptsWc<0?"var(--red)":"var(--muted)",background:ptsWc>0?"var(--green-dim)":ptsWc<0?"var(--red-dim)":"var(--surface)",border:ptsWc===0?"1px solid var(--border)":"none"}}>{ptsWc>0?"+":""}{ptsWc} pts</span>
+          </div>
+          <div style={{fontFamily:"Bebas Neue",fontSize:28,color:"var(--gold)"}}>{remainingWc}<span style={{fontSize:16,color:"var(--muted)"}}>/{maxWc}</span></div>
+          <div style={{fontSize:11,color:"var(--muted)"}}>🃏 {usedWc} usado{usedWc!==1?"s":""}</div>
         </div>
       </div>
       <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
