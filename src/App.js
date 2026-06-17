@@ -2545,6 +2545,8 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const [selectedDay, setSelectedDay] = useState(null); // día elegido en el bloque "Tus pronósticos"
   const [myWc, setMyWc] = useState([]);
   const [maxWc, setMaxWc] = useState(5);
+  const [tableProfiles, setTableProfiles] = useState([]);
+  const [tablePre, setTablePre] = useState([]);
   useEffect(() => {
     sb.from("chronicles").select("titulo,match_date,created_at").eq("published", true).order("created_at", { ascending: false }).limit(1)
       .then(({ data }) => { if (data && data.length) setUltimaCronica(data[0]); });
@@ -2552,6 +2554,8 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   useEffect(() => {
     sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => setMyWc(data || []));
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWc(data.rule_value); });
+    sb.from("profiles").select("id").then(({ data }) => setTableProfiles(data || []));
+    sb.from("pretournament_predictions").select("user_id, points").then(({ data }) => setTablePre(data || []));
   }, [user.id]);
   const myPreds = predictions.filter(p => p.user_id === user.id);
   const totalPts = myPreds.reduce((s, p) => s + (p.points || 0), 0);
@@ -2584,6 +2588,17 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
         return s + predictions.filter(p => p.user_id === uid).reduce((ss, p) => ss + (p.points || 0), 0);
       }, 0) / allUserIds.length)
     : 0;
+
+  // Posición y total como en la tabla de Posiciones (puntos de partidos + pre-torneo)
+  const tableBase = tableProfiles.length ? tableProfiles.map(p => p.id) : allUserIds;
+  const tableRows = tableBase.map(id => {
+    const mPts = predictions.filter(p => p.user_id === id).reduce((s, p) => s + (p.points || 0), 0);
+    const pPts = tablePre.filter(p => p.user_id === id).reduce((s, p) => s + (p.points || 0), 0);
+    return { id, pts: mPts + pPts };
+  }).sort((a, b) => b.pts - a.pts);
+  const myRankPos = tableRows.findIndex(r => r.id === user.id) + 1;
+  const totalPlayers = tableRows.length;
+  const myTablePts = tableRows.find(r => r.id === user.id)?.pts ?? totalPts;
 
   const finishedPreds = [...played]
     .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
@@ -2695,7 +2710,13 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
     )}
 
     <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:"var(--r)",padding:"18px 20px",marginBottom:20}}>
-      <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1,marginBottom:14}}>📊 TUS ESTADÍSTICAS</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{fontFamily:"Bebas Neue",fontSize:17,color:"var(--gold)",letterSpacing:1}}>📊 TUS ESTADÍSTICAS</div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {myRankPos > 0 && <span style={{fontFamily:"Bebas Neue",fontSize:18,color:"var(--txt)",letterSpacing:.5}}>#{myRankPos}<span style={{fontSize:12,color:"var(--muted)"}}> de {totalPlayers}</span></span>}
+          <span style={{fontFamily:"Bebas Neue",fontSize:20,color:"var(--gold)",letterSpacing:.5}}>{myTablePts} pts</span>
+        </div>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
         <div style={{background:"var(--surface)",borderRadius:8,padding:"12px 14px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:4}}>
