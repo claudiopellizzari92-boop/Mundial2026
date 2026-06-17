@@ -2913,8 +2913,20 @@ function TusPuntosView({ matches, predictions, userId, wildcards }) {
         lastDay = dayKey;
         const pts = pred?.points || 0;
         const outcome = pred ? predOutcome(pred, m) : null;
-        const color = outcome === "exact" ? "var(--gold)" : outcome === "winner" ? "var(--green)" : outcome === "goals" ? "var(--blue)" : "var(--muted)";
-        const label = !pred ? "Sin predicción" : outcome === "exact" ? "¡Exacto!" : outcome === "winner" ? "Ganador" : outcome === "goals" ? "Goles" : "Sin acierto";
+        // Color por valor de puntos (contempla comodín: +7/+4/0/-1)
+        let color, glow = false;
+        if (pts >= 7) { color = "var(--gold)"; glow = true; }
+        else if (pts === 5) color = "var(--gold)";
+        else if (pts === 4) color = "#7bed9f";        // verde lima (comodín ganador)
+        else if (pts === 3) color = "var(--green)";
+        else if (pts === 1) color = "var(--blue)";
+        else if (pts < 0)   color = "var(--red)";     // -1 comodín fallado
+        else                color = "var(--muted)";   // 0
+        const label = !pred ? "Sin predicción"
+          : outcome === "exact" ? "¡Exacto!"
+          : outcome === "winner" ? "Ganador"
+          : outcome === "goals" ? "Goles"
+          : (pts < 0 ? "Comodín fallado" : "Sin acierto");
         return (
           <React.Fragment key={m.id}>
             {showHeader && <div style={{ display: "flex", alignItems: "center", gap: 8, margin: idx === 0 ? "0 0 10px" : "18px 0 10px" }}><span style={{ fontSize: 12 }}>📅</span><span style={{ fontFamily: "Bebas Neue", fontSize: 16, color: "var(--gold)", letterSpacing: 1 }}>{m.match_date}</span></div>}
@@ -2934,7 +2946,7 @@ function TusPuntosView({ matches, predictions, userId, wildcards }) {
                   </div>
                 </div>
                 <div style={{ textAlign: "center", flexShrink: 0, minWidth: 64 }}>
-                  <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color, lineHeight: 1 }}>{pts > 0 ? "+" + pts : pts}</div>
+                  <div style={{ fontFamily: "Bebas Neue", fontSize: 24, color, lineHeight: 1, textShadow: glow ? `0 0 10px ${color}` : "none" }}>{pts > 0 ? "+" + pts : pts}</div>
                   <div style={{ fontSize: 10, color, marginTop: 2 }}>{label}</div>
                 </div>
               </div>
