@@ -1636,6 +1636,43 @@ function InfoTab({ user, isAdmin, matches, allPredictions, profiles }) {
 }
 // ── Auth ──────────────────────────────────────────────────────────────────────
 // ── Cronista IA ───────────────────────────────────────────────────────────────
+
+// Segundos que el cuerpo de una crónica debe permanecer visible en pantalla
+// para contarla como "leída". Como las crónicas son largas, 10s evita falsos
+// positivos por el auto-expand de la última (estar expandida no alcanza: hay
+// que quedarse mirándola).
+const CHRONICLE_READ_SECONDS = 10;
+
+// Observa la visibilidad real del cuerpo y, tras CHRONICLE_READ_SECONDS seguidos
+// en pantalla, dispara onRead(chronicleId) una sola vez. Si el usuario scrollea
+// y se va antes, el timer se resetea.
+function ReadObserver({ active, chronicleId, onRead, children }) {
+  const ref = React.useRef(null);
+  const timerRef = React.useRef(null);
+  const doneRef = React.useRef(false);
+  useEffect(() => {
+    if (!active || doneRef.current) return;
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const clearTimer = () => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } };
+    const obs = new IntersectionObserver((entries) => {
+      const visible = !!entries[0] && entries[0].isIntersecting;
+      if (visible && !timerRef.current && !doneRef.current) {
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          doneRef.current = true;
+          onRead(chronicleId);
+        }, CHRONICLE_READ_SECONDS * 1000);
+      } else if (!visible) {
+        clearTimer();
+      }
+    }, { threshold: 0.01 });
+    obs.observe(el);
+    return () => { obs.disconnect(); clearTimer(); };
+  }, [active, chronicleId, onRead]);
+  return <div ref={ref}>{children}</div>;
+}
+
 function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [chronicles, setChronicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1652,6 +1689,8 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   const [cronSub, setCronSub] = useState("lista");
   const [cronReactions, setCronReactions] = useState({});
   const [expandedChron, setExpandedChron] = useState({});
+  const [reads, setReads] = useState({});        // { chronicle_id: [ {user_id, read_at}, ... ] }
+  const [showReaders, setShowReaders] = useState({}); // panel admin "quién leyó" por crónica
   const CRON_EMOJIS = ["😂","🔥","😭","❤️","👎"];
 
   // Ordenar las fechas cronológicamente por el primer kickoff de cada día (no alfabéticamente por texto)
@@ -1699,7 +1738,28 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
     (cronReactions[chronicleId] || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
     return counts;
   }
-  useEffect(() => { loadChronicles(); loadCronReactions(); }, []);
+  async function loadReads() {
+    const { data } = await sb.from("chronicle_reads").select("*");
+    const byChron = {};
+    (data || []).forEach(r => { (byChron[r.chronicle_id] = byChron[r.chronicle_id] || []).push(r); });
+    setReads(byChron);
+  }
+  // Registra (una sola vez) que el usuario actual leyó una crónica.
+  // ignoreDuplicates: conserva el primer read_at y no pisa lecturas previas.
+  const recordRead = useCallback(async (chronicleId) => {
+    let alreadyRead = false;
+    setReads(prev => {
+      const rows = prev[chronicleId] || [];
+      if (rows.some(r => r.user_id === user.id)) { alreadyRead = true; return prev; }
+      return { ...prev, [chronicleId]: [...rows, { chronicle_id: chronicleId, user_id: user.id, read_at: new Date().toISOString() }] };
+    });
+    if (alreadyRead) return;
+    await sb.from("chronicle_reads").upsert(
+      { chronicle_id: chronicleId, user_id: user.id },
+      { onConflict: "chronicle_id,user_id", ignoreDuplicates: true }
+    );
+  }, [user.id]);
+  useEffect(() => { loadChronicles(); loadCronReactions(); loadReads(); }, []);
   // Expandir por defecto la crónica más reciente (la primera del array ya viene ordenada desc)
   useEffect(() => {
     if (chronicles.length > 0) {
@@ -2090,15 +2150,17 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
                   const bajada = parrafos[0] || "";
                   const resto = parrafos.slice(1).join("\n\n");
                   const isExpanded = !!expandedChron[c.id];
-                  return (<>
-                    <div style={{fontSize:17,color:"var(--txt)",lineHeight:1.55,fontStyle:"italic",fontWeight:500,marginBottom:14}}>{bajada}</div>
-                    {resto && isExpanded && <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{resto}</div>}
-                    {resto && (
-                      <button onClick={()=>setExpandedChron(e=>({...e,[c.id]:!e[c.id]}))} style={{marginTop:10,background:"none",border:"none",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:5}}>
-                        {isExpanded ? "Mostrar menos ▴" : "Seguir leyendo ▾"}
-                      </button>
-                    )}
-                  </>);
+                  return (
+                    <ReadObserver active={c.published && (isExpanded || !resto)} chronicleId={c.id} onRead={recordRead}>
+                      <div style={{fontSize:17,color:"var(--txt)",lineHeight:1.55,fontStyle:"italic",fontWeight:500,marginBottom:14}}>{bajada}</div>
+                      {resto && isExpanded && <div style={{fontSize:15,color:"var(--txt)",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{resto}</div>}
+                      {resto && (
+                        <button onClick={()=>setExpandedChron(e=>({...e,[c.id]:!e[c.id]}))} style={{marginTop:10,background:"none",border:"none",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:5}}>
+                          {isExpanded ? "Mostrar menos ▴" : "Seguir leyendo ▾"}
+                        </button>
+                      )}
+                    </ReadObserver>
+                  );
                 })()}
                 {/* firma del autor */}
                 <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid var(--border)",fontSize:13,color:"var(--gold)",fontStyle:"italic",letterSpacing:.3}}>✍️ El Cronista</div>
@@ -2120,6 +2182,49 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
                     })}
                   </div>
                 )}
+                {isAdmin && c.published && (() => {
+                  const readRows = reads[c.id] || [];
+                  const readIds = new Set(readRows.map(r => r.user_id));
+                  const lectores = profiles.filter(p => readIds.has(p.id));
+                  const faltan = profiles.filter(p => !readIds.has(p.id));
+                  const open = !!showReaders[c.id];
+                  const readAtOf = (uid) => { const r = readRows.find(x => x.user_id === uid); return r ? new Date(r.read_at).toLocaleString("es", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" }) : ""; };
+                  return (
+                    <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+                      <button onClick={()=>setShowReaders(s=>({...s,[c.id]:!s[c.id]}))} style={{background:"none",border:"none",color:"var(--blue)",fontSize:13,fontWeight:600,cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:6}}>
+                        👀 {lectores.length}/{profiles.length} leyeron {open ? "▴" : "▾"}
+                      </button>
+                      {open && (
+                        <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:12}}>
+                          <div>
+                            <div style={{fontSize:11,color:"var(--green)",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Leyeron ({lectores.length})</div>
+                            {lectores.length ? (
+                              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                {lectores.map(p => (
+                                  <span key={p.id} title={readAtOf(p.id)} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 10px 3px 3px",borderRadius:20,background:"var(--green-dim)",border:"1px solid rgba(42,223,122,.3)",fontSize:12}}>
+                                    <Avatar profile={p} size="sm" />{p.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : <span style={{fontSize:12,color:"var(--muted)"}}>Nadie todavía.</span>}
+                          </div>
+                          <div>
+                            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Todavía no ({faltan.length})</div>
+                            {faltan.length ? (
+                              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                {faltan.map(p => (
+                                  <span key={p.id} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 10px 3px 3px",borderRadius:20,background:"var(--surface)",border:"1px solid var(--border)",fontSize:12,color:"var(--muted)"}}>
+                                    <Avatar profile={p} size="sm" />{p.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : <span style={{fontSize:12,color:"var(--green)"}}>¡Todos la leyeron! 🎉</span>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {isAdmin && (
                   <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
                     {!c.published && (
