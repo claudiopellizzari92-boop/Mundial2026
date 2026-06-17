@@ -2921,10 +2921,12 @@ function TusPuntosView({ matches, predictions, userId, wildcards }) {
             <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderLeft: `3px solid ${color}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600 }}>
-                    <span>{m.home_flag} {m.home}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, flexWrap: "wrap" }}>
+                    <img src={m.home_flag} alt={m.home} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+                    <span>{m.home}</span>
                     <span style={{ color: "var(--gold)", fontFamily: "Bebas Neue", fontSize: 17 }}>{m.home_score}-{m.away_score}</span>
-                    <span>{m.away} {m.away_flag}</span>
+                    <span>{m.away}</span>
+                    <img src={m.away_flag} alt={m.away} style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
                   </div>
                   <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                     {pred ? <>Tu pronóstico: <strong style={{ color: "var(--txt)" }}>{pred.home_score}-{pred.away_score}</strong></> : <span style={{ color: "var(--red)" }}>No cargaste pronóstico</span>}
