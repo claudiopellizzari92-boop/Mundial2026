@@ -2534,6 +2534,102 @@ function PreTournament({ user }) {
   </>);
 }
 
+// ── Tarjeta compartible (canvas) + Web Share ─────────────────────────────────
+function rrPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function fitText(ctx, text, maxW) {
+  let t = String(text || "");
+  if (ctx.measureText(t).width <= maxW) return t;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
+}
+function buildStatsCardCanvas(d) {
+  const W = 1080, H = 1400, pad = 70;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  // Fondo
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#0d1424"); g.addColorStop(0.5, "#07090f"); g.addColorStop(1, "#0a0d16");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#f5b731"; ctx.fillRect(0, 0, W, 10);
+  // Header
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#f5b731"; ctx.font = "700 44px Arial, sans-serif";
+  ctx.fillText("🏆 QUINIELA MUNDIAL 2026", pad, 96);
+  ctx.fillStyle = "#8a93a8"; ctx.font = "400 30px Arial, sans-serif";
+  ctx.fillText("Mi resumen", pad, 144);
+  // Nombre
+  ctx.fillStyle = "#dde2f0"; ctx.font = "800 72px Arial, sans-serif";
+  ctx.fillText(fitText(ctx, d.name, W - pad * 2), pad, 250);
+  // Card posición + puntos
+  const cardY = 290, cardW = W - pad * 2, cardH = 240;
+  ctx.fillStyle = "#11151f"; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.fill();
+  ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.stroke();
+  const cxPos = pad + cardW * 0.27, cxPts = pad + cardW * 0.73;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText("POSICIÓN", cxPos, cardY + 66);
+  ctx.fillStyle = "#dde2f0"; ctx.font = "800 116px Arial"; ctx.fillText("#" + d.pos, cxPos, cardY + 180);
+  ctx.fillStyle = "#8a93a8"; ctx.font = "400 26px Arial"; ctx.fillText("de " + d.totalPlayers, cxPos, cardY + 216);
+  ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2, cardY + 40); ctx.lineTo(W / 2, cardY + cardH - 40); ctx.stroke();
+  ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText("PUNTOS", cxPts, cardY + 66);
+  ctx.fillStyle = "#f5b731"; ctx.font = "800 116px Arial"; ctx.fillText(String(d.pts), cxPts, cardY + 180);
+  const diff = d.pts - d.avg;
+  ctx.fillStyle = diff >= 0 ? "#2adf7a" : "#ff4d6d"; ctx.font = "400 26px Arial";
+  ctx.fillText((diff >= 0 ? "▲ " : "▼ ") + Math.abs(diff) + " vs promedio", cxPts, cardY + 216);
+  // 4 tiles
+  const tiles = [
+    { label: "EXACTOS", val: d.exact, sub: d.exactPts + " pts", color: "#f5b731" },
+    { label: "GANADOR", val: d.winner, sub: d.winnerPts + " pts", color: "#2adf7a" },
+    { label: "GOLES", val: d.goles, sub: d.golesPts + " pts", color: "#4a9eff" },
+    { label: "COMODINES", val: d.wcRemaining + "/" + d.wcMax, sub: (d.wcPts > 0 ? "+" : "") + d.wcPts + " pts", color: "#f5b731" },
+  ];
+  const gridY = cardY + cardH + 50, gap = 30;
+  const tileW = (cardW - gap) / 2, tileH = 210;
+  tiles.forEach((t, i) => {
+    const x = pad + (i % 2) * (tileW + gap);
+    const y = gridY + Math.floor(i / 2) * (tileH + gap);
+    ctx.fillStyle = "#11151f"; rrPath(ctx, x, y, tileW, tileH, 22); ctx.fill();
+    ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; rrPath(ctx, x, y, tileW, tileH, 22); ctx.stroke();
+    ctx.textAlign = "left"; ctx.fillStyle = "#8a93a8"; ctx.font = "600 28px Arial"; ctx.fillText(t.label, x + 36, y + 64);
+    ctx.fillStyle = t.color; ctx.font = "800 92px Arial"; ctx.fillText(String(t.val), x + 36, y + 160);
+    ctx.textAlign = "right"; ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText(t.sub, x + tileW - 36, y + 160);
+  });
+  // Footer
+  ctx.textAlign = "center"; ctx.fillStyle = "#5a6278"; ctx.font = "400 28px Arial";
+  ctx.fillText("mundial2026-plum.vercel.app", W / 2, H - 56);
+  return canvas;
+}
+function shareCanvas(canvas, filename, shareText) {
+  return new Promise((resolve) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) { resolve(false); return; }
+      const file = new File([blob], filename, { type: "image/png" });
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: shareText });
+          resolve(true); return;
+        }
+      } catch (e) { /* cancelado o no soportado → descarga */ }
+      try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      } catch (e) {}
+      resolve(true);
+    }, "image/png");
+  });
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
   const [ultimaCronica, setUltimaCronica] = useState(null);
@@ -2549,7 +2645,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   useEffect(() => {
     sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => setMyWc(data || []));
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWc(data.rule_value); });
-    sb.from("profiles").select("id").then(({ data }) => setTableProfiles(data || []));
+    sb.from("profiles").select("id, name").then(({ data }) => setTableProfiles(data || []));
     sb.from("pretournament_predictions").select("user_id, points").then(({ data }) => setTablePre(data || []));
   }, [user.id]);
   const myPreds = predictions.filter(p => p.user_id === user.id);
@@ -2594,6 +2690,25 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const myRankPos = tableRows.findIndex(r => r.id === user.id) + 1;
   const totalPlayers = tableRows.length;
   const myTablePts = tableRows.find(r => r.id === user.id)?.pts ?? totalPts;
+  const myName = (tableProfiles.find(p => p.id === user.id) || {}).name || "Jugador";
+
+  const [sharing, setSharing] = useState(false);
+  async function handleShareStats() {
+    setSharing(true);
+    try {
+      const canvas = buildStatsCardCanvas({
+        name: myName,
+        pos: myRankPos || "-", totalPlayers,
+        pts: myTablePts, avg: avgPts,
+        exact: exact.length, exactPts: ptsExact,
+        winner: winner.length, winnerPts: ptsWinner,
+        goles: goles.length, golesPts: ptsGoles,
+        wcRemaining: remainingWc, wcMax: maxWc, wcPts: ptsWc,
+      });
+      await shareCanvas(canvas, "quiniela-mis-stats.png", "Mis stats en la Quiniela Mundial 2026 ⚽🏆");
+    } catch (e) {}
+    setSharing(false);
+  }
 
   const finishedPreds = [...played]
     .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
@@ -2764,6 +2879,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
           {totalPts === 0 && avgPts === 0 ? "Sin partidos jugados aún" : totalPts >= avgPts ? `▲ ${totalPts - avgPts} pts por encima del promedio` : `▼ ${avgPts - totalPts} pts por debajo del promedio`}
         </div>
       </div>
+      <button onClick={handleShareStats} disabled={sharing} style={{marginTop:16,width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:"var(--gold)",color:"#000",fontWeight:700,fontSize:14,cursor:sharing?"default":"pointer",opacity:sharing?0.6:1}}>{sharing ? "Generando…" : "📤 Compartir mis stats"}</button>
     </div>
 
     {!locked && (
