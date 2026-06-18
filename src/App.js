@@ -4625,6 +4625,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [takingSnapshot, setTakingSnapshot] = useState(false);
   const [openSec, setOpenSec] = useState(null);
   const toggleSec = (k) => setOpenSec(prev => prev === k ? null : k);
+  const [healthPreds, setHealthPreds] = useState([]);
 
   async function takeSnapshot() {
     setTakingSnapshot(true);
@@ -4792,6 +4793,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         setGroupResults(gr);
       }
     });
+    sb.from("predictions").select("user_id, match_id").then(({ data }) => setHealthPreds(data || []));
   }, []);
 
   async function saveGroupResults() {
@@ -4981,6 +4983,90 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           </div>
         )}
       </div>
+
+      {(() => {
+        const healthPredSet = new Set(healthPreds.map(p => p.user_id + "|" + p.match_id));
+        const healthActiveIds = new Set(healthPreds.map(p => p.user_id));
+        const dKey = (m) => m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10);
+        // 1) Resultados finalizados sin cargar (pasaron +2h30 del kickoff y no tienen marcador)
+        const pendingResults = matches.filter(m => {
+          const noScore = m.home_score == null || m.away_score == null;
+          return noScore && (nowMs() - new Date(m.kickoff_at).getTime()) > 9000000;
+        }).sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
+        // 2) Jornada por cerrar: jugadores con pronósticos faltantes
+        const openMatches = matches.filter(m => new Date(m.kickoff_at).getTime() > nowMs() && !isLocked(m.kickoff_at, matches, m.match_date));
+        const openSorted = [...openMatches].sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
+        const closingKey = openSorted.length ? dKey(openSorted[0]) : null;
+        const closingMatches = closingKey ? openMatches.filter(m => dKey(m) === closingKey) : [];
+        const missingPlayers = closingMatches.length ? (profiles || []).map(pr => {
+          const missing = closingMatches.filter(m => !healthPredSet.has(pr.id + "|" + m.id)).length;
+          return { id: pr.id, name: pr.name, missing };
+        }).filter(p => p.missing > 0).sort((a, b) => b.missing - a.missing) : [];
+        // 3) Cuentas sin ningún pronóstico en todo el torneo
+        const inactivePlayers = (profiles || []).filter(pr => !healthActiveIds.has(pr.id));
+        const healthIssues = pendingResults.length + missingPlayers.length + inactivePlayers.length;
+        const rowHdr = (icon, ok, label, n) => (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 18 }}>{ok ? "✅" : icon}</span><span style={{ fontWeight: 600, color: "var(--txt)" }}>{label}</span></div>
+            <span style={{ fontFamily: "Bebas Neue", fontSize: 18, color: ok ? "var(--green)" : "var(--red)" }}>{n}</span>
+          </div>
+        );
+        return (
+          <div className="admin-section">
+            <div className="admin-section-hdr" style={{ cursor: "pointer" }} onClick={() => toggleSec("salud")}>
+              <h3>🩺 CHEQUEO DE SALUD {openSec === "salud" ? "▴" : "▾"}</h3>
+              <span style={{ fontFamily: "Bebas Neue", fontSize: 16, color: healthIssues > 0 ? "var(--red)" : "var(--green)" }}>{healthIssues > 0 ? `${healthIssues} ⚠️` : "Todo OK ✅"}</span>
+            </div>
+            {openSec === "salud" && <div className="admin-section-body">
+              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>Chequeos automáticos para mantener la quiniela al día. Se actualizan solos con los datos cargados.</p>
+
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, marginBottom: 12 }}>
+                {rowHdr("⚠️", pendingResults.length === 0, "Resultados finalizados sin cargar", pendingResults.length)}
+                {pendingResults.length > 0
+                  ? <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {pendingResults.map(m => (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 13, color: "var(--txt)", borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+                          <span>{m.home} vs {m.away}</span>
+                          <span style={{ fontSize: 11, color: "var(--muted)" }}>{dKey(m)} · {localTime(m.kickoff_at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  : <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>Todos los partidos jugados tienen su marcador.</div>}
+              </div>
+
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, marginBottom: 12 }}>
+                {rowHdr("⚠️", missingPlayers.length === 0, "Pronósticos faltantes (jornada por cerrar)", missingPlayers.length)}
+                {closingKey
+                  ? <>
+                      <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>Cierra: <strong style={{ color: "var(--gold)" }}>{closingKey}</strong> · {localTime(openSorted[0].kickoff_at)} ({closingMatches.length} partido{closingMatches.length !== 1 ? "s" : ""})</div>
+                      {missingPlayers.length > 0
+                        ? <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                            {missingPlayers.map(p => (
+                              <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 13, color: "var(--txt)", borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+                                <span>{p.name}</span>
+                                <span style={{ fontSize: 12, color: "var(--red)" }}>faltan {p.missing} de {closingMatches.length}</span>
+                              </div>
+                            ))}
+                          </div>
+                        : <div style={{ marginTop: 8, fontSize: 12, color: "var(--green)" }}>Todos cargaron sus pronósticos. 🎉</div>}
+                    </>
+                  : <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>No hay jornada abierta próxima a cerrar.</div>}
+              </div>
+
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 14 }}>
+                {rowHdr("⚠️", inactivePlayers.length === 0, "Cuentas sin ningún pronóstico", inactivePlayers.length)}
+                {inactivePlayers.length > 0
+                  ? <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {inactivePlayers.map(p => (
+                        <span key={p.id} style={{ fontSize: 12, color: "var(--txt)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px" }}>{p.name}</span>
+                      ))}
+                    </div>
+                  : <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>Todos los participantes pronosticaron al menos una vez.</div>}
+              </div>
+            </div>}
+          </div>
+        );
+      })()}
 
       <div className="admin-section">
         <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("clasificados")}>
