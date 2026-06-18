@@ -5082,28 +5082,48 @@ function nextSnoozeBand(msToClose) {
 }
 
 function PredReminderPopup({ reminder, onGo, onClose, onSnooze }) {
+  const [confirming, setConfirming] = useState(false);
   const hours = Math.floor(reminder.msToClose / 3600000);
   const mins = Math.floor((reminder.msToClose % 3600000) / 60000);
   const band = nextSnoozeBand(reminder.msToClose);
+  // Tiempo hasta el próximo aviso (cuando falten `band` horas para el cierre)
+  const untilNextMs = band != null ? Math.max(0, reminder.msToClose - band * 3600000) : 0;
+  const unH = Math.floor(untilNextMs / 3600000);
+  const unM = Math.floor((untilNextMs % 3600000) / 60000);
+  const untilLabel = unH > 0 ? `${unH}h ${unM}m` : `${unM}m`;
   const handleLater = () => {
     if (band != null && onSnooze) {
-      // postergar hasta que falten `band` horas para el cierre
-      onSnooze(reminder.date, Date.now() + reminder.msToClose - band * 3600000);
+      setConfirming(true); // pedir confirmación antes de postergar
     } else {
       onClose();
     }
   };
+  const confirmSnooze = () => {
+    // postergar hasta que falten `band` horas para el cierre
+    onSnooze(reminder.date, Date.now() + reminder.msToClose - band * 3600000);
+  };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
-        <div style={{ fontSize: 42, marginBottom: 6 }}>⏰</div>
-        <div style={{ fontFamily: "Bebas Neue", fontSize: 25, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>¡No te quedes afuera!</div>
-        <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Te faltan <strong style={{ color: "var(--gold)" }}>{reminder.missing}</strong> de {reminder.total} pronósticos de la próxima jornada.</p>
-        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Cierran en <strong style={{ color: "var(--red)" }}>{hours}h {mins}m</strong>. ¡Después no se pueden cargar!</p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={handleLater} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>{band != null ? `⏰ Faltando ${band}h` : "Más tarde"}</button>
-          <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cargar ahora ⚽</button>
-        </div>
+        {confirming ? (<>
+          <div style={{ fontSize: 40, marginBottom: 6 }}>🔕</div>
+          <div style={{ fontFamily: "Bebas Neue", fontSize: 22, color: "var(--gold)", letterSpacing: 1, marginBottom: 10 }}>¿Pausar el recordatorio?</div>
+          <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Vas a desactivar el aviso por las próximas <strong style={{ color: "var(--gold)" }}>{untilLabel}</strong>.</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Te volveremos a avisar cuando falten <strong style={{ color: "var(--red)" }}>{band}h</strong> para el cierre.</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>No, cancelar</button>
+            <button onClick={confirmSnooze} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sí, desactivar</button>
+          </div>
+        </>) : (<>
+          <div style={{ fontSize: 42, marginBottom: 6 }}>⏰</div>
+          <div style={{ fontFamily: "Bebas Neue", fontSize: 25, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>¡No te quedes afuera!</div>
+          <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Te faltan <strong style={{ color: "var(--gold)" }}>{reminder.missing}</strong> de {reminder.total} pronósticos de la próxima jornada.</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Cierran en <strong style={{ color: "var(--red)" }}>{hours}h {mins}m</strong>. ¡Después no se pueden cargar!</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={handleLater} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>{band != null ? `⏰ Faltando ${band}h` : "Más tarde"}</button>
+            <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cargar ahora ⚽</button>
+          </div>
+        </>)}
       </div>
     </div>
   );
