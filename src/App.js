@@ -4141,11 +4141,17 @@ function Compare({ user, matches, allPredictions, profiles }) {
   });
 
   const allDays = Object.keys(byDay);
-  // Última fecha jugada (la más reciente con partidos cerrados); si ninguna, la próxima a jugarse.
+  // Día en el que estamos (si hay partidos hoy); si no, última jugada o próxima a jugarse.
+  const _t = new Date(nowMs());
+  const _ty = _t.getFullYear(), _tm = _t.getMonth(), _td = _t.getDate();
+  const todayDay = allDays.find(d => byDay[d].some(m => {
+    const k = new Date(m.kickoff_at);
+    return k.getFullYear() === _ty && k.getMonth() === _tm && k.getDate() === _td;
+  }));
   const lockedDays = allDays.filter(d => byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
   const lastLockedDay = lockedDays.length ? lockedDays[lockedDays.length - 1] : null;
   const firstUnlockedDay = allDays.find(d => !byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
-  const defaultDay = lastLockedDay || firstUnlockedDay || allDays[0];
+  const defaultDay = todayDay || lastLockedDay || firstUnlockedDay || allDays[0];
   const [activeDay, setActiveDay] = useState(null);
   const dayBarRef = React.useRef(null);
 
