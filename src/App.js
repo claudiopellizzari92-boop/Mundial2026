@@ -2550,61 +2550,155 @@ function fitText(ctx, text, maxW) {
   while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
   return t + "…";
 }
-function buildStatsCardCanvas(d) {
-  const W = 1080, H = 1400, pad = 70;
+function loadImage(url) {
+  return new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+    setTimeout(() => resolve(null), 4500);
+  });
+}
+function initialsOf(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return ((parts[0][0] || "") + (parts.length > 1 ? parts[1][0] : "")).toUpperCase();
+}
+function nameLayout(ctx, name, maxW) {
+  name = String(name || "Jugador");
+  for (let size = 76; size >= 48; size -= 2) {
+    ctx.font = `800 ${size}px Arial, sans-serif`;
+    if (ctx.measureText(name).width <= maxW) return { lines: [name], size, lineH: size * 1.12 };
+  }
+  let size = 56;
+  ctx.font = `800 ${size}px Arial, sans-serif`;
+  const words = name.split(/\s+/);
+  let l1 = "", l2 = "";
+  for (const w of words) {
+    const t1 = l1 ? l1 + " " + w : w;
+    if (!l2 && ctx.measureText(t1).width <= maxW) l1 = t1;
+    else l2 = l2 ? l2 + " " + w : w;
+  }
+  while (size > 34 && (ctx.measureText(l1).width > maxW || ctx.measureText(l2).width > maxW)) {
+    size -= 2; ctx.font = `800 ${size}px Arial, sans-serif`;
+  }
+  if (ctx.measureText(l1).width > maxW) l1 = fitText(ctx, l1, maxW);
+  if (l2 && ctx.measureText(l2).width > maxW) l2 = fitText(ctx, l2, maxW);
+  return { lines: l2 ? [l1, l2] : [l1], size, lineH: size * 1.16 };
+}
+function drawPill(ctx, text, rightX, centerY, color, dim) {
+  ctx.font = "700 31px Arial, sans-serif";
+  const tw = ctx.measureText(text).width;
+  const h = 48, w = tw + 38, x = rightX - w, y = centerY - h / 2;
+  ctx.fillStyle = dim; rrPath(ctx, x, y, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, x + w / 2, centerY + 2);
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+}
+async function buildStatsCardCanvas(d) {
+  const W = 1080, pad = 70, cardW = W - pad * 2;
+  const av = await loadImage(d.avatarUrl);
+  // Medir layout del nombre para dimensionar el lienzo
+  const mcanvas = document.createElement("canvas");
+  const mctx = mcanvas.getContext("2d");
+  const avR = 96;
+  const headerBottom = 56 + avR * 2 + 14; // bajo el avatar
+  const nameMaxW = cardW;
+  const nl = nameLayout(mctx, d.name, nameMaxW);
+  const nameTop = headerBottom + 30;
+  const nameBottom = nameTop + nl.lineH * nl.lines.length;
+  const cardY = nameBottom + 24, cardH = 240;
+  const gridY = cardY + cardH + 46, gap = 28, tileW = (cardW - gap) / 2, tileH = 210;
+  const gridBottom = gridY + tileH * 2 + gap;
+  const H = Math.round(gridBottom + 116);
+
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
   // Fondo
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#0d1424"); g.addColorStop(0.5, "#07090f"); g.addColorStop(1, "#0a0d16");
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#0e1626"); g.addColorStop(0.55, "#080b12"); g.addColorStop(1, "#0a0e18");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#f5b731"; ctx.fillRect(0, 0, W, 10);
+  // halo dorado suave arriba
+  const halo = ctx.createRadialGradient(W * 0.5, -120, 60, W * 0.5, -120, 620);
+  halo.addColorStop(0, "rgba(245,183,49,.16)"); halo.addColorStop(1, "rgba(245,183,49,0)");
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, 360);
+  ctx.fillStyle = "#f5b731"; ctx.fillRect(0, 0, W, 8);
+
   // Header
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#f5b731"; ctx.font = "700 44px Arial, sans-serif";
-  ctx.fillText("🏆 QUINIELA MUNDIAL 2026", pad, 96);
+  ctx.fillStyle = "#f5b731"; ctx.font = "800 42px Arial, sans-serif";
+  ctx.fillText("🏆 QUINIELA MUNDIAL 2026", pad, 98);
   ctx.fillStyle = "#8a93a8"; ctx.font = "400 30px Arial, sans-serif";
   ctx.fillText("Mi resumen", pad, 144);
-  // Nombre
-  ctx.fillStyle = "#dde2f0"; ctx.font = "800 72px Arial, sans-serif";
-  ctx.fillText(fitText(ctx, d.name, W - pad * 2), pad, 250);
+
+  // Avatar arriba a la derecha (grande, con aro dorado)
+  const cx = W - pad - avR, cy = 56 + avR;
+  ctx.beginPath(); ctx.arc(cx, cy, avR + 8, 0, Math.PI * 2); ctx.fillStyle = "#f5b731"; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, avR + 3, 0, Math.PI * 2); ctx.fillStyle = "#0a0e18"; ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, avR, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+  if (av) {
+    const ar = av.width / av.height;
+    let dw = avR * 2, dh = avR * 2, dx = cx - avR, dy = cy - avR;
+    if (ar > 1) { dh = avR * 2; dw = dh * ar; dx = cx - dw / 2; } else { dw = avR * 2; dh = dw / ar; dy = cy - dh / 2; }
+    ctx.drawImage(av, dx, dy, dw, dh);
+  } else {
+    ctx.fillStyle = "#1b2233"; ctx.fillRect(cx - avR, cy - avR, avR * 2, avR * 2);
+  }
+  ctx.restore();
+  if (!av) {
+    ctx.fillStyle = "#f5b731"; ctx.font = "800 76px Arial, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(initialsOf(d.name), cx, cy + 4);
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  }
+
+  // Nombre completo (1 o 2 líneas, autoajustado)
+  ctx.fillStyle = "#ffffff"; ctx.font = `800 ${nl.size}px Arial, sans-serif`; ctx.textAlign = "left";
+  nl.lines.forEach((ln, i) => ctx.fillText(ln, pad, nameTop + nl.size + i * nl.lineH));
+
   // Card posición + puntos
-  const cardY = 290, cardW = W - pad * 2, cardH = 240;
-  ctx.fillStyle = "#11151f"; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.fill();
-  ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.stroke();
+  ctx.fillStyle = "#101725"; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.fill();
+  ctx.strokeStyle = "#222b3d"; ctx.lineWidth = 2; rrPath(ctx, pad, cardY, cardW, cardH, 28); ctx.stroke();
   const cxPos = pad + cardW * 0.27, cxPts = pad + cardW * 0.73;
   ctx.textAlign = "center";
   ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText("POSICIÓN", cxPos, cardY + 66);
-  ctx.fillStyle = "#dde2f0"; ctx.font = "800 116px Arial"; ctx.fillText("#" + d.pos, cxPos, cardY + 180);
+  ctx.fillStyle = "#ffffff"; ctx.font = "800 118px Arial"; ctx.fillText("#" + d.pos, cxPos, cardY + 182);
   ctx.fillStyle = "#8a93a8"; ctx.font = "400 26px Arial"; ctx.fillText("de " + d.totalPlayers, cxPos, cardY + 216);
-  ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2, cardY + 40); ctx.lineTo(W / 2, cardY + cardH - 40); ctx.stroke();
+  ctx.strokeStyle = "#222b3d"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2, cardY + 42); ctx.lineTo(W / 2, cardY + cardH - 42); ctx.stroke();
   ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText("PUNTOS", cxPts, cardY + 66);
-  ctx.fillStyle = "#f5b731"; ctx.font = "800 116px Arial"; ctx.fillText(String(d.pts), cxPts, cardY + 180);
+  ctx.fillStyle = "#f5b731"; ctx.font = "800 118px Arial"; ctx.fillText(String(d.pts), cxPts, cardY + 182);
   const diff = d.pts - d.avg;
-  ctx.fillStyle = diff >= 0 ? "#2adf7a" : "#ff4d6d"; ctx.font = "400 26px Arial";
+  ctx.fillStyle = diff >= 0 ? "#2adf7a" : "#ff4d6d"; ctx.font = "700 26px Arial";
   ctx.fillText((diff >= 0 ? "▲ " : "▼ ") + Math.abs(diff) + " vs promedio", cxPts, cardY + 216);
-  // 4 tiles
+
+  // 4 tiles con píldora de puntos
+  const wcCol = d.wcPts > 0 ? "#2adf7a" : d.wcPts < 0 ? "#ff4d6d" : "#8a93a8";
+  const wcDim = d.wcPts > 0 ? "rgba(42,223,122,.16)" : d.wcPts < 0 ? "rgba(255,77,109,.16)" : "rgba(138,147,168,.18)";
   const tiles = [
-    { label: "EXACTOS", val: d.exact, sub: d.exactPts + " pts", color: "#f5b731" },
-    { label: "GANADOR", val: d.winner, sub: d.winnerPts + " pts", color: "#2adf7a" },
-    { label: "GOLES", val: d.goles, sub: d.golesPts + " pts", color: "#4a9eff" },
-    { label: "COMODINES", val: d.wcRemaining + "/" + d.wcMax, sub: (d.wcPts > 0 ? "+" : "") + d.wcPts + " pts", color: "#f5b731" },
+    { label: "EXACTOS", val: d.exact, sub: d.exactPts + " pts", color: "#f5b731", dim: "rgba(245,183,49,.16)" },
+    { label: "GANADOR", val: d.winner, sub: d.winnerPts + " pts", color: "#2adf7a", dim: "rgba(42,223,122,.16)" },
+    { label: "GOLES", val: d.goles, sub: d.golesPts + " pts", color: "#4a9eff", dim: "rgba(74,158,255,.16)" },
+    { label: "COMODINES", val: d.wcRemaining + "/" + d.wcMax, sub: (d.wcPts > 0 ? "+" : "") + d.wcPts + " pts", color: "#f5b731", pillColor: wcCol, dim: wcDim },
   ];
-  const gridY = cardY + cardH + 50, gap = 30;
-  const tileW = (cardW - gap) / 2, tileH = 210;
   tiles.forEach((t, i) => {
     const x = pad + (i % 2) * (tileW + gap);
     const y = gridY + Math.floor(i / 2) * (tileH + gap);
-    ctx.fillStyle = "#11151f"; rrPath(ctx, x, y, tileW, tileH, 22); ctx.fill();
-    ctx.strokeStyle = "#242a3a"; ctx.lineWidth = 2; rrPath(ctx, x, y, tileW, tileH, 22); ctx.stroke();
-    ctx.textAlign = "left"; ctx.fillStyle = "#8a93a8"; ctx.font = "600 28px Arial"; ctx.fillText(t.label, x + 36, y + 64);
-    ctx.fillStyle = t.color; ctx.font = "800 92px Arial"; ctx.fillText(String(t.val), x + 36, y + 160);
-    ctx.textAlign = "right"; ctx.fillStyle = "#8a93a8"; ctx.font = "600 30px Arial"; ctx.fillText(t.sub, x + tileW - 36, y + 160);
+    ctx.fillStyle = "#101725"; rrPath(ctx, x, y, tileW, tileH, 22); ctx.fill();
+    ctx.strokeStyle = "#222b3d"; ctx.lineWidth = 2; rrPath(ctx, x, y, tileW, tileH, 22); ctx.stroke();
+    // acento de color
+    ctx.fillStyle = t.color; rrPath(ctx, x + 30, y + 34, 50, 7, 4); ctx.fill();
+    ctx.textAlign = "left"; ctx.fillStyle = "#8a93a8"; ctx.font = "600 27px Arial"; ctx.fillText(t.label, x + 30, y + 84);
+    ctx.fillStyle = t.color; ctx.font = "800 90px Arial"; ctx.fillText(String(t.val), x + 30, y + 172);
+    drawPill(ctx, t.sub, x + tileW - 28, y + 146, t.pillColor || t.color, t.dim);
   });
+
   // Footer
   ctx.textAlign = "center"; ctx.fillStyle = "#5a6278"; ctx.font = "400 28px Arial";
-  ctx.fillText("mundial2026-plum.vercel.app", W / 2, H - 56);
+  ctx.fillText("mundial2026-plum.vercel.app", W / 2, H - 50);
   return canvas;
 }
 function shareCanvas(canvas, filename, shareText) {
@@ -2645,7 +2739,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   useEffect(() => {
     sb.from("wildcards").select("*").eq("user_id", user.id).then(({ data }) => setMyWc(data || []));
     sb.from("scoring_rules").select("rule_value").eq("rule_key", "max_wildcards").single().then(({ data }) => { if (data && data.rule_value != null) setMaxWc(data.rule_value); });
-    sb.from("profiles").select("id, name").then(({ data }) => setTableProfiles(data || []));
+    sb.from("profiles").select("id, name, avatar_url").then(({ data }) => setTableProfiles(data || []));
     sb.from("pretournament_predictions").select("user_id, points").then(({ data }) => setTablePre(data || []));
   }, [user.id]);
   const myPreds = predictions.filter(p => p.user_id === user.id);
@@ -2691,13 +2785,14 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const totalPlayers = tableRows.length;
   const myTablePts = tableRows.find(r => r.id === user.id)?.pts ?? totalPts;
   const myName = (tableProfiles.find(p => p.id === user.id) || {}).name || "Jugador";
+  const myAvatar = (tableProfiles.find(p => p.id === user.id) || {}).avatar_url || null;
 
   const [sharing, setSharing] = useState(false);
   async function handleShareStats() {
     setSharing(true);
     try {
-      const canvas = buildStatsCardCanvas({
-        name: myName,
+      const canvas = await buildStatsCardCanvas({
+        name: myName, avatarUrl: myAvatar,
         pos: myRankPos || "-", totalPlayers,
         pts: myTablePts, avg: avgPts,
         exact: exact.length, exactPts: ptsExact,
