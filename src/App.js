@@ -245,6 +245,8 @@ input,button,select{font-family:inherit;}
 .champion-avatar{box-shadow:0 0 0 2px #f5b731,0 0 12px rgba(245,183,49,.6);}
 .silver-avatar{box-shadow:0 0 0 2px #b0bcd0,0 0 12px rgba(176,188,208,.6);}
 @keyframes popIn{0%{transform:scale(.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+@keyframes skelShimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+.skel{background:linear-gradient(90deg,var(--surface) 25%,var(--border) 37%,var(--surface) 63%);background-size:400% 100%;animation:skelShimmer 1.4s ease infinite;border-radius:8px;display:block;}
 .light-mode{
   --bg:#f0f2f7;--surface:#ffffff;--card:#ffffff;--card2:#f5f7fc;
   --border:#dde2ee;--border2:#c8cfdf;
@@ -2767,20 +2769,21 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
   const wcMatchIds = new Set(myWc.map(w => w.match_id));
   const ptsWc = myPreds.filter(p => wcMatchIds.has(p.match_id)).reduce((s, p) => s + (p.points || 0), 0);
 
-  const allUserIds = [...new Set(predictions.map(p => p.user_id))];
+  // Puntos por usuario en una sola pasada (O(n) en vez de O(n²))
+  const matchPtsByUser = {};
+  for (const p of predictions) matchPtsByUser[p.user_id] = (matchPtsByUser[p.user_id] || 0) + (p.points || 0);
+  const prePtsByUser = {};
+  for (const p of tablePre) prePtsByUser[p.user_id] = (prePtsByUser[p.user_id] || 0) + (p.points || 0);
+  const allUserIds = Object.keys(matchPtsByUser);
   const avgPts = allUserIds.length > 0
-    ? Math.round(allUserIds.reduce((s, uid) => {
-        return s + predictions.filter(p => p.user_id === uid).reduce((ss, p) => ss + (p.points || 0), 0);
-      }, 0) / allUserIds.length)
+    ? Math.round(allUserIds.reduce((s, uid) => s + matchPtsByUser[uid], 0) / allUserIds.length)
     : 0;
 
   // Posición y total como en la tabla de Posiciones (puntos de partidos + pre-torneo)
   const tableBase = tableProfiles.length ? tableProfiles.map(p => p.id) : allUserIds;
-  const tableRows = tableBase.map(id => {
-    const mPts = predictions.filter(p => p.user_id === id).reduce((s, p) => s + (p.points || 0), 0);
-    const pPts = tablePre.filter(p => p.user_id === id).reduce((s, p) => s + (p.points || 0), 0);
-    return { id, pts: mPts + pPts };
-  }).sort((a, b) => b.pts - a.pts);
+  const tableRows = tableBase
+    .map(id => ({ id, pts: (matchPtsByUser[id] || 0) + (prePtsByUser[id] || 0) }))
+    .sort((a, b) => b.pts - a.pts);
   const myRankPos = tableRows.findIndex(r => r.id === user.id) + 1;
   const totalPlayers = tableRows.length;
   const myTablePts = tableRows.find(r => r.id === user.id)?.pts ?? totalPts;
@@ -5726,12 +5729,64 @@ function CronicaTab({ user, isAdmin, matches, allPredictions, profiles }) {
   );
 }
 
+// ── Skeletons de carga ───────────────────────────────────────────────────────
+function Skel({ w = "100%", h = 16, r = 8, style = {} }) {
+  return <div className="skel" style={{ width: w, height: h, borderRadius: r, ...style }} />;
+}
+function SkelCard({ children, style = {} }) {
+  return <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "18px 20px", marginBottom: 20, ...style }}>{children}</div>;
+}
+function SkeletonDashboard() {
+  return (
+    <div>
+      <Skel w="55%" h={26} style={{ marginBottom: 18 }} />
+      <SkelCard>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}><Skel w="40%" h={18} /><Skel w={70} h={18} /></div>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface)", borderRadius: 8, marginBottom: 8 }}>
+            <Skel w="34%" h={14} /><Skel w={54} h={22} style={{ margin: "0 auto" }} r={6} /><Skel w="34%" h={14} />
+          </div>
+        ))}
+      </SkelCard>
+      <SkelCard>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}><Skel w="45%" h={18} /><Skel w={90} h={18} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={{ background: "var(--surface)", borderRadius: 8, padding: "12px 14px" }}>
+              <Skel w="55%" h={12} style={{ marginBottom: 10 }} /><Skel w="40%" h={28} style={{ marginBottom: 8 }} /><Skel w="50%" h={11} />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 16 }}><Skel w="100%" h={8} r={20} style={{ marginBottom: 8 }} /><Skel w="100%" h={8} r={20} /></div>
+      </SkelCard>
+    </div>
+  );
+}
+function SkeletonStandings() {
+  return (
+    <div>
+      <Skel w="45%" h={26} style={{ marginBottom: 18 }} />
+      <SkelCard style={{ padding: "10px 12px" }}>
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 6px", borderBottom: i < 8 ? "1px solid var(--border)" : "none" }}>
+            <Skel w={22} h={22} r={6} />
+            <Skel w={34} h={34} r="50%" />
+            <Skel w="45%" h={16} />
+            <Skel w={44} h={20} r={6} style={{ marginLeft: "auto" }} />
+          </div>
+        ))}
+      </SkelCard>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
   const [booting, setBooting] = useState(true);
   const [matches, setMatches] = useState([]);
   const [loadError, setLoadError] = useState(false);
+  const [loaded, setLoaded] = useState(false); // true tras la primera carga (para skeletons)
   const [myPredictions, setMyPredictions] = useState([]);
   const [allPredictions, setAllPredictions] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -5999,6 +6054,7 @@ export default function App() {
     if (allPq.data) setAllPredictions(allPq.data);
     if (profq.data) setProfiles(profq.data);
     if (adminq.data) setIsAdmin(adminq.data.length>0);
+    setLoaded(true);
     // Última crónica publicada (para el puntito de aviso en la pestaña Crónica)
     const { data: lastChron } = await sb.from("chronicles")
       .select("id, updated_at").eq("published", true)
@@ -6169,11 +6225,11 @@ export default function App() {
       </div>
       <main className="main">
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
-        {tab==="home"      && <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/>}
+        {tab==="home"      && (loaded ? <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/> : <SkeletonDashboard/>)}
         {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="standings" && <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements} autoOpenUserId={profileToOpen} onAutoOpened={()=>setProfileToOpen(null)}/>}
+        {tab==="standings" && (loaded ? <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements} autoOpenUserId={profileToOpen} onAutoOpened={()=>setProfileToOpen(null)}/> : <SkeletonStandings/>)}
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
