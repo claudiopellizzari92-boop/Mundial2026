@@ -2235,11 +2235,6 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
                     <button onClick={()=>startEdit(c)} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
                       ✏️ Editar
                     </button>
-                    {!c.published && (
-                      <button onClick={()=>generar(c.match_date)} disabled={generating} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:generating?"default":"pointer"}}>
-                        {generating ? "🪄 Regenerando..." : "🔄 Regenerar"}
-                      </button>
-                    )}
                     <button onClick={()=>descargarPDF(c)} style={{padding:"10px 16px",background:"var(--surface)",color:"var(--txt)",border:"1px solid var(--border)",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
                       ⬇️ Descargar PDF
                     </button>
