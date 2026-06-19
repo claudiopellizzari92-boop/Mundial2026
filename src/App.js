@@ -5347,7 +5347,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
       <DebtorAdmin profiles={profiles} onRefresh={onRefresh} />
 
-      <BreakingNewsAdmin onRefresh={onRefresh} />
+      <BreakingNewsAdmin onRefresh={onRefresh} profiles={profiles} />
 
       <div className="admin-section">
         <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("codigos")}><h3>🔗 CÓDIGOS DE INVITACIÓN {openSec==="codigos"?"▴":"▾"}</h3></div>
@@ -5510,7 +5510,7 @@ function BreakingNewsPopup({ news, onClose }) {
 }
 
 // Sección admin para subir/gestionar las noticias de última hora
-function BreakingNewsAdmin({ onRefresh }) {
+function BreakingNewsAdmin({ onRefresh, profiles }) {
   const [list, setList] = useState([]);
   const [title, setTitle] = useState("");
   const [showCount, setShowCount] = useState("3");
@@ -5518,6 +5518,9 @@ function BreakingNewsAdmin({ onRefresh }) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [secOpen, setSecOpen] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState([]); // vacío = todos
+  const [showTargets, setShowTargets] = useState(false);
+  const allProfiles = profiles || [];
 
   async function load() {
     const { data } = await sb.from("breaking_news").select("*").order("created_at", { ascending: false });
@@ -5535,9 +5538,10 @@ function BreakingNewsAdmin({ onRefresh }) {
       const up = await sb.storage.from("news").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
       if (up.error) { setMsg({ type: "err", text: "Error subiendo imagen: " + up.error.message }); setUploading(false); return; }
       const { data: pub } = sb.storage.from("news").getPublicUrl(path);
-      const { error } = await sb.from("breaking_news").insert({ title: title.trim() || null, image_url: pub.publicUrl, image_path: path, show_count: veces, active: true });
+      const targets = (selectedTargets.length > 0 && selectedTargets.length < allProfiles.length) ? selectedTargets : null;
+      const { error } = await sb.from("breaking_news").insert({ title: title.trim() || null, image_url: pub.publicUrl, image_path: path, show_count: veces, active: true, target_users: targets });
       if (error) { setMsg({ type: "err", text: "Error guardando: " + error.message }); setUploading(false); return; }
-      setTitle(""); setFile(null); setShowCount("3");
+      setTitle(""); setFile(null); setShowCount("3"); setSelectedTargets([]); setShowTargets(false);
       setMsg({ type: "ok", text: "✅ Noticia publicada" });
       await load(); onRefresh && onRefresh();
       setTimeout(() => setMsg(null), 2500);
@@ -5578,6 +5582,31 @@ function BreakingNewsAdmin({ onRefresh }) {
         {/* Crear */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título (opcional, ej: 🚨 Cambio de horario Fecha 7)" style={{ width: "100%", padding: "9px 12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+          {/* Destinatarios */}
+          <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7 }}>
+            <div onClick={() => setShowTargets(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", cursor: "pointer" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>👥 Mostrar a: <strong style={{ color: "var(--gold)" }}>{(selectedTargets.length === 0 || selectedTargets.length === allProfiles.length) ? "Todos" : `${selectedTargets.length} seleccionado${selectedTargets.length !== 1 ? "s" : ""}`}</strong></span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{showTargets ? "▴" : "▾"}</span>
+            </div>
+            {showTargets && <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button className="btn-small" onClick={() => setSelectedTargets(allProfiles.map(p => p.id))}>Todos</button>
+                <button className="btn-small" onClick={() => setSelectedTargets([])}>Ninguno</button>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+                {allProfiles.map(p => {
+                  const on = selectedTargets.includes(p.id);
+                  return (
+                    <button key={p.id} onClick={() => setSelectedTargets(s => on ? s.filter(x => x !== p.id) : [...s, p.id])}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold-dim)" : "var(--surface)", color: on ? "var(--gold)" : "var(--nav)" }}>
+                      <span>{on ? "✓" : "+"}</span>{p.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Si no elegís a nadie (o elegís a todos), la noticia va para todos.</div>
+            </div>}
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <label style={{ flex: 1, minWidth: 140, padding: "9px 12px", background: "var(--card)", border: "1px dashed var(--border)", borderRadius: 7, color: file ? "var(--txt)" : "var(--muted)", fontSize: 12, cursor: "pointer", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {file ? "🖼️ " + file.name : "📎 Elegir imagen"}
@@ -5607,7 +5636,7 @@ function BreakingNewsAdmin({ onRefresh }) {
                       <span style={{ fontSize: 14 }}>{n.active ? "🟢" : "⚪"}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "var(--txt)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title || "Sin título"}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{new Date(n.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {n.show_count} vez{n.show_count !== 1 ? "es" : ""}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{new Date(n.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {n.show_count} vez{n.show_count !== 1 ? "es" : ""} · {(!n.target_users || !Array.isArray(n.target_users) || n.target_users.length === 0) ? "👥 Todos" : `🎯 ${n.target_users.length} jugador${n.target_users.length !== 1 ? "es" : ""}`}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
@@ -6127,11 +6156,16 @@ export default function App() {
       .select("id, updated_at").eq("published", true)
       .order("updated_at", { ascending: false }).limit(1);
     if (lastChron && lastChron.length) setLatestChronicleKey(String(lastChron[0].id));
-    // Noticia de última hora activa (la más reciente)
+    // Noticia de última hora activa más reciente que aplique a este jugador
     const { data: news } = await sb.from("breaking_news")
       .select("*").eq("active", true)
-      .order("created_at", { ascending: false }).limit(1);
-    setBreakingNews(news && news.length ? news[0] : null);
+      .order("created_at", { ascending: false }).limit(8);
+    const applicable = (news || []).find(n => {
+      const t = n.target_users;
+      if (!t || !Array.isArray(t) || t.length === 0) return true; // para todos
+      return t.includes(user.id);
+    });
+    setBreakingNews(applicable || null);
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
