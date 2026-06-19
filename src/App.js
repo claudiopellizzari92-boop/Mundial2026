@@ -3011,6 +3011,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
 function Matches({ user, matches, predictions, allPredictions, onSave, profiles }) {
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState({});
+  const [savingAll, setSavingAll] = useState(false);
   const [saved, setSaved] = useState({});
   const [wildcards, setWildcards] = useState([]);
   const [savingWildcard, setSavingWildcard] = useState({});
@@ -3022,9 +3023,17 @@ function Matches({ user, matches, predictions, allPredictions, onSave, profiles 
   const [matchSub, setMatchSub] = useState("porcargar");
 
   useEffect(() => {
-    const init = {};
-    predictions.forEach(p => { init[p.match_id] = { home: String(p.home_score), away: String(p.away_score) }; });
-    setScores(init);
+    // Merge: solo agrega/actualiza desde la base lo que NO estás editando,
+    // para no borrar pronósticos escritos y aún sin guardar en otros partidos.
+    setScores(prev => {
+      const merged = { ...prev };
+      predictions.forEach(p => {
+        if (merged[p.match_id] === undefined) {
+          merged[p.match_id] = { home: String(p.home_score), away: String(p.away_score) };
+        }
+      });
+      return merged;
+    });
   }, [predictions]);
 
   useEffect(() => {
@@ -3092,6 +3101,44 @@ function Matches({ user, matches, predictions, allPredictions, onSave, profiles 
     onSave();
   }
 
+  // Pronósticos completos y todavía sin guardar (o cambiados) entre los partidos abiertos
+  function pendientesGuardar() {
+    return matches
+      .filter(m => !isLocked(m.kickoff_at, matches, m.match_date))
+      .filter(m => {
+        const sc = scores[m.id];
+        if (!sc || sc.home === undefined || sc.away === undefined || sc.home === "" || sc.away === "") return false;
+        const ex = predictions.find(p => p.match_id === m.id);
+        if (!ex) return true;
+        return String(ex.home_score) !== String(sc.home) || String(ex.away_score) !== String(sc.away);
+      });
+  }
+
+  async function saveAll() {
+    const pend = pendientesGuardar();
+    if (!pend.length) return;
+    setSavingAll(true);
+    for (const m of pend) {
+      const sc = scores[m.id];
+      const homeScore = parseInt(sc.home), awayScore = parseInt(sc.away);
+      const existing = predictions.find(p => p.match_id === m.id);
+      try {
+        if (existing) {
+          await sb.from("prediction_history").insert({
+            prediction_id: existing.id, user_id: user.id, match_id: m.id,
+            home_score: existing.home_score, away_score: existing.away_score,
+          });
+          await sb.from("predictions").update({ home_score: homeScore, away_score: awayScore, updated_at: new Date().toISOString() }).eq("id", existing.id);
+        } else {
+          await sb.from("predictions").insert({ user_id: user.id, match_id: m.id, home_score: homeScore, away_score: awayScore });
+        }
+        setSaved(s => ({ ...s, [m.id]: true }));
+      } catch (e) { /* sigue con los demás */ }
+    }
+    setSavingAll(false);
+    onSave();
+  }
+
   async function toggleWildcard(match) {
     const hasWildcard = wildcards.find(w => w.match_id === match.id);
     setSavingWildcard(s => ({ ...s, [match.id]: true }));
@@ -3136,6 +3183,16 @@ const isEliminated = !!profiles?.find(p => p.id === user.id)?.is_eliminated;
           <button className={`pre-tab ${matchSub==="porcargar"?"active":""}`} onClick={()=>setMatchSub("porcargar")}>⚽ Por cargar {porCargar.length>0?`(${porCargar.length})`:""}</button>
           <button className={`pre-tab ${matchSub==="cargados"?"active":""}`} onClick={()=>setMatchSub("cargados")}>🔒 Cargados {cargados.length>0?`(${cargados.length})`:""}</button>
           <button className={`pre-tab ${matchSub==="puntos"?"active":""}`} onClick={()=>setMatchSub("puntos")}>🏆 Tus puntos</button>
+        </div>
+      );
+    })()}
+    {matchSub==="porcargar" && (() => {
+      const pend = pendientesGuardar();
+      if (!pend.length) return null;
+      return (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:10,padding:"10px 14px",marginBottom:16}}>
+          <span style={{fontSize:13,color:"var(--txt)"}}>Tenés <strong style={{color:"var(--gold)"}}>{pend.length}</strong> pronóstico{pend.length!==1?"s":""} sin guardar.</span>
+          <button onClick={saveAll} disabled={savingAll} style={{padding:"9px 16px",borderRadius:8,border:"none",background:"var(--gold)",color:"#000",fontWeight:700,fontSize:13,cursor:savingAll?"default":"pointer",opacity:savingAll?0.6:1,whiteSpace:"nowrap"}}>{savingAll?"Guardando…":`💾 Guardar todos (${pend.length})`}</button>
         </div>
       );
     })()}
