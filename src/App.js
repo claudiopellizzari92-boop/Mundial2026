@@ -415,7 +415,7 @@ function Avatar({ profile, size = "md" }) {
   return (
     <div style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
       {inner}
-      <span style={{ position: "absolute", top: -5, right: -5, fontSize: size === "sm" ? 12 : 14, lineHeight: 1 }} title="Difunto">🎗️</span>
+      <span style={{ position: "absolute", top: -5, right: -5, fontSize: size === "sm" ? 12 : 14, lineHeight: 1, filter: "brightness(0) drop-shadow(0 0 1.5px rgba(255,255,255,.85))" }} title="Difunto">🎗️</span>
     </div>
   );
 }
@@ -4013,15 +4013,47 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       </table>
       </div>
     </div>
-    {(() => {
-      const difuntos = (profiles || []).filter(p => p.is_difunto);
-      if (!difuntos.length) return null;
-      return (
-        <div className="card" style={{ marginTop: 20, padding: "18px 20px" }}>
-          <div className="sec-hdr" style={{ marginBottom: 12 }}><h2>⚰️ CEMENTERIO</h2><span>{difuntos.length} caído{difuntos.length !== 1 ? "s" : ""}</span></div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {difuntos.map(p => (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+    <Cementerio profiles={profiles} user={user} />
+  </>);
+}
+
+// ── Cementerio (con libro de mensajes) ────────────────────────────────────────
+function Cementerio({ profiles, user }) {
+  const difuntos = (profiles || []).filter(p => p.is_difunto);
+  const [mensajes, setMensajes] = useState([]);
+  const [drafts, setDrafts] = useState({});
+  const [posting, setPosting] = useState(null);
+
+  async function load() {
+    const { data } = await sb.from("cementerio_mensajes").select("*").order("created_at", { ascending: true });
+    setMensajes(data || []);
+  }
+  useEffect(() => { if (difuntos.length) load(); }, [difuntos.length]);
+
+  if (!difuntos.length) return null;
+
+  async function post(difuntoId) {
+    const txt = (drafts[difuntoId] || "").trim();
+    if (!txt) return;
+    setPosting(difuntoId);
+    const { error } = await sb.from("cementerio_mensajes").insert({ difunto_id: difuntoId, user_id: user.id, mensaje: txt });
+    if (!error) {
+      setDrafts(d => ({ ...d, [difuntoId]: "" }));
+      await load();
+    }
+    setPosting(null);
+  }
+  const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
+
+  return (
+    <div className="card" style={{ marginTop: 20, padding: "18px 20px" }}>
+      <div className="sec-hdr" style={{ marginBottom: 12 }}><h2>⚰️ CEMENTERIO</h2><span>{difuntos.length} caído{difuntos.length !== 1 ? "s" : ""}</span></div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {difuntos.map(p => {
+          const msgs = mensajes.filter(m => m.difunto_id === p.id);
+          return (
+            <div key={p.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <Avatar profile={p} size="md" />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, textDecoration: "line-through", opacity: .65 }}>{p.name}</div>
@@ -4029,12 +4061,39 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                   {p.epitafio && <div style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", marginTop: 3 }}>"{p.epitafio}"</div>}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      );
-    })()}
-  </>);
+              <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                {msgs.length === 0
+                  ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía nadie dejó un mensaje. Sé el primero en despedirlo. 🕯️</div>
+                  : msgs.map(m => (
+                      <div key={m.id} style={{ fontSize: 13, color: "var(--txt)", display: "flex", gap: 6 }}>
+                        <span style={{ color: "#a78bfa", fontWeight: 600, flexShrink: 0 }}>{nameOf(m.user_id)}:</span>
+                        <span style={{ wordBreak: "break-word" }}>{m.mensaje}</span>
+                      </div>
+                    ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <input
+                    value={drafts[p.id] || ""}
+                    onChange={e => setDrafts(d => ({ ...d, [p.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === "Enter") post(p.id); }}
+                    placeholder="Dejá tu mensaje de despedida…"
+                    maxLength={200}
+                    style={{ flex: 1, minWidth: 0, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
+                  />
+                  <button
+                    onClick={() => post(p.id)}
+                    disabled={posting === p.id || !(drafts[p.id] || "").trim()}
+                    style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#3b2f5e", color: "#c4b5fd", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", opacity: (posting === p.id || !(drafts[p.id] || "").trim()) ? .5 : 1 }}
+                  >
+                    {posting === p.id ? "…" : "🕯️ Enviar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Compare View ─────────────────────────────────────────────────────────────
