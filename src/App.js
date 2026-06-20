@@ -4023,6 +4023,8 @@ function Cementerio({ profiles, user }) {
   const [mensajes, setMensajes] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [posting, setPosting] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
 
   async function load() {
     const { data } = await sb.from("cementerio_mensajes").select("*").order("created_at", { ascending: true });
@@ -4035,12 +4037,27 @@ function Cementerio({ profiles, user }) {
   async function post(difuntoId) {
     const txt = (drafts[difuntoId] || "").trim();
     if (!txt) return;
+    if (mensajes.some(m => m.difunto_id === difuntoId && m.user_id === user.id)) return; // ya dejó el suyo
     setPosting(difuntoId);
     const { error } = await sb.from("cementerio_mensajes").insert({ difunto_id: difuntoId, user_id: user.id, mensaje: txt });
     if (!error) {
       setDrafts(d => ({ ...d, [difuntoId]: "" }));
       await load();
     }
+    setPosting(null);
+  }
+  async function saveEdit(m) {
+    const txt = editText.trim();
+    if (!txt) return;
+    setPosting(m.id);
+    const { error } = await sb.from("cementerio_mensajes").update({ mensaje: txt }).eq("id", m.id);
+    if (!error) { setEditingId(null); setEditText(""); await load(); }
+    setPosting(null);
+  }
+  async function remove(m) {
+    setPosting(m.id);
+    const { error } = await sb.from("cementerio_mensajes").delete().eq("id", m.id);
+    if (!error) await load();
     setPosting(null);
   }
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
@@ -4051,6 +4068,7 @@ function Cementerio({ profiles, user }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {difuntos.map(p => {
           const msgs = mensajes.filter(m => m.difunto_id === p.id);
+          const mine = msgs.find(m => m.user_id === user.id);
           return (
             <div key={p.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -4064,29 +4082,55 @@ function Cementerio({ profiles, user }) {
               <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 {msgs.length === 0
                   ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía nadie dejó un mensaje. Sé el primero en despedirlo. 🕯️</div>
-                  : msgs.map(m => (
-                      <div key={m.id} style={{ fontSize: 13, color: "var(--txt)", display: "flex", gap: 6 }}>
-                        <span style={{ color: "#a78bfa", fontWeight: 600, flexShrink: 0 }}>{nameOf(m.user_id)}:</span>
-                        <span style={{ wordBreak: "break-word" }}>{m.mensaje}</span>
-                      </div>
-                    ))}
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <input
-                    value={drafts[p.id] || ""}
-                    onChange={e => setDrafts(d => ({ ...d, [p.id]: e.target.value }))}
-                    onKeyDown={e => { if (e.key === "Enter") post(p.id); }}
-                    placeholder="Dejá tu mensaje de despedida…"
-                    maxLength={200}
-                    style={{ flex: 1, minWidth: 0, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
-                  />
-                  <button
-                    onClick={() => post(p.id)}
-                    disabled={posting === p.id || !(drafts[p.id] || "").trim()}
-                    style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#3b2f5e", color: "#c4b5fd", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", opacity: (posting === p.id || !(drafts[p.id] || "").trim()) ? .5 : 1 }}
-                  >
-                    {posting === p.id ? "…" : "🕯️ Enviar"}
-                  </button>
-                </div>
+                  : msgs.map(m => {
+                      const esMio = m.user_id === user.id;
+                      if (esMio && editingId === m.id) {
+                        return (
+                          <div key={m.id} style={{ display: "flex", gap: 8 }}>
+                            <input
+                              value={editText}
+                              onChange={e => setEditText(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") saveEdit(m); }}
+                              maxLength={200} autoFocus
+                              style={{ flex: 1, minWidth: 0, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
+                            />
+                            <button onClick={() => saveEdit(m)} disabled={posting === m.id || !editText.trim()} style={{ padding: "8px 12px", borderRadius: 7, border: "none", background: "#3b2f5e", color: "#c4b5fd", fontWeight: 600, fontSize: 13, cursor: "pointer", opacity: (posting === m.id || !editText.trim()) ? .5 : 1 }}>{posting === m.id ? "…" : "Guardar"}</button>
+                            <button onClick={() => { setEditingId(null); setEditText(""); }} style={{ padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={m.id} style={{ fontSize: 13, color: "var(--txt)", display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
+                          <span style={{ color: "#a78bfa", fontWeight: 600, flexShrink: 0 }}>{nameOf(m.user_id)}:</span>
+                          <span style={{ wordBreak: "break-word" }}>{m.mensaje}</span>
+                          {esMio && (
+                            <span style={{ display: "inline-flex", gap: 10, marginLeft: 4 }}>
+                              <button onClick={() => { setEditingId(m.id); setEditText(m.mensaje); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 12, cursor: "pointer", padding: 0 }}>✏️ editar</button>
+                              <button onClick={() => remove(m)} disabled={posting === m.id} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer", padding: 0 }}>🗑️ borrar</button>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                {!mine && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <input
+                      value={drafts[p.id] || ""}
+                      onChange={e => setDrafts(d => ({ ...d, [p.id]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === "Enter") post(p.id); }}
+                      placeholder="Dejá tu mensaje de despedida…"
+                      maxLength={200}
+                      style={{ flex: 1, minWidth: 0, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }}
+                    />
+                    <button
+                      onClick={() => post(p.id)}
+                      disabled={posting === p.id || !(drafts[p.id] || "").trim()}
+                      style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#3b2f5e", color: "#c4b5fd", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", opacity: (posting === p.id || !(drafts[p.id] || "").trim()) ? .5 : 1 }}
+                    >
+                      {posting === p.id ? "…" : "🕯️ Enviar"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
