@@ -406,19 +406,16 @@ const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0,
 function Avatar({ profile, size = "md" }) {
   const ac = championAvatarClass(profile);
   const sz = size === "sm" ? 28 : 34;
-  if (profile?.avatar_url) {
-    return (
-      <img
-        src={profile.avatar_url}
-        alt={profile.name || ""}
-        className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`}
-        style={{ objectFit: "cover", borderRadius: "50%", width: sz, height: sz, flexShrink: 0 }}
-      />
-    );
-  }
+  const difunto = !!profile?.is_difunto;
+  const luto = difunto ? { filter: "grayscale(1)", opacity: .6 } : {};
+  const inner = profile?.avatar_url
+    ? <img src={profile.avatar_url} alt={profile.name || ""} className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`} style={{ objectFit: "cover", borderRadius: "50%", width: sz, height: sz, flexShrink: 0, ...luto }} />
+    : <div className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`} style={{ flexShrink: 0, ...luto }}>{initials(profile?.name)}</div>;
+  if (!difunto) return inner;
   return (
-    <div className={`avatar ${size === "sm" ? "sm" : ""} ${ac}`} style={{ flexShrink: 0 }}>
-      {initials(profile?.name)}
+    <div style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+      {inner}
+      <span style={{ position: "absolute", top: -5, right: -5, fontSize: size === "sm" ? 12 : 14, lineHeight: 1 }} title="Difunto">🎗️</span>
     </div>
   );
 }
@@ -3961,11 +3958,18 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
                   <Avatar profile={row} size="sm" />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                      <ChampionName profile={row} name={row.name} style={row.is_eliminated ? {textDecoration:"line-through",opacity:.5} : {}} />
+                      <ChampionName profile={row} name={row.name} style={(row.is_eliminated || row.is_difunto) ? {textDecoration:"line-through",opacity:.5} : {}} />
                       <TitleBadges profile={row} size={13} />
                       {row.id === user.id && <span className="me-badge">TÚ</span>}
                       {row.equipped_badge && (() => { const a = ACHIEVEMENTS.find(a => a.key === row.equipped_badge); return a ? <span title={a.name} style={{fontSize:16,cursor:"default"}}>{a.icon}</span> : null; })()}
                     </div>
+                    {row.is_difunto && (
+                      <div style={{fontSize:10,marginTop:2,lineHeight:1.4}}>
+                        <span style={{color:"#a78bfa"}}>🪦 Descansa en paz</span>
+                        {row.difunto_since && <span style={{color:"var(--muted)"}}> · ✝ {new Date(row.difunto_since).toLocaleDateString("es",{day:"2-digit",month:"short"})}</span>}
+                        {row.epitafio && <span style={{color:"var(--muted)",fontStyle:"italic"}}> · "{row.epitafio}"</span>}
+                      </div>
+                    )}
                     {row.is_eliminated && (
   <div style={{fontSize:10,color:"var(--red)",marginTop:2,display:"flex",alignItems:"center",gap:4}}>
     <span>💀 Eliminado por mala paga</span>
@@ -4009,6 +4013,27 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
       </table>
       </div>
     </div>
+    {(() => {
+      const difuntos = (profiles || []).filter(p => p.is_difunto);
+      if (!difuntos.length) return null;
+      return (
+        <div className="card" style={{ marginTop: 20, padding: "18px 20px" }}>
+          <div className="sec-hdr" style={{ marginBottom: 12 }}><h2>⚰️ CEMENTERIO</h2><span>{difuntos.length} caído{difuntos.length !== 1 ? "s" : ""}</span></div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {difuntos.map(p => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+                <Avatar profile={p} size="md" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, textDecoration: "line-through", opacity: .65 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 2 }}>🪦 Descansa en paz{p.difunto_since ? ` · ✝ ${new Date(p.difunto_since).toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}` : ""}</div>
+                  {p.epitafio && <div style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", marginTop: 3 }}>"{p.epitafio}"</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
   </>);
 }
 
@@ -4432,6 +4457,8 @@ function DebtorAdmin({ profiles, onRefresh }) {
   const [amount, setAmount] = useState("");
   const [since, setSince] = useState("");
   const [saving, setSaving] = useState(null);
+  const [editingDif, setEditingDif] = useState(null);
+  const [epitaph, setEpitaph] = useState("");
   const [intervalSecs, setIntervalSecs] = useState(120);
   const [savingInterval, setSavingInterval] = useState(false);
   const [intervalSaved, setIntervalSaved] = useState(false);
@@ -4491,6 +4518,30 @@ function DebtorAdmin({ profiles, onRefresh }) {
   }
 
   const debtors = profiles.filter(p => p.is_debtor);
+  const difuntos = profiles.filter(p => p.is_difunto);
+
+  async function toggleDifunto(prof) {
+    if (prof.is_difunto) {
+      setSaving(prof.id);
+      await sb.from("profiles").update({ is_difunto: false, difunto_since: null }).eq("id", prof.id);
+      setSaving(null);
+      onRefresh();
+    } else {
+      setEditingDif(prof.id);
+      setEpitaph(prof.epitafio || "");
+    }
+  }
+  async function saveDifunto(profId) {
+    setSaving(profId);
+    await sb.from("profiles").update({
+      is_difunto: true,
+      difunto_since: new Date().toISOString(),
+      epitafio: epitaph.trim() || null,
+    }).eq("id", profId);
+    setEditingDif(null);
+    setSaving(null);
+    onRefresh();
+  }
 
   return (
     <div className="admin-section">
@@ -4509,6 +4560,7 @@ function DebtorAdmin({ profiles, onRefresh }) {
             {intervalSaved ? "✓" : savingInterval ? "..." : "Guardar"}
           </button>
           <span style={{ fontSize: 12, color: "var(--red)" }}>{debtors.length} en deuda</span>
+          {difuntos.length > 0 && <span style={{ fontSize: 12, color: "#a78bfa" }}>🪦 {difuntos.length}</span>}
         </div>
       </div>
       {secOpen && <div className="admin-section-body">
@@ -4555,6 +4607,14 @@ function DebtorAdmin({ profiles, onRefresh }) {
   >
     {prof.is_eliminated ? "💀 Reintegrar" : "💀 Eliminar"}
   </button>
+  <button
+    className="btn-small"
+    onClick={() => toggleDifunto(prof)}
+    disabled={saving === prof.id}
+    style={prof.is_difunto ? { background: "#3b2f5e", borderColor: "#6d28d9", color: "#c4b5fd" } : { borderColor: "#6d28d9", color: "#a78bfa" }}
+  >
+    {prof.is_difunto ? "🪦 Revivir" : "🪦 Difunto"}
+  </button>
 </div>
                 </div>
                 {isEditing && (
@@ -4577,6 +4637,16 @@ function DebtorAdmin({ profiles, onRefresh }) {
                       {saving === prof.id ? "..." : "Confirmar"}
                     </button>
                     <button className="btn-small" onClick={() => setEditing(null)} style={{ background: "none" }}>Cancelar</button>
+                  </div>
+                )}
+                {editingDif === prof.id && (
+                  <div style={{ padding: "0 14px 14px", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>🪦 EPITAFIO (opcional)</div>
+                      <input value={epitaph} onChange={e => setEpitaph(e.target.value)} placeholder='Ej: "Abandonó el grupo antes que el Mundial"' style={{ width: "100%", padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+                    </div>
+                    <button className="btn-small" onClick={() => saveDifunto(prof.id)} disabled={saving === prof.id} style={{ background: "#3b2f5e", borderColor: "#6d28d9", color: "#c4b5fd" }}>{saving === prof.id ? "..." : "🪦 Enterrar"}</button>
+                    <button className="btn-small" onClick={() => setEditingDif(null)} style={{ background: "none" }}>Cancelar</button>
                   </div>
                 )}
               </div>
