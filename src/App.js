@@ -7119,11 +7119,11 @@ export default function App() {
           {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
-          {isAdmin && <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>}
+          <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
-          {isAdmin && <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>}
+          <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>
           <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
             <Avatar profile={user.profile} />
           </div>
@@ -7145,7 +7145,7 @@ export default function App() {
         {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
-        {isAdmin && <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>}
+        <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
           <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
@@ -7173,7 +7173,7 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
-        {tab==="tienda"    && isAdmin && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
+        {tab==="tienda"    && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
           <DebtorOverlay
