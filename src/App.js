@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://bheziohaquiwnvbzrlio.supabase.co";
@@ -6068,6 +6068,49 @@ function SkeletonStandings() {
   );
 }
 
+// ── Ruleta de la caja misteriosa ──────────────────────────────────────────────
+function Ruleta({ pool, won, onFinish }) {
+  const CELL = 88, GAP = 8, STEP = CELL + GAP, VIEW = 300, WIN = 44;
+  const reel = useMemo(() => {
+    const base = (pool && pool.length) ? pool : [{ nada: true }];
+    const cells = [];
+    for (let i = 0; i < 52; i++) {
+      cells.push(Math.random() < 0.25 ? { nada: true } : base[Math.floor(Math.random() * base.length)]);
+    }
+    cells[WIN] = won ? won : { nada: true };
+    return cells;
+  }, []);
+  const [offset, setOffset] = useState(0);
+  useEffect(() => {
+    const jitter = Math.random() * 40 - 20;
+    const final = -(WIN * STEP - (VIEW / 2 - CELL / 2)) + jitter;
+    const t1 = setTimeout(() => setOffset(final), 80);
+    const t2 = setTimeout(() => onFinish && onFinish(), 4300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "var(--gold)", letterSpacing: 1, marginBottom: 12 }}>🎰 Girando…</div>
+      <div style={{ position: "relative", width: VIEW, maxWidth: "100%", margin: "0 auto", overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "14px 0" }}>
+        <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 2, background: "var(--gold)", transform: "translateX(-1px)", zIndex: 2, boxShadow: "0 0 8px var(--gold)" }} />
+        <div style={{ position: "absolute", top: 1, left: "50%", transform: "translateX(-50%)", zIndex: 3, color: "var(--gold)", fontSize: 12 }}>▼</div>
+        <div style={{ display: "flex", gap: GAP, paddingLeft: (VIEW / 2 - CELL / 2), transform: `translateX(${offset}px)`, transition: offset ? "transform 4s cubic-bezier(.10,.75,.15,1)" : "none" }}>
+          {reel.map((c, i) => (
+            <div key={i} style={{ width: CELL, flexShrink: 0, height: CELL, borderRadius: 10, background: "var(--card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: 4 }}>
+              {c.nada
+                ? <div style={{ fontSize: 30, opacity: .5 }}>❌</div>
+                : c.imagen_url
+                  ? <img src={c.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />
+                  : <div style={{ fontSize: 32 }}>{c.emoji || "🎁"}</div>}
+              <div style={{ fontSize: 9, color: "var(--muted)", textAlign: "center", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>{c.nada ? "Nada" : c.nombre}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Ícono de la moneda Petro ──────────────────────────────────────────────────
 function PetroCoin({ size = 16 }) {
   return (
@@ -6093,6 +6136,7 @@ const TIPO_INFO = {
   espiar:   { label: "Espiar pronósticos (humo)" },
   gag:      { label: "Estafa con mensaje (gag)" },
   poster:   { label: "Póster (con imagen)" },
+  caja:     { label: "Caja misteriosa (premio al azar)" },
   generico: { label: "Genérico (solo descuenta Petros)" },
 };
 
@@ -6244,6 +6288,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
     setDetail(null);
     if (it.tipo === "frame") { setFramePicker(it.key); setSpyPicker(null); return; }
     if (it.tipo === "espiar") { setSpyPicker(it.key); setFramePicker(null); return; }
+    if (it.tipo === "caja") { abrirCaja(it); return; }
     setConfirm({
       titulo: `¿Comprar "${it.nombre}"?`,
       texto: txtCosto(it.precio),
@@ -6251,6 +6296,25 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
         setConfirm(null);
         const r = await comprar(it.key);
         if (r && r.ok) setModal(it.tipo === "gag" ? { type: "gag", item: it } : { type: "generic", item: it });
+      },
+    });
+  }
+  function abrirCaja(it) {
+    setConfirm({
+      titulo: `¿Abrir "${it.nombre}"?`,
+      texto: txtCosto(it.precio),
+      onOk: async () => {
+        setConfirm(null);
+        setBusy(it.key);
+        const { data, error } = await sb.rpc("abrir_caja", { p_box_key: it.key });
+        setBusy(null);
+        if (error || !data || !data.ok) {
+          setModal({ type: "error", msg: (data && data.error) || "No se pudo abrir la caja." });
+          return;
+        }
+        await loadAll();
+        if (onRefresh) onRefresh();
+        setModal({ type: "caja", won: data.won, fase: "ruleta" });
       },
     });
   }
@@ -6408,7 +6472,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     <span className="tienda-price"><PetroCoin size={14} /> {it.precio}</span>
                     <button onClick={() => comprarItem(it)} disabled={noPlata || cargando} className="tienda-buy"
                       style={{ background: noPlata ? "var(--surface)" : "linear-gradient(135deg,#f5d36b,#e0a92e)", color: noPlata ? "var(--muted)" : "#1a1a1a", cursor: noPlata ? "not-allowed" : "pointer", opacity: cargando ? .6 : 1 }}>
-                      {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : "Comprar"}
+                      {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : it.tipo === "caja" ? "Abrir" : "Comprar"}
                     </button>
                   </div>
                 </div>
@@ -6662,7 +6726,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "center" }}>
               <button onClick={() => comprarItem(detail)} disabled={!isAdmin && saldo < detail.precio}
                 style={{ padding: "10px 22px", borderRadius: 9, border: "none", background: (!isAdmin && saldo < detail.precio) ? "var(--surface)" : "var(--gold)", color: (!isAdmin && saldo < detail.precio) ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: (!isAdmin && saldo < detail.precio) ? "not-allowed" : "pointer" }}>
-                {(!isAdmin && saldo < detail.precio) ? "Sin Petros" : detail.tipo === "frame" ? "Elegir" : detail.tipo === "espiar" ? "Espiar" : "Comprar"}
+                {(!isAdmin && saldo < detail.precio) ? "Sin Petros" : detail.tipo === "frame" ? "Elegir" : detail.tipo === "espiar" ? "Espiar" : detail.tipo === "caja" ? "Abrir" : "Comprar"}
               </button>
               <button onClick={() => setDetail(null)} style={{ padding: "10px 18px", borderRadius: 9, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
             </div>
@@ -6725,7 +6789,28 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
               <div style={{ fontSize: 44 }}>😬</div>
               <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{modal.msg}</div>
             </>)}
-            <button onClick={() => setModal(null)} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+            {modal.type === "caja" && (<>
+              <style>{`@keyframes cajaPop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}`}</style>
+              {modal.fase === "ruleta"
+                ? <Ruleta pool={visibles.filter(i => i.tipo !== "caja")} won={modal.won} onFinish={() => setModal(m => (m && m.type === "caja") ? { ...m, fase: "premio" } : m)} />
+                : !modal.won ? (<>
+                    <div style={{ fontSize: 56 }}>🍃</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, marginTop: 8 }}>¡Nada! 😢</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Esta vez la caja salió vacía. ¡La próxima será!</div>
+                  </>) : (<>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "var(--gold)", letterSpacing: 1.5 }}>¡TE TOCÓ!</div>
+                    <div style={{ animation: "cajaPop .5s ease-out", marginTop: 10 }}>
+                      {modal.won.imagen_url
+                        ? <img src={modal.won.imagen_url} alt="" style={{ maxWidth: "70%", borderRadius: 12 }} />
+                        : <div style={{ fontSize: 66 }}>{modal.won.emoji || "🎁"}</div>}
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 800, marginTop: 10 }}>{modal.won.nombre}</div>
+                    {modal.won.tipo === "frame" && modal.won.frame && <div style={{ fontSize: 13, color: "#a78bfa", marginTop: 6 }}>Marco <b>{modal.won.frame}</b> equipado en tu avatar.</div>}
+                  </>)}
+            </>)}
+            {!(modal.type === "caja" && modal.fase === "ruleta") && (
+              <button onClick={() => setModal(null)} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+            )}
           </div>
         </div>
       )}
