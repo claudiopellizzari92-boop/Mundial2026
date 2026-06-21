@@ -244,6 +244,12 @@ input,button,select{font-family:inherit;}
 .silver-name{background:linear-gradient(90deg,#b0bcd0,#e8edf5,#b0bcd0,#8899aa,#b0bcd0);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2.5s linear infinite,silverGlow 2s ease-in-out infinite;font-weight:700;}
 .champion-avatar{box-shadow:0 0 0 2px #f5b731,0 0 12px rgba(245,183,49,.6);}
 .silver-avatar{box-shadow:0 0 0 2px #b0bcd0,0 0 12px rgba(176,188,208,.6);}
+.frame-fuego{box-shadow:0 0 0 2px #ff6b35,0 0 12px rgba(255,107,53,.7);}
+.frame-neon{box-shadow:0 0 0 2px #00e5ff,0 0 12px rgba(0,229,255,.7);}
+.frame-rosa{box-shadow:0 0 0 2px #ff4fa3,0 0 12px rgba(255,79,163,.7);}
+.frame-violeta{box-shadow:0 0 0 2px #a78bfa,0 0 12px rgba(167,139,250,.7);}
+.frame-verde{box-shadow:0 0 0 2px #2adf7a,0 0 12px rgba(42,223,122,.6);}
+.frame-azul{box-shadow:0 0 0 2px #4a9eff,0 0 12px rgba(74,158,255,.6);}
 @keyframes popIn{0%{transform:scale(.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
 @keyframes skelShimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
 .skel{background:linear-gradient(90deg,var(--surface) 25%,var(--border) 37%,var(--surface) 63%);background-size:400% 100%;animation:skelShimmer 1.4s ease infinite;border-radius:8px;display:block;}
@@ -450,11 +456,16 @@ function ChampionName({ profile, name, style = {} }) {
   return <span style={style}>{name}</span>;
 }
 
+function frameClass(profile) {
+  const f = profile?.avatar_frame;
+  const ok = ["fuego", "neon", "rosa", "violeta", "verde", "azul"];
+  return (f && ok.includes(f)) ? `frame-${f}` : "";
+}
 function championAvatarClass(profile) {
   const { wins, silvers } = getTitleInfo(profile);
   if (wins > 0) return "champion-avatar";
   if (silvers > 0) return "silver-avatar";
-  return "";
+  return frameClass(profile);
 }
 
 function isLocked(kickoff, allMatches, matchDate) {
@@ -6049,6 +6060,343 @@ function SkeletonStandings() {
   );
 }
 
+// ── Tienda (perks con Petros) ─────────────────────────────────────────────────
+const TIENDA_RATE = 1; // Petros por punto de partidos
+const STORE_FRAMES = [
+  { key: "fuego", nombre: "Fuego", color: "#ff6b35" },
+  { key: "neon", nombre: "Neón", color: "#00e5ff" },
+  { key: "rosa", nombre: "Rosa", color: "#ff4fa3" },
+  { key: "violeta", nombre: "Violeta", color: "#a78bfa" },
+  { key: "verde", nombre: "Verde", color: "#2adf7a" },
+  { key: "azul", nombre: "Azul", color: "#4a9eff" },
+];
+const TIPO_INFO = {
+  frame:    { label: "Marco de avatar (selector de color)" },
+  espiar:   { label: "Espiar pronósticos (humo)" },
+  gag:      { label: "Estafa con mensaje (gag)" },
+  poster:   { label: "Póster (con imagen)" },
+  generico: { label: "Genérico (solo descuenta Petros)" },
+};
+
+function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin }) {
+  const [sub, setSub] = useState("comprar");
+  const [items, setItems] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(null);
+  const [framePicker, setFramePicker] = useState(null);
+  const [spyPicker, setSpyPicker] = useState(null);
+  const [modal, setModal] = useState(null);
+
+  // gestión (admin)
+  const [precioEdits, setPrecioEdits] = useState({});
+  const [nuevo, setNuevo] = useState({ key: "", nombre: "", emoji: "", tipo: "generico", precio: 10, descripcion: "", titulo: "", texto: "", imagen_url: "" });
+  const [subiendo, setSubiendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
+  const bonus = user.profile?.monedas_bonus || 0;
+  const earned = myPts * TIENDA_RATE + bonus;
+  const spent = purchases.reduce((s, p) => s + (p.precio || 0), 0);
+  const saldo = earned - spent;
+  const miMarco = user.profile?.avatar_frame || null;
+
+  async function loadAll() {
+    const [itemsRes, purchRes] = await Promise.all([
+      sb.from("store_items").select("*").order("precio", { ascending: true }),
+      sb.from("store_purchases").select("*").eq("user_id", user.id),
+    ]);
+    setItems(itemsRes.data || []);
+    setPurchases(purchRes.data || []);
+    setLoading(false);
+  }
+  useEffect(() => { loadAll(); }, []);
+
+  const visibles = items.filter(it => it.activo);
+
+  function upcomingMatches() {
+    const now = nowMs();
+    return (matches || [])
+      .filter(m => m.status !== "finished" && new Date(m.kickoff_at).getTime() > now)
+      .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
+  }
+
+  async function comprar(itemKey, metadata = {}) {
+    setBusy(itemKey);
+    const { data, error } = await sb.rpc("comprar_item", { p_item_key: itemKey, p_metadata: metadata });
+    setBusy(null);
+    if (error || !data || !data.ok) {
+      setModal({ type: "error", msg: (data && data.error) || "No se pudo completar la compra." });
+      return null;
+    }
+    await loadAll();
+    return data;
+  }
+
+  async function comprarItem(it) {
+    if (it.tipo === "frame") { setFramePicker(it.key); setSpyPicker(null); return; }
+    if (it.tipo === "espiar") { setSpyPicker(it.key); setFramePicker(null); return; }
+    const r = await comprar(it.key);
+    if (r && r.ok) {
+      if (it.tipo === "gag") setModal({ type: "gag", item: it });
+      else setModal({ type: "generic", item: it });
+    }
+  }
+  async function comprarFrame(itemKey, frameKey) {
+    const r = await comprar(itemKey, { frame: frameKey });
+    if (r && r.ok) {
+      setFramePicker(null);
+      if (onRefresh) onRefresh();
+      setModal({ type: "frame_ok", frameKey });
+    }
+  }
+  async function comprarEspiar(itemKey, target) {
+    const r = await comprar(itemKey, { target_id: target.id, target_name: target.name });
+    if (r && r.ok) {
+      const ups = upcomingMatches().slice(0, 5);
+      const fakes = ups.map(m => ({ m, h: Math.floor(Math.random() * 4), a: Math.floor(Math.random() * 4) }));
+      setSpyPicker(null);
+      setModal({ type: "espiar", target, fakes });
+    }
+  }
+
+  // ── gestión admin ──
+  async function subirImagen(file) {
+    setSubiendo(true);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `poster_${Date.now()}.${ext}`;
+    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    if (up.error) { setSubiendo(false); setModal({ type: "error", msg: "No se pudo subir la imagen: " + up.error.message }); return; }
+    const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+    setNuevo(n => ({ ...n, imagen_url: pub.publicUrl }));
+    setSubiendo(false);
+  }
+  async function guardarNuevo() {
+    if (!nuevo.key.trim() || !nuevo.nombre.trim()) { setModal({ type: "error", msg: "Completá clave y nombre." }); return; }
+    setGuardando(true);
+    const payload = nuevo.tipo === "gag" ? { titulo: nuevo.titulo, texto: nuevo.texto } : null;
+    const { error } = await sb.from("store_items").insert({
+      key: nuevo.key.trim(), nombre: nuevo.nombre.trim(), emoji: nuevo.emoji || null,
+      precio: Number(nuevo.precio) || 0, tipo: nuevo.tipo, descripcion: nuevo.descripcion || null,
+      imagen_url: nuevo.imagen_url || null, payload, activo: true,
+    });
+    setGuardando(false);
+    if (error) { setModal({ type: "error", msg: "No se pudo crear: " + error.message }); return; }
+    setNuevo({ key: "", nombre: "", emoji: "", tipo: "generico", precio: 10, descripcion: "", titulo: "", texto: "", imagen_url: "" });
+    loadAll();
+  }
+  async function guardarPrecio(key) {
+    const v = Number(precioEdits[key]);
+    if (isNaN(v)) return;
+    await sb.from("store_items").update({ precio: v }).eq("key", key);
+    setPrecioEdits(e => { const c = { ...e }; delete c[key]; return c; });
+    loadAll();
+  }
+  async function toggleActivo(it) {
+    await sb.from("store_items").update({ activo: !it.activo }).eq("key", it.key);
+    loadAll();
+  }
+  async function borrarItem(key) {
+    await sb.from("store_items").delete().eq("key", key);
+    loadAll();
+  }
+
+  const otros = (profiles || []).filter(p => p.id !== user.id);
+  const inp = { padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none", width: "100%" };
+
+  return (
+    <div className="container">
+      <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>🛒 Tienda</h2>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Ganás 1 Petro por cada punto que sumás en los partidos.</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>TUS PETROS</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}>🪙 {saldo}</div>
+          </div>
+        </div>
+        {isAdmin && (
+          <div className="pre-tabs" style={{ marginTop: 14 }}>
+            <button className={`pre-tab ${sub === "comprar" ? "active" : ""}`} onClick={() => setSub("comprar")}>🛍️ Comprar</button>
+            <button className={`pre-tab ${sub === "gestion" ? "active" : ""}`} onClick={() => setSub("gestion")}>⚙️ Gestión</button>
+          </div>
+        )}
+      </div>
+
+      {sub === "comprar" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div>
+            : visibles.length === 0 ? <div style={{ color: "var(--muted)", fontSize: 13 }}>No hay ítems disponibles por ahora.</div>
+            : visibles.map(it => {
+            const noPlata = saldo < it.precio;
+            const cargando = busy === it.key;
+            return (
+              <div key={it.key} className="card" style={{ padding: "14px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  {it.imagen_url
+                    ? <img src={it.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                    : <div style={{ fontSize: 30, flexShrink: 0, width: 46, textAlign: "center" }}>{it.emoji || "🎁"}</div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{it.nombre}</div>
+                    {it.descripcion && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{it.descripcion}</div>}
+                    {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>Tenés equipado: {miMarco}</div>}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--gold)", marginBottom: 6 }}>🪙 {it.precio}</div>
+                    <button onClick={() => comprarItem(it)} disabled={noPlata || cargando}
+                      style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: noPlata ? "var(--surface)" : "var(--gold)", color: noPlata ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: noPlata ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                      {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : "Comprar"}
+                    </button>
+                  </div>
+                </div>
+
+                {it.tipo === "frame" && framePicker === it.key && (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Elegí un color (se descuentan 🪙 {it.precio}):</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      {STORE_FRAMES.map(f => (
+                        <button key={f.key} onClick={() => comprarFrame(it.key, f.key)} disabled={busy === it.key} title={f.nombre}
+                          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                          <span style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--surface)", boxShadow: `0 0 0 2px ${f.color}, 0 0 10px ${f.color}99`, display: "block" }} />
+                          <span style={{ fontSize: 10, color: "var(--muted)" }}>{f.nombre}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setFramePicker(null)} style={{ marginTop: 10, background: "none", border: "none", color: "var(--muted)", fontSize: 12, cursor: "pointer", padding: 0 }}>Cancelar</button>
+                  </div>
+                )}
+
+                {it.tipo === "espiar" && spyPicker === it.key && (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>¿A quién querés espiar? (se descuentan 🪙 {it.precio})</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+                      {otros.map(o => (
+                        <button key={o.id} onClick={() => comprarEspiar(it.key, o)} disabled={busy === it.key}
+                          style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", cursor: "pointer", textAlign: "left" }}>
+                          <Avatar profile={o} size="sm" />
+                          <span style={{ fontSize: 13, color: "var(--txt)" }}>{o.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setSpyPicker(null)} style={{ marginTop: 10, background: "none", border: "none", color: "var(--muted)", fontSize: 12, cursor: "pointer", padding: 0 }}>Cancelar</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sub === "gestion" && isAdmin && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>➕ Nuevo ítem</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input style={{ ...inp, flex: "1 1 120px" }} placeholder="clave (sin espacios)" value={nuevo.key} onChange={e => setNuevo(n => ({ ...n, key: e.target.value.replace(/\s/g, "_") }))} />
+                <input style={{ ...inp, flex: "2 1 160px" }} placeholder="Nombre visible" value={nuevo.nombre} onChange={e => setNuevo(n => ({ ...n, nombre: e.target.value }))} />
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input style={{ ...inp, flex: "0 1 80px" }} placeholder="emoji" value={nuevo.emoji} onChange={e => setNuevo(n => ({ ...n, emoji: e.target.value }))} />
+                <input style={{ ...inp, flex: "0 1 100px" }} type="number" placeholder="precio" value={nuevo.precio} onChange={e => setNuevo(n => ({ ...n, precio: e.target.value }))} />
+                <select style={{ ...inp, flex: "1 1 160px" }} value={nuevo.tipo} onChange={e => setNuevo(n => ({ ...n, tipo: e.target.value }))}>
+                  {Object.entries(TIPO_INFO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <input style={inp} placeholder="Descripción (opcional)" value={nuevo.descripcion} onChange={e => setNuevo(n => ({ ...n, descripcion: e.target.value }))} />
+              {nuevo.tipo === "gag" && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input style={{ ...inp, flex: "1 1 140px" }} placeholder='Título del cartel (ej: "¡Ohh, era falso!!")' value={nuevo.titulo} onChange={e => setNuevo(n => ({ ...n, titulo: e.target.value }))} />
+                  <input style={{ ...inp, flex: "1 1 140px" }} placeholder="Texto del cartel" value={nuevo.texto} onChange={e => setNuevo(n => ({ ...n, texto: e.target.value }))} />
+                </div>
+              )}
+              {nuevo.tipo === "poster" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
+                    {subiendo ? "Subiendo…" : "📷 Subir imagen"}
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagen(e.target.files[0]); }} />
+                  </label>
+                  {nuevo.imagen_url && <img src={nuevo.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />}
+                </div>
+              )}
+              <button onClick={guardarNuevo} disabled={guardando} style={{ alignSelf: "flex-start", padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{guardando ? "Guardando…" : "Crear ítem"}</button>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📦 Ítems ({items.length})</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {items.map(it => (
+                <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 20 }}>{it.emoji || "🎁"}</span>
+                  <div style={{ flex: "1 1 120px", minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{it.nombre}</div>
+                    <div style={{ fontSize: 10, color: "var(--muted)" }}>{it.key} · {it.tipo}{!it.activo ? " · inactivo" : ""}</div>
+                  </div>
+                  <input type="number" value={precioEdits[it.key] !== undefined ? precioEdits[it.key] : it.precio}
+                    onChange={e => setPrecioEdits(p => ({ ...p, [it.key]: e.target.value }))}
+                    style={{ width: 70, padding: "5px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+                  {precioEdits[it.key] !== undefined && precioEdits[it.key] != it.precio && (
+                    <button onClick={() => guardarPrecio(it.key)} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "var(--green)", color: "#07140c", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>💾</button>
+                  )}
+                  <button onClick={() => toggleActivo(it)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: it.activo ? "var(--green)" : "var(--muted)", fontSize: 12, cursor: "pointer" }}>{it.activo ? "Activo" : "Off"}</button>
+                  <button onClick={() => borrarItem(it.key)} style={{ padding: "5px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal && (
+        <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "24px 22px", textAlign: "center" }}>
+            {modal.type === "gag" && (<>
+              <div style={{ fontSize: 52 }}>{modal.item.emoji || "🃏"}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>{(modal.item.payload && modal.item.payload.titulo) || "¡Ohh, era falso!!"}</div>
+              <div style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>{(modal.item.payload && modal.item.payload.texto) || "Suerte para la próxima :("}</div>
+            </>)}
+            {modal.type === "frame_ok" && (<>
+              <div style={{ fontSize: 52 }}>🖼️</div>
+              <div style={{ fontSize: 19, fontWeight: 800, marginTop: 8 }}>¡Marco equipado!</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>Tu avatar ahora tiene el marco <b>{modal.frameKey}</b>.</div>
+            </>)}
+            {modal.type === "espiar" && (<>
+              <div style={{ fontSize: 40 }}>🕵️</div>
+              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 6 }}>Pronósticos de {modal.target.name}</div>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }}>
+                {modal.fakes.length === 0
+                  ? <div style={{ fontSize: 13, color: "var(--muted)", textAlign: "center" }}>No hay partidos próximos para espiar… o te están escondiendo algo. 👀</div>
+                  : modal.fakes.map((f, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, padding: "6px 10px" }}>
+                        <span style={{ color: "var(--txt)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.m.home} vs {f.m.away}</span>
+                        <span style={{ color: "var(--gold)", fontWeight: 700, flexShrink: 0 }}>{f.h} - {f.a}</span>
+                      </div>
+                    ))}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 10, fontStyle: "italic" }}>Fuentes 100% confiables 🤞</div>
+            </>)}
+            {modal.type === "generic" && (<>
+              {modal.item.imagen_url
+                ? <img src={modal.item.imagen_url} alt="" style={{ maxWidth: "100%", borderRadius: 10, marginBottom: 10 }} />
+                : <div style={{ fontSize: 52 }}>{modal.item.emoji || "🎁"}</div>}
+              <div style={{ fontSize: 19, fontWeight: 800, marginTop: 8 }}>¡Lo conseguiste!</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>{modal.item.nombre}</div>
+            </>)}
+            {modal.type === "error" && (<>
+              <div style={{ fontSize: 44 }}>😬</div>
+              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{modal.msg}</div>
+            </>)}
+            <button onClick={() => setModal(null)} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -6456,6 +6804,7 @@ export default function App() {
           {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
+          {isAdmin && <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>}
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
@@ -6480,6 +6829,7 @@ export default function App() {
         {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
+        {isAdmin && <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>}
         {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
           <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
@@ -6507,6 +6857,7 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
+        {tab==="tienda"    && isAdmin && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
           <DebtorOverlay
