@@ -6208,6 +6208,23 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
     return base.sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at)).slice(0, 5);
   }
 
+  function seedScore(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return Math.abs(h);
+  }
+  function spyFakes(pid) {
+    return spyPool().map(m => ({
+      m,
+      h: seedScore(String(pid) + "H" + m.id) % 4,
+      a: seedScore(String(pid) + "A" + m.id) % 4,
+    }));
+  }
+  function reSpy(p) {
+    const targetName = (p.metadata && p.metadata.target_name) || "alguien";
+    setModal({ type: "espiar", target: { name: targetName }, fakes: spyFakes(p.id) });
+  }
+
   async function comprar(itemKey, metadata = {}) {
     setBusy(itemKey);
     const { data, error } = await sb.rpc("comprar_item", { p_item_key: itemKey, p_metadata: metadata });
@@ -6256,10 +6273,12 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
         setConfirm(null);
         const r = await comprar(itemKey, { target_id: target.id, target_name: target.name });
         if (r && r.ok) {
-          const ups = spyPool();
-          const fakes = ups.map(m => ({ m, h: Math.floor(Math.random() * 4), a: Math.floor(Math.random() * 4) }));
           setSpyPicker(null);
-          setModal({ type: "espiar", target, fakes });
+          const { data: last } = await sb.from("store_purchases").select("id")
+            .eq("user_id", user.id).eq("item_key", itemKey)
+            .order("created_at", { ascending: false }).limit(1);
+          const pid = (last && last[0] && last[0].id) || (String(target.id) + itemKey);
+          setModal({ type: "espiar", target, fakes: spyFakes(pid) });
         }
       },
     });
@@ -6450,8 +6469,9 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                   {lista.map(p => {
                     const it = itemByKey[p.item_key];
                     const buyer = profileById[p.user_id];
+                    const esEspia = it && it.tipo === "espiar";
                     return (
-                      <div key={p.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" }}>
+                      <div key={p.id} onClick={esEspia ? () => reSpy(p) : undefined} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", cursor: esEspia ? "pointer" : "default" }}>
                         {it && it.imagen_url
                           ? <img src={it.imagen_url} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                           : <div style={{ fontSize: 26, width: 40, textAlign: "center", flexShrink: 0 }}>{(it && it.emoji) || "🎁"}</div>}
@@ -6460,6 +6480,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
                             {isAdmin && comprasView === "todas" ? `${(buyer && buyer.name) || "?"} · ` : ""}{fmt(p.created_at)}
                           </div>
+                          {esEspia && <div style={{ fontSize: 11, color: "var(--gold)", marginTop: 3, fontWeight: 600 }}>👁️ Tocá para volver a ver lo espiado</div>}
                         </div>
                         <span className="tienda-price"><PetroCoin size={13} /> {p.precio}</span>
                       </div>
