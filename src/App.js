@@ -6082,8 +6082,8 @@ function Ruleta({ pool, won, onFinish }) {
   }, []);
   const [offset, setOffset] = useState(0);
   useEffect(() => {
-    const jitter = Math.random() * 40 - 20;
-    const final = -(WIN * STEP - (VIEW / 2 - CELL / 2)) + jitter;
+    const jitter = Math.random() * 36 - 18;
+    const final = -(WIN * STEP) + jitter;
     const t1 = setTimeout(() => setOffset(final), 80);
     const t2 = setTimeout(() => onFinish && onFinish(), 4300);
     return () => { clearTimeout(t1); clearTimeout(t2); };
