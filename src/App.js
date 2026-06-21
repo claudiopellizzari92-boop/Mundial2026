@@ -250,6 +250,15 @@ input,button,select{font-family:inherit;}
 .frame-violeta{box-shadow:0 0 0 2px #a78bfa,0 0 12px rgba(167,139,250,.7);}
 .frame-verde{box-shadow:0 0 0 2px #2adf7a,0 0 12px rgba(42,223,122,.6);}
 .frame-azul{box-shadow:0 0 0 2px #4a9eff,0 0 12px rgba(74,158,255,.6);}
+.tienda-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+@media(min-width:760px){.tienda-grid{grid-template-columns:1fr 1fr;}}
+.tienda-item{background:linear-gradient(135deg,var(--card),var(--surface));border:1px solid var(--border);border-radius:16px;padding:16px;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease;}
+.tienda-item:hover{transform:translateY(-2px);border-color:rgba(245,183,49,.45);box-shadow:0 8px 24px rgba(0,0,0,.32);}
+.tienda-row{display:flex;align-items:center;gap:14px;}
+.tienda-thumb{width:58px;height:58px;border-radius:13px;object-fit:cover;flex-shrink:0;box-shadow:0 0 0 1px var(--border);}
+.tienda-price{display:inline-flex;align-items:center;gap:5px;background:rgba(245,183,49,.13);border:1px solid rgba(245,183,49,.32);border-radius:999px;padding:3px 11px;font-weight:800;color:var(--gold);font-size:13px;white-space:nowrap;}
+.tienda-buy{padding:8px 18px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:filter .15s ease;}
+.tienda-buy:hover{filter:brightness(1.08);}
 @keyframes popIn{0%{transform:scale(.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
 @keyframes skelShimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
 .skel{background:linear-gradient(90deg,var(--surface) 25%,var(--border) 37%,var(--surface) 63%);background-size:400% 100%;animation:skelShimmer 1.4s ease infinite;border-radius:8px;display:block;}
@@ -6260,29 +6269,29 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
       </div>
 
       {sub === "comprar" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="tienda-grid">
           {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div>
             : visibles.length === 0 ? <div style={{ color: "var(--muted)", fontSize: 13 }}>No hay ítems disponibles por ahora.</div>
             : visibles.map(it => {
             const noPlata = !isAdmin && saldo < it.precio;
             const cargando = busy === it.key;
             return (
-              <div key={it.key} className="card" style={{ padding: "14px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div key={it.key} className="tienda-item">
+                <div className="tienda-row">
                   <div onClick={() => setDetail(it)} style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0, cursor: "pointer" }}>
                     {it.imagen_url
-                      ? <img src={it.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-                      : <div style={{ fontSize: 30, flexShrink: 0, width: 46, textAlign: "center" }}>{it.emoji || "🎁"}</div>}
+                      ? <img src={it.imagen_url} alt="" className="tienda-thumb" />
+                      : <div className="tienda-thumb" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, background: "var(--surface)" }}>{it.emoji || "🎁"}</div>}
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700 }}>{it.nombre}</div>
-                      {it.descripcion && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{it.descripcion}</div>}
-                      {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>Tenés equipado: {miMarco}</div>}
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{it.nombre}</div>
+                      {it.descripcion && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3, lineHeight: 1.4 }}>{it.descripcion}</div>}
+                      {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 4 }}>Tenés equipado: {miMarco}</div>}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--gold)", marginBottom: 6 }}><PetroCoin size={14} /> {it.precio}</div>
-                    <button onClick={() => comprarItem(it)} disabled={noPlata || cargando}
-                      style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: noPlata ? "var(--surface)" : "var(--gold)", color: noPlata ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: noPlata ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                    <span className="tienda-price"><PetroCoin size={14} /> {it.precio}</span>
+                    <button onClick={() => comprarItem(it)} disabled={noPlata || cargando} className="tienda-buy"
+                      style={{ background: noPlata ? "var(--surface)" : "linear-gradient(135deg,#f5d36b,#e0a92e)", color: noPlata ? "var(--muted)" : "#1a1a1a", cursor: noPlata ? "not-allowed" : "pointer", opacity: cargando ? .6 : 1 }}>
                       {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : "Comprar"}
                     </button>
                   </div>
