@@ -6107,6 +6107,8 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const [modal, setModal] = useState(null);
   const [detail, setDetail] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [comprasView, setComprasView] = useState("mias");
+  const [allPurchases, setAllPurchases] = useState([]);
 
   // gestión (admin)
   const [precioEdits, setPrecioEdits] = useState({});
@@ -6126,12 +6128,15 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const miMarco = user.profile?.avatar_frame || null;
 
   async function loadAll() {
-    const [itemsRes, purchRes] = await Promise.all([
+    const promesas = [
       sb.from("store_items").select("*").order("precio", { ascending: true }),
-      sb.from("store_purchases").select("*").eq("user_id", user.id),
-    ]);
-    setItems(itemsRes.data || []);
-    setPurchases(purchRes.data || []);
+      sb.from("store_purchases").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+    ];
+    if (isAdmin) promesas.push(sb.from("store_purchases").select("*").order("created_at", { ascending: false }));
+    const res = await Promise.all(promesas);
+    setItems(res[0].data || []);
+    setPurchases(res[1].data || []);
+    if (isAdmin) setAllPurchases(res[2].data || []);
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
@@ -6296,12 +6301,11 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--gold)", lineHeight: 1.1, marginTop: 3, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={24} /> {isAdmin ? "∞" : saldo}</div>
           </div>
         </div>
-        {isAdmin && (
-          <div className="pre-tabs" style={{ marginTop: 14 }}>
-            <button className={`pre-tab ${sub === "comprar" ? "active" : ""}`} onClick={() => setSub("comprar")}>🛍️ Comprar</button>
-            <button className={`pre-tab ${sub === "gestion" ? "active" : ""}`} onClick={() => setSub("gestion")}>⚙️ Gestión</button>
-          </div>
-        )}
+        <div className="pre-tabs" style={{ marginTop: 14 }}>
+          <button className={`pre-tab ${sub === "comprar" ? "active" : ""}`} onClick={() => setSub("comprar")}>🛍️ Comprar</button>
+          <button className={`pre-tab ${sub === "compras" ? "active" : ""}`} onClick={() => setSub("compras")}>🎒 Mis compras</button>
+          {isAdmin && <button className={`pre-tab ${sub === "gestion" ? "active" : ""}`} onClick={() => setSub("gestion")}>⚙️ Gestión</button>}
+        </div>
       </div>
 
       {sub === "comprar" && (
@@ -6369,6 +6373,45 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
           })}
         </div>
       )}
+
+      {sub === "compras" && (() => {
+        const itemByKey = {}; items.forEach(i => { itemByKey[i.key] = i; });
+        const profileById = {}; (profiles || []).forEach(p => { profileById[p.id] = p; });
+        const lista = (isAdmin && comprasView === "todas") ? allPurchases : purchases;
+        const fmt = (d) => new Date(d).toLocaleDateString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+        return (
+          <div>
+            {isAdmin && (
+              <div className="pre-tabs" style={{ marginBottom: 14 }}>
+                <button className={`pre-tab ${comprasView === "mias" ? "active" : ""}`} onClick={() => setComprasView("mias")}>Mías</button>
+                <button className={`pre-tab ${comprasView === "todas" ? "active" : ""}`} onClick={() => setComprasView("todas")}>Todas ({allPurchases.length})</button>
+              </div>
+            )}
+            {lista.length === 0
+              ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Todavía no hay compras por acá.</div>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {lista.map(p => {
+                    const it = itemByKey[p.item_key];
+                    const buyer = profileById[p.user_id];
+                    return (
+                      <div key={p.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" }}>
+                        {it && it.imagen_url
+                          ? <img src={it.imagen_url} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                          : <div style={{ fontSize: 26, width: 40, textAlign: "center", flexShrink: 0 }}>{(it && it.emoji) || "🎁"}</div>}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>{(it && it.nombre) || p.item_key}</div>
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                            {isAdmin && comprasView === "todas" ? `${(buyer && buyer.name) || "?"} · ` : ""}{fmt(p.created_at)}
+                          </div>
+                        </div>
+                        <span className="tienda-price"><PetroCoin size={13} /> {p.precio}</span>
+                      </div>
+                    );
+                  })}
+                </div>}
+          </div>
+        );
+      })()}
 
       {sub === "gestion" && isAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
