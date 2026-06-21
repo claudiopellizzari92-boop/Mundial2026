@@ -6114,11 +6114,15 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
 
   const visibles = items.filter(it => it.activo);
 
-  function upcomingMatches() {
-    const now = nowMs();
-    return (matches || [])
-      .filter(m => m.status !== "finished" && new Date(m.kickoff_at).getTime() > now)
-      .sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at));
+  function spyPool() {
+    const sinResultado = (matches || []).filter(m =>
+      m.status !== "finished" && m.home_score == null && m.away_score == null
+    );
+    const bloqueados = sinResultado.filter(m => isLocked(m.kickoff_at, matches, m.match_date));
+    const base = bloqueados.length
+      ? bloqueados
+      : sinResultado.filter(m => new Date(m.kickoff_at).getTime() > nowMs());
+    return base.sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at)).slice(0, 5);
   }
 
   async function comprar(itemKey, metadata = {}) {
@@ -6153,7 +6157,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   async function comprarEspiar(itemKey, target) {
     const r = await comprar(itemKey, { target_id: target.id, target_name: target.name });
     if (r && r.ok) {
-      const ups = upcomingMatches().slice(0, 5);
+      const ups = spyPool();
       const fakes = ups.map(m => ({ m, h: Math.floor(Math.random() * 4), a: Math.floor(Math.random() * 4) }));
       setSpyPicker(null);
       setModal({ type: "espiar", target, fakes });
@@ -6368,7 +6372,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
               <div style={{ fontSize: 17, fontWeight: 800, marginTop: 6 }}>Pronósticos de {modal.target.name}</div>
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }}>
                 {modal.fakes.length === 0
-                  ? <div style={{ fontSize: 13, color: "var(--muted)", textAlign: "center" }}>No hay partidos próximos para espiar… o te están escondiendo algo. 👀</div>
+                  ? <div style={{ fontSize: 13, color: "var(--muted)", textAlign: "center" }}>No hay partidos bloqueados para espiar ahora… o te están escondiendo algo. 👀</div>
                   : modal.fakes.map((f, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 7, padding: "6px 10px" }}>
                         <span style={{ color: "var(--txt)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.m.home} vs {f.m.away}</span>
