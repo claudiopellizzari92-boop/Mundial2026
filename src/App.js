@@ -6096,6 +6096,15 @@ const TIPO_INFO = {
   generico: { label: "Genérico (solo descuenta Petros)" },
 };
 
+const PETRO_PACKS = [
+  { cant: 30, precio: "$2.49" },
+  { cant: 80, precio: "$5.99" },
+  { cant: 170, precio: "$11.99", badge: "POPULAR" },
+  { cant: 360, precio: "$23.99" },
+  { cant: 950, precio: "$59.99" },
+  { cant: 2000, precio: "$119.99", badge: "MEJOR VALOR" },
+];
+
 function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin }) {
   const [sub, setSub] = useState("comprar");
   const [items, setItems] = useState([]);
@@ -6109,6 +6118,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const [confirm, setConfirm] = useState(null);
   const [comprasView, setComprasView] = useState("mias");
   const [allPurchases, setAllPurchases] = useState([]);
+  const [packsOpen, setPacksOpen] = useState(false);
 
   // gestión (admin)
   const [precioEdits, setPrecioEdits] = useState({});
@@ -6296,9 +6306,12 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <h2 style={{ margin: 0, fontSize: 20 }}>🛒 Tienda</h2>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Ganás 1 Petro por cada punto que sumás en los partidos.</div>
           </div>
-          <div style={{ textAlign: "right", background: "rgba(245,183,49,0.12)", border: "1px solid rgba(245,183,49,0.35)", borderRadius: 12, padding: "8px 14px" }}>
-            <div style={{ fontSize: 12, color: "var(--txt)", fontWeight: 700, letterSpacing: 0.5 }}>TUS PETROS</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--gold)", lineHeight: 1.1, marginTop: 3, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={24} /> {isAdmin ? "∞" : saldo}</div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <div style={{ textAlign: "right", background: "rgba(245,183,49,0.12)", border: "1px solid rgba(245,183,49,0.35)", borderRadius: 12, padding: "8px 14px" }}>
+              <div style={{ fontSize: 12, color: "var(--txt)", fontWeight: 700, letterSpacing: 0.5 }}>TUS PETROS</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: "var(--gold)", lineHeight: 1.1, marginTop: 3, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={24} /> {isAdmin ? "∞" : saldo}</div>
+            </div>
+            <button onClick={() => setPacksOpen(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>＋ Conseguí más Petros</button>
           </div>
         </div>
         <div className="pre-tabs" style={{ marginTop: 14 }}>
@@ -6511,6 +6524,28 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
         </div>
       )}
 
+      {packsOpen && (
+        <div onClick={() => setPacksOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.78)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1050, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 520, width: "100%", padding: 22, maxHeight: "86vh", overflowY: "auto" }}>
+            <div style={{ textAlign: "center", fontSize: 20, fontWeight: 800 }}>💰 Conseguí más Petros</div>
+            <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", marginTop: 4, marginBottom: 16 }}>Packs especiales ¡por tiempo limitado!</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+              {PETRO_PACKS.map(pk => (
+                <button key={pk.cant} onClick={() => { setPacksOpen(false); setModal({ type: "broma_petros" }); }}
+                  style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "stretch", background: "linear-gradient(160deg,#f5d36b,#cf9620)", border: "none", borderRadius: 14, padding: 0, cursor: "pointer", overflow: "hidden", color: "#3a2c05" }}>
+                  <div style={{ background: pk.badge ? "#e53950" : "transparent", color: "#fff", fontSize: 9, fontWeight: 800, padding: "3px 0", letterSpacing: 0.5, textAlign: "center", minHeight: 15 }}>{pk.badge || ""}</div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 8px 10px" }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, textShadow: "0 1px 0 rgba(255,255,255,.45)" }}>{pk.cant}</div>
+                    <PetroCoin size={38} />
+                  </div>
+                  <div style={{ background: "rgba(0,0,0,.4)", color: "#fff", fontWeight: 800, fontSize: 15, padding: "8px 0", textAlign: "center" }}>{pk.precio}</div>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setPacksOpen(false)} style={{ marginTop: 16, width: "100%", padding: "9px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 420, width: "100%", padding: "22px 22px", textAlign: "center" }}>
@@ -6545,6 +6580,11 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
       {modal && (
         <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "24px 22px", textAlign: "center" }}>
+            {modal.type === "broma_petros" && (<>
+              <div style={{ fontSize: 52 }}>🤡</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>¿En serio ibas a pagar?</div>
+              <div style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>Los Petros no se compran con plata, se ganan clavando pronósticos. Andá a jugar. 😏</div>
+            </>)}
             {modal.type === "gag" && (<>
               <div style={{ fontSize: 52 }}>{modal.item.emoji || "🃏"}</div>
               <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>{(modal.item.payload && modal.item.payload.titulo) || "¡Ohh, era falso!!"}</div>
