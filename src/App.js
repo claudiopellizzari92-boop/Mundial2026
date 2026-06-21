@@ -6343,6 +6343,14 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             .order("created_at", { ascending: false }).limit(1);
           const pid = (last && last[0] && last[0].id) || (String(target.id) + itemKey);
           setModal({ type: "espiar", target, fakes: spyFakes(pid) });
+          if (target.id !== user.id) {
+            sb.rpc("avisar_espionaje", { p_target_id: target.id });
+            sendPushNotification("users", [target.id], {
+              title: "🕵️ Te quisieron espiar",
+              body: `${user.profile?.name || "Alguien"} intentó espiar tus resultados pero no tuvo suerte`,
+              tag: `spy-${target.id}-${Date.now()}`, url: "/",
+            });
+          }
         }
       },
     });
@@ -6829,6 +6837,7 @@ export default function App() {
   const [allPredictions, setAllPredictions] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [mySpent, setMySpent] = useState(0);
+  const [avisos, setAvisos] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -7093,6 +7102,11 @@ export default function App() {
     if (myPq.data) setMyPredictions(myPq.data);
     if (allPq.data) setAllPredictions(allPq.data);
     if (profq.data) setProfiles(profq.data);
+    {
+      const { data: av } = await sb.from("avisos").select("*")
+        .eq("user_id", user.id).eq("leido", false).order("created_at", { ascending: true });
+      if (av) setAvisos(av);
+    }
     if (purchq && purchq.data) setMySpent(purchq.data.reduce((s, p) => s + (p.precio || 0), 0));
     if (adminq.data) setIsAdmin(adminq.data.length>0);
     setLoaded(true);
@@ -7205,6 +7219,12 @@ export default function App() {
   const myWalletPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const myWallet = myWalletPts * TIENDA_RATE + (user.profile?.monedas_bonus || 0) - mySpent;
 
+  async function cerrarAvisos() {
+    const ids = avisos.map(a => a.id);
+    setAvisos([]);
+    if (ids.length) await sb.from("avisos").update({ leido: true }).in("id", ids);
+  }
+
   return (<><style>{css}</style>
     <div className={`shell${darkMode ? "" : " light-mode"}`}>
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
@@ -7254,6 +7274,24 @@ export default function App() {
           <button className="hamburger" onClick={()=>setMenuOpen(o=>!o)}><span/><span/><span/></button>
         </div>
       </nav>
+
+      {avisos.length > 0 && (
+        <div onClick={cerrarAvisos} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: 22, textAlign: "center" }}>
+            <div style={{ fontSize: 40 }}>🔔</div>
+            <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{avisos.length === 1 ? "Tenés un aviso" : `Tenés ${avisos.length} avisos`}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14, textAlign: "left" }}>
+              {avisos.map(a => (
+                <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px" }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{a.emoji || "📩"}</span>
+                  <span style={{ fontSize: 13.5, color: "var(--txt)", lineHeight: 1.4 }}>{a.texto}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={cerrarAvisos} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Entendido</button>
+          </div>
+        </div>
+      )}
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
         {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
