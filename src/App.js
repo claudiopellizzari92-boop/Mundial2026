@@ -282,6 +282,7 @@ input,button,select{font-family:inherit;}
 .hamburger{display:none;flex-direction:column;gap:5px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;cursor:pointer;padding:9px 11px;}
 .hamburger span{display:block;width:22px;height:2.5px;background:var(--gold);border-radius:2px;}
 .desktop-only{display:inline-flex;}
+.mobile-only{display:none;}
 .mobile-menu{display:none;position:fixed;top:62px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;padding:8px 12px;flex-direction:column;gap:2px;}
 .mobile-menu.open{display:flex;}
 .mobile-nav-tab{padding:11px 14px;border-radius:8px;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;text-align:left;transition:all .2s;}
@@ -293,6 +294,7 @@ input,button,select{font-family:inherit;}
   .nav-brand{font-size:18px;}
   .nav-user span{display:none;}
   .desktop-only{display:none!important;}
+  .mobile-only{display:inline-flex!important;}
   .hamburger{display:flex;}
   .main{padding:16px 14px;}
   .dash-grid{grid-template-columns:repeat(3,1fr);gap:8px;}
@@ -6955,6 +6957,7 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
+          {isAdmin && <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>}
           <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
             <Avatar profile={user.profile} />
           </div>
