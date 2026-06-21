@@ -6722,6 +6722,7 @@ export default function App() {
   const [myPredictions, setMyPredictions] = useState([]);
   const [allPredictions, setAllPredictions] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [mySpent, setMySpent] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -6966,12 +6967,13 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const [mq, myPq, allPq, profq, adminq] = await Promise.all([
+    const [mq, myPq, allPq, profq, adminq, purchq] = await Promise.all([
       sb.from("matches").select("*").order("kickoff_at"),
       sb.from("predictions").select("*").eq("user_id", user.id),
       sb.from("predictions").select("*"),
       sb.from("profiles").select("*"),
       sb.from("admins").select("*").eq("user_id", user.id),
+      sb.from("store_purchases").select("precio").eq("user_id", user.id),
     ]);
     const firstErr = mq.error || myPq.error || allPq.error || profq.error || adminq.error;
     if (firstErr) {
@@ -6985,6 +6987,7 @@ export default function App() {
     if (myPq.data) setMyPredictions(myPq.data);
     if (allPq.data) setAllPredictions(allPq.data);
     if (profq.data) setProfiles(profq.data);
+    if (purchq && purchq.data) setMySpent(purchq.data.reduce((s, p) => s + (p.precio || 0), 0));
     if (adminq.data) setIsAdmin(adminq.data.length>0);
     setLoaded(true);
     // Última crónica publicada (para el puntito de aviso en la pestaña Crónica)
@@ -7093,6 +7096,9 @@ export default function App() {
   if (resettingPassword) return (<><style>{css}</style><ResetPasswordScreen onDone={() => setResettingPassword(false)}/></>);
   if (!user) return (<><style>{css}</style><AuthScreen onAuth={setUser}/></>);
 
+  const myWalletPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
+  const myWallet = myWalletPts * TIENDA_RATE + (user.profile?.monedas_bonus || 0) - mySpent;
+
   return (<><style>{css}</style>
     <div className={`shell${darkMode ? "" : " light-mode"}`}>
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
@@ -7123,6 +7129,7 @@ export default function App() {
           {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
         </div>
         <div className="nav-user">
+          <button onClick={()=>goTab("tienda")} title="Mi cartera" style={{display:"inline-flex",alignItems:"center",gap:5,background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"6px 10px",color:"var(--gold)",fontWeight:800,fontSize:14,lineHeight:1}}><PetroCoin size={16}/> {isAdmin ? "∞" : myWallet}</button>
           <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>
           <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
             <Avatar profile={user.profile} />
