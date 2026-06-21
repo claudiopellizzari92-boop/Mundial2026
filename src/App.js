@@ -6119,6 +6119,12 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const [comprasView, setComprasView] = useState("mias");
   const [allPurchases, setAllPurchases] = useState([]);
   const [packsOpen, setPacksOpen] = useState(false);
+  const [packPick, setPackPick] = useState(null);
+  const [codigo, setCodigo] = useState("");
+  const [canjeando, setCanjeando] = useState(false);
+  const [codigos, setCodigos] = useState([]);
+  const [nuevoCodCant, setNuevoCodCant] = useState(30);
+  const [generando, setGenerando] = useState(false);
 
   // gestión (admin)
   const [precioEdits, setPrecioEdits] = useState({});
@@ -6147,9 +6153,47 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
     setItems(res[0].data || []);
     setPurchases(res[1].data || []);
     if (isAdmin) setAllPurchases(res[2].data || []);
+    if (isAdmin) {
+      const { data: cods } = await sb.from("petro_codigos").select("*").order("created_at", { ascending: false });
+      setCodigos(cods || []);
+    }
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
+
+  async function canjear(cod) {
+    const code = (cod || "").trim();
+    if (!code) return;
+    setCanjeando(true);
+    const { data, error } = await sb.rpc("canjear_codigo", { p_codigo: code });
+    setCanjeando(false);
+    if (error || !data || !data.ok) {
+      setModal({ type: "error", msg: (data && data.error) || "No se pudo canjear el código." });
+      return;
+    }
+    setPacksOpen(false); setPackPick(null); setCodigo("");
+    if (onRefresh) onRefresh();
+    setModal({ type: "canje_ok", cantidad: data.cantidad });
+  }
+  function randomCode() {
+    const s = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let c = "";
+    for (let i = 0; i < 5; i++) c += s[Math.floor(Math.random() * s.length)];
+    return "PETRO-" + c;
+  }
+  async function generarCodigo() {
+    const cant = Number(nuevoCodCant) || 0;
+    if (cant <= 0) { setModal({ type: "error", msg: "Poné una cantidad mayor a 0." }); return; }
+    setGenerando(true);
+    const { error } = await sb.from("petro_codigos").insert({ codigo: randomCode(), cantidad: cant });
+    setGenerando(false);
+    if (error) { setModal({ type: "error", msg: "No se pudo generar: " + error.message }); return; }
+    loadAll();
+  }
+  async function borrarCodigo(cod) {
+    await sb.from("petro_codigos").delete().eq("codigo", cod);
+    loadAll();
+  }
 
   const visibles = items.filter(it => it.activo);
 
@@ -6429,6 +6473,33 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
       {sub === "gestion" && isAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🎟️ Códigos de Petros</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Generar código por</span>
+              <input type="number" value={nuevoCodCant} onChange={e => setNuevoCodCant(e.target.value)} style={{ width: 90, padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+              <span style={{ fontSize: 13, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}><PetroCoin size={14} /> Petros</span>
+              <button onClick={generarCodigo} disabled={generando} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{generando ? "…" : "Generar"}</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+              {codigos.length === 0
+                ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no generaste códigos.</div>
+                : codigos.map(c => {
+                    const buyer = (profiles || []).find(p => p.id === c.usado_por);
+                    return (
+                      <div key={c.codigo} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", flexWrap: "wrap", opacity: c.usado_por ? .55 : 1 }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, letterSpacing: 1, color: c.usado_por ? "var(--muted)" : "var(--gold)" }}>{c.codigo}</span>
+                        <span style={{ fontSize: 12, color: "var(--txt)", display: "flex", alignItems: "center", gap: 3 }}><PetroCoin size={12} /> {c.cantidad}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: "var(--muted)", textAlign: "right" }}>{c.usado_por ? `Usado por ${(buyer && buyer.name) || "alguien"}` : "Sin usar"}</span>
+                        {!c.usado_por && (<>
+                          <button onClick={() => { navigator.clipboard && navigator.clipboard.writeText(c.codigo); }} title="Copiar" style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: "var(--blue)", fontSize: 12, cursor: "pointer" }}>📋</button>
+                          <button onClick={() => borrarCodigo(c.codigo)} title="Borrar" style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
+                        </>)}
+                      </div>
+                    );
+                  })}
+            </div>
+          </div>
+          <div className="card" style={{ padding: "16px 18px" }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>➕ Nuevo ítem</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -6525,24 +6596,36 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
       )}
 
       {packsOpen && (
-        <div onClick={() => setPacksOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.78)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1050, padding: 20 }}>
+        <div onClick={() => { setPacksOpen(false); setPackPick(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.78)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1050, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 520, width: "100%", padding: 22, maxHeight: "86vh", overflowY: "auto" }}>
-            <div style={{ textAlign: "center", fontSize: 20, fontWeight: 800 }}>💰 Conseguí más Petros</div>
-            <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", marginTop: 4, marginBottom: 16 }}>Packs especiales ¡por tiempo limitado!</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
-              {PETRO_PACKS.map(pk => (
-                <button key={pk.cant} onClick={() => { setPacksOpen(false); setModal({ type: "broma_petros" }); }}
-                  style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "stretch", background: "linear-gradient(160deg,#f5d36b,#cf9620)", border: "none", borderRadius: 14, padding: 0, cursor: "pointer", overflow: "hidden", color: "#3a2c05" }}>
-                  <div style={{ background: pk.badge ? "#e53950" : "transparent", color: "#fff", fontSize: 9, fontWeight: 800, padding: "3px 0", letterSpacing: 0.5, textAlign: "center", minHeight: 15 }}>{pk.badge || ""}</div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 8px 10px" }}>
-                    <div style={{ fontSize: 24, fontWeight: 900, textShadow: "0 1px 0 rgba(255,255,255,.45)" }}>{pk.cant}</div>
-                    <PetroCoin size={38} />
-                  </div>
-                  <div style={{ background: "rgba(0,0,0,.4)", color: "#fff", fontWeight: 800, fontSize: 15, padding: "8px 0", textAlign: "center" }}>{pk.precio}</div>
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setPacksOpen(false)} style={{ marginTop: 16, width: "100%", padding: "9px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+            {!packPick ? (<>
+              <div style={{ textAlign: "center", fontSize: 20, fontWeight: 800 }}>💰 Conseguí más Petros</div>
+              <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", marginTop: 4, marginBottom: 16 }}>Elegí un pack y canjealo con tu código.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+                {PETRO_PACKS.map(pk => (
+                  <button key={pk.cant} onClick={() => { setPackPick(pk); setCodigo(""); }}
+                    style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "stretch", background: "linear-gradient(160deg,#f5d36b,#cf9620)", border: "none", borderRadius: 14, padding: 0, cursor: "pointer", overflow: "hidden", color: "#3a2c05" }}>
+                    <div style={{ background: pk.badge ? "#e53950" : "transparent", color: "#fff", fontSize: 9, fontWeight: 800, padding: "3px 0", letterSpacing: 0.5, textAlign: "center", minHeight: 15 }}>{pk.badge || ""}</div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 8px 10px" }}>
+                      <div style={{ fontSize: 24, fontWeight: 900, textShadow: "0 1px 0 rgba(255,255,255,.45)" }}>{pk.cant}</div>
+                      <PetroCoin size={38} />
+                    </div>
+                    <div style={{ background: "rgba(0,0,0,.4)", color: "#fff", fontWeight: 800, fontSize: 15, padding: "8px 0", textAlign: "center" }}>{pk.precio}</div>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setPacksOpen(false)} style={{ marginTop: 16, width: "100%", padding: "9px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+            </>) : (<>
+              <div style={{ textAlign: "center", fontSize: 19, fontWeight: 800 }}>Canjear código</div>
+              <div style={{ textAlign: "center", margin: "12px 0 4px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 800, color: "var(--gold)", fontSize: 18 }}><PetroCoin size={20} /> Pack de {packPick.cant} · {packPick.precio}</div>
+              <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>Ingresá el código que te dio el admin.</div>
+              <input value={codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") canjear(codigo); }} placeholder="PETRO-XXXXX" maxLength={40} autoFocus
+                style={{ width: "100%", padding: "11px 12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 9, color: "var(--txt)", fontSize: 16, letterSpacing: 1, textAlign: "center", outline: "none" }} />
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button onClick={() => canjear(codigo)} disabled={canjeando || !codigo.trim()} style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: (canjeando || !codigo.trim()) ? .6 : 1 }}>{canjeando ? "Canjeando…" : "Canjear"}</button>
+                <button onClick={() => setPackPick(null)} style={{ padding: "11px 18px", borderRadius: 9, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 15, cursor: "pointer" }}>Volver</button>
+              </div>
+            </>)}
           </div>
         </div>
       )}
@@ -6580,10 +6663,10 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
       {modal && (
         <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "24px 22px", textAlign: "center" }}>
-            {modal.type === "broma_petros" && (<>
-              <div style={{ fontSize: 52 }}>🤡</div>
-              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>¿En serio ibas a pagar?</div>
-              <div style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>Los Petros no se compran con plata, se ganan clavando pronósticos. Andá a jugar. 😏</div>
+            {modal.type === "canje_ok" && (<>
+              <div style={{ fontSize: 52 }}>🎉</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>¡Código canjeado!</div>
+              <div style={{ fontSize: 15, color: "var(--gold)", fontWeight: 800, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><PetroCoin size={18} /> +{modal.cantidad} Petros</div>
             </>)}
             {modal.type === "gag" && (<>
               <div style={{ fontSize: 52 }}>{modal.item.emoji || "🃏"}</div>
