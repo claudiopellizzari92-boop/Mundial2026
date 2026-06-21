@@ -6228,7 +6228,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>TUS PETROS</div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}><PetroCoin size={22} /> {saldo}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}><PetroCoin size={22} /> {isAdmin ? "∞" : saldo}</div>
           </div>
         </div>
         {isAdmin && (
@@ -6244,7 +6244,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
           {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div>
             : visibles.length === 0 ? <div style={{ color: "var(--muted)", fontSize: 13 }}>No hay ítems disponibles por ahora.</div>
             : visibles.map(it => {
-            const noPlata = saldo < it.precio;
+            const noPlata = !isAdmin && saldo < it.precio;
             const cargando = busy === it.key;
             return (
               <div key={it.key} className="card" style={{ padding: "14px 16px" }}>
