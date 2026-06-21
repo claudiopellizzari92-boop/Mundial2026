@@ -6114,6 +6114,10 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const [nuevo, setNuevo] = useState({ key: "", nombre: "", emoji: "", tipo: "generico", precio: 10, descripcion: "", titulo: "", texto: "", imagen_url: "" });
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editSubiendo, setEditSubiendo] = useState(false);
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const bonus = user.profile?.monedas_bonus || 0;
@@ -6241,6 +6245,39 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   }
   async function borrarItem(key) {
     await sb.from("store_items").delete().eq("key", key);
+    loadAll();
+  }
+  function startEdit(it) {
+    setEditando(it.key);
+    setEditForm({
+      nombre: it.nombre || "", emoji: it.emoji || "", tipo: it.tipo || "generico",
+      precio: it.precio, descripcion: it.descripcion || "",
+      titulo: (it.payload && it.payload.titulo) || "", texto: (it.payload && it.payload.texto) || "",
+      imagen_url: it.imagen_url || "",
+    });
+  }
+  async function subirImagenEdit(file) {
+    setEditSubiendo(true);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `item_${Date.now()}.${ext}`;
+    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    if (up.error) { setEditSubiendo(false); setModal({ type: "error", msg: "No se pudo subir la imagen: " + up.error.message }); return; }
+    const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+    setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
+    setEditSubiendo(false);
+  }
+  async function guardarEdicion() {
+    if (!editForm.nombre.trim()) { setModal({ type: "error", msg: "El nombre no puede quedar vacío." }); return; }
+    setGuardandoEdit(true);
+    const payload = editForm.tipo === "gag" ? { titulo: editForm.titulo, texto: editForm.texto } : null;
+    const { error } = await sb.from("store_items").update({
+      nombre: editForm.nombre.trim(), emoji: editForm.emoji || null,
+      precio: Number(editForm.precio) || 0, tipo: editForm.tipo,
+      descripcion: editForm.descripcion || null, imagen_url: editForm.imagen_url || null, payload,
+    }).eq("key", editando);
+    setGuardandoEdit(false);
+    if (error) { setModal({ type: "error", msg: "No se pudo guardar: " + error.message }); return; }
+    setEditando(null); setEditForm(null);
     loadAll();
   }
 
@@ -6375,20 +6412,56 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📦 Ítems ({items.length})</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {items.map(it => (
-                <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 20 }}>{it.emoji || "🎁"}</span>
-                  <div style={{ flex: "1 1 120px", minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{it.nombre}</div>
-                    <div style={{ fontSize: 10, color: "var(--muted)" }}>{it.key} · {it.tipo}{!it.activo ? " · inactivo" : ""}</div>
+                <div key={it.key} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", flexWrap: "wrap" }}>
+                    {it.imagen_url
+                      ? <img src={it.imagen_url} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                      : <span style={{ fontSize: 20 }}>{it.emoji || "🎁"}</span>}
+                    <div style={{ flex: "1 1 120px", minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{it.nombre}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)" }}>{it.key} · {it.tipo}{!it.activo ? " · inactivo" : ""}</div>
+                    </div>
+                    <input type="number" value={precioEdits[it.key] !== undefined ? precioEdits[it.key] : it.precio}
+                      onChange={e => setPrecioEdits(p => ({ ...p, [it.key]: e.target.value }))}
+                      style={{ width: 70, padding: "5px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--txt)", fontSize: 13, outline: "none" }} />
+                    {precioEdits[it.key] !== undefined && precioEdits[it.key] != it.precio && (
+                      <button onClick={() => guardarPrecio(it.key)} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "var(--green)", color: "#07140c", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>💾</button>
+                    )}
+                    <button onClick={() => editando === it.key ? (setEditando(null), setEditForm(null)) : startEdit(it)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: editando === it.key ? "var(--gold)" : "none", color: editando === it.key ? "#1a1a1a" : "var(--blue)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✏️ Editar</button>
+                    <button onClick={() => toggleActivo(it)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: it.activo ? "var(--green)" : "var(--muted)", fontSize: 12, cursor: "pointer" }}>{it.activo ? "Activo" : "Off"}</button>
+                    <button onClick={() => borrarItem(it.key)} style={{ padding: "5px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
                   </div>
-                  <input type="number" value={precioEdits[it.key] !== undefined ? precioEdits[it.key] : it.precio}
-                    onChange={e => setPrecioEdits(p => ({ ...p, [it.key]: e.target.value }))}
-                    style={{ width: 70, padding: "5px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--txt)", fontSize: 13, outline: "none" }} />
-                  {precioEdits[it.key] !== undefined && precioEdits[it.key] != it.precio && (
-                    <button onClick={() => guardarPrecio(it.key)} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "var(--green)", color: "#07140c", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>💾</button>
+                  {editando === it.key && editForm && (
+                    <div style={{ padding: 12, borderTop: "1px solid var(--border)", background: "var(--card)", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <input style={inp} placeholder="Nombre visible" value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <input style={{ ...inp, flex: "0 1 80px" }} placeholder="emoji" value={editForm.emoji} onChange={e => setEditForm(f => ({ ...f, emoji: e.target.value }))} />
+                        <input style={{ ...inp, flex: "0 1 100px" }} type="number" placeholder="precio" value={editForm.precio} onChange={e => setEditForm(f => ({ ...f, precio: e.target.value }))} />
+                        <select style={{ ...inp, flex: "1 1 160px" }} value={editForm.tipo} onChange={e => setEditForm(f => ({ ...f, tipo: e.target.value }))}>
+                          {Object.entries(TIPO_INFO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                      </div>
+                      <input style={inp} placeholder="Descripción (opcional)" value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />
+                      {editForm.tipo === "gag" && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <input style={{ ...inp, flex: "1 1 140px" }} placeholder="Título del cartel" value={editForm.titulo} onChange={e => setEditForm(f => ({ ...f, titulo: e.target.value }))} />
+                          <input style={{ ...inp, flex: "1 1 140px" }} placeholder="Texto del cartel" value={editForm.texto} onChange={e => setEditForm(f => ({ ...f, texto: e.target.value }))} />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
+                          {editSubiendo ? "Subiendo…" : editForm.imagen_url ? "🖼️ Cambiar imagen" : "🖼️ Subir imagen (opcional)"}
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagenEdit(e.target.files[0]); }} />
+                        </label>
+                        {editForm.imagen_url && <img src={editForm.imagen_url} alt="" style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover" }} />}
+                        {editForm.imagen_url && <button onClick={() => setEditForm(f => ({ ...f, imagen_url: "" }))} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer" }}>Quitar</button>}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={guardarEdicion} disabled={guardandoEdit} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--green)", color: "#07140c", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{guardandoEdit ? "Guardando…" : "Guardar cambios"}</button>
+                        <button onClick={() => { setEditando(null); setEditForm(null); }} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                      </div>
+                    </div>
                   )}
-                  <button onClick={() => toggleActivo(it)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: it.activo ? "var(--green)" : "var(--muted)", fontSize: 12, cursor: "pointer" }}>{it.activo ? "Activo" : "Off"}</button>
-                  <button onClick={() => borrarItem(it.key)} style={{ padding: "5px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
                 </div>
               ))}
             </div>
