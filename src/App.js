@@ -6060,6 +6060,16 @@ function SkeletonStandings() {
   );
 }
 
+// ── Ícono de la moneda Petro ──────────────────────────────────────────────────
+function PetroCoin({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" style={{ display: "inline-block", verticalAlign: "-0.18em", flexShrink: 0 }} aria-hidden="true">
+      <circle cx="16" cy="16" r="16" fill="#cdb24e" />
+      <text x="16" y="22.5" textAnchor="middle" fontSize="21" fontWeight="800" fill="#fff" fontFamily="Arial, system-ui, sans-serif">₽</text>
+    </svg>
+  );
+}
+
 // ── Tienda (perks con Petros) ─────────────────────────────────────────────────
 const TIENDA_RATE = 1; // Petros por punto de partidos
 const STORE_FRAMES = [
@@ -6218,7 +6228,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>TUS PETROS</div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}>🪙 {saldo}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}><PetroCoin size={22} /> {saldo}</div>
           </div>
         </div>
         {isAdmin && (
@@ -6248,7 +6258,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>Tenés equipado: {miMarco}</div>}
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--gold)", marginBottom: 6 }}>🪙 {it.precio}</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--gold)", marginBottom: 6 }}><PetroCoin size={14} /> {it.precio}</div>
                     <button onClick={() => comprarItem(it)} disabled={noPlata || cargando}
                       style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: noPlata ? "var(--surface)" : "var(--gold)", color: noPlata ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: noPlata ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
                       {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : "Comprar"}
@@ -6258,7 +6268,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
 
                 {it.tipo === "frame" && framePicker === it.key && (
                   <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Elegí un color (se descuentan 🪙 {it.precio}):</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Elegí un color (se descuentan <PetroCoin size={13} /> {it.precio}):</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                       {STORE_FRAMES.map(f => (
                         <button key={f.key} onClick={() => comprarFrame(it.key, f.key)} disabled={busy === it.key} title={f.nombre}
@@ -6274,7 +6284,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
 
                 {it.tipo === "espiar" && spyPicker === it.key && (
                   <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>¿A quién querés espiar? (se descuentan 🪙 {it.precio})</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>¿A quién querés espiar? (se descuentan <PetroCoin size={13} /> {it.precio})</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
                       {otros.map(o => (
                         <button key={o.id} onClick={() => comprarEspiar(it.key, o)} disabled={busy === it.key}
