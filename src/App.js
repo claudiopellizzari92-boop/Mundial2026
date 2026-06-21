@@ -4346,13 +4346,10 @@ function Compare({ user, matches, allPredictions, profiles }) {
   });
 
   const allDays = Object.keys(byDay);
-  // Día en el que estamos (si hay partidos hoy); si no, última jugada o próxima a jugarse.
-  const _t = new Date(nowMs());
-  const _ty = _t.getFullYear(), _tm = _t.getMonth(), _td = _t.getDate();
-  const todayDay = allDays.find(d => byDay[d].some(m => {
-    const k = new Date(m.kickoff_at);
-    return k.getFullYear() === _ty && k.getMonth() === _tm && k.getDate() === _td;
-  }));
+  // Día actual = la fecha de hoy en el mismo formato que match_date (YYYY-MM-DD, UTC).
+  // Si hoy no hay partidos, cae a la última jugada o a la próxima a jugarse.
+  const todayKey = new Date(nowMs()).toISOString().slice(0, 10);
+  const todayDay = byDay[todayKey] ? todayKey : null;
   const lockedDays = allDays.filter(d => byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
   const lastLockedDay = lockedDays.length ? lockedDays[lockedDays.length - 1] : null;
   const firstUnlockedDay = allDays.find(d => !byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
