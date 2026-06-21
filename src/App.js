@@ -6097,6 +6097,8 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   const [framePicker, setFramePicker] = useState(null);
   const [spyPicker, setSpyPicker] = useState(null);
   const [modal, setModal] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
   // gestión (admin)
   const [precioEdits, setPrecioEdits] = useState({});
@@ -6147,31 +6149,49 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
     return data;
   }
 
-  async function comprarItem(it) {
+  function txtCosto(precio) {
+    return isAdmin ? "Sos admin: no se te descuentan Petros." : `Se descontarán ₽${precio} de tu saldo.`;
+  }
+  function comprarItem(it) {
+    setDetail(null);
     if (it.tipo === "frame") { setFramePicker(it.key); setSpyPicker(null); return; }
     if (it.tipo === "espiar") { setSpyPicker(it.key); setFramePicker(null); return; }
-    const r = await comprar(it.key);
-    if (r && r.ok) {
-      if (it.tipo === "gag") setModal({ type: "gag", item: it });
-      else setModal({ type: "generic", item: it });
-    }
+    setConfirm({
+      titulo: `¿Comprar "${it.nombre}"?`,
+      texto: txtCosto(it.precio),
+      onOk: async () => {
+        setConfirm(null);
+        const r = await comprar(it.key);
+        if (r && r.ok) setModal(it.tipo === "gag" ? { type: "gag", item: it } : { type: "generic", item: it });
+      },
+    });
   }
-  async function comprarFrame(itemKey, frameKey) {
-    const r = await comprar(itemKey, { frame: frameKey });
-    if (r && r.ok) {
-      setFramePicker(null);
-      if (onRefresh) onRefresh();
-      setModal({ type: "frame_ok", frameKey });
-    }
+  function comprarFrame(itemKey, frameKey, precio) {
+    setConfirm({
+      titulo: `¿Comprar el marco "${frameKey}"?`,
+      texto: txtCosto(precio),
+      onOk: async () => {
+        setConfirm(null);
+        const r = await comprar(itemKey, { frame: frameKey });
+        if (r && r.ok) { setFramePicker(null); if (onRefresh) onRefresh(); setModal({ type: "frame_ok", frameKey }); }
+      },
+    });
   }
-  async function comprarEspiar(itemKey, target) {
-    const r = await comprar(itemKey, { target_id: target.id, target_name: target.name });
-    if (r && r.ok) {
-      const ups = spyPool();
-      const fakes = ups.map(m => ({ m, h: Math.floor(Math.random() * 4), a: Math.floor(Math.random() * 4) }));
-      setSpyPicker(null);
-      setModal({ type: "espiar", target, fakes });
-    }
+  function comprarEspiar(itemKey, target, precio) {
+    setConfirm({
+      titulo: `¿Espiar a ${target.name}?`,
+      texto: txtCosto(precio),
+      onOk: async () => {
+        setConfirm(null);
+        const r = await comprar(itemKey, { target_id: target.id, target_name: target.name });
+        if (r && r.ok) {
+          const ups = spyPool();
+          const fakes = ups.map(m => ({ m, h: Math.floor(Math.random() * 4), a: Math.floor(Math.random() * 4) }));
+          setSpyPicker(null);
+          setModal({ type: "espiar", target, fakes });
+        }
+      },
+    });
   }
 
   // ── gestión admin ──
@@ -6249,13 +6269,15 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             return (
               <div key={it.key} className="card" style={{ padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  {it.imagen_url
-                    ? <img src={it.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-                    : <div style={{ fontSize: 30, flexShrink: 0, width: 46, textAlign: "center" }}>{it.emoji || "🎁"}</div>}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>{it.nombre}</div>
-                    {it.descripcion && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{it.descripcion}</div>}
-                    {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>Tenés equipado: {miMarco}</div>}
+                  <div onClick={() => setDetail(it)} style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0, cursor: "pointer" }}>
+                    {it.imagen_url
+                      ? <img src={it.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                      : <div style={{ fontSize: 30, flexShrink: 0, width: 46, textAlign: "center" }}>{it.emoji || "🎁"}</div>}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{it.nombre}</div>
+                      {it.descripcion && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{it.descripcion}</div>}
+                      {it.tipo === "frame" && miMarco && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>Tenés equipado: {miMarco}</div>}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 800, color: "var(--gold)", marginBottom: 6 }}><PetroCoin size={14} /> {it.precio}</div>
@@ -6271,7 +6293,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Elegí un color (se descuentan <PetroCoin size={13} /> {it.precio}):</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                       {STORE_FRAMES.map(f => (
-                        <button key={f.key} onClick={() => comprarFrame(it.key, f.key)} disabled={busy === it.key} title={f.nombre}
+                        <button key={f.key} onClick={() => comprarFrame(it.key, f.key, it.precio)} disabled={busy === it.key} title={f.nombre}
                           style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                           <span style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--surface)", boxShadow: `0 0 0 2px ${f.color}, 0 0 10px ${f.color}99`, display: "block" }} />
                           <span style={{ fontSize: 10, color: "var(--muted)" }}>{f.nombre}</span>
@@ -6287,7 +6309,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>¿A quién querés espiar? (se descuentan <PetroCoin size={13} /> {it.precio})</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
                       {otros.map(o => (
-                        <button key={o.id} onClick={() => comprarEspiar(it.key, o)} disabled={busy === it.key}
+                        <button key={o.id} onClick={() => comprarEspiar(it.key, o, it.precio)} disabled={busy === it.key}
                           style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", cursor: "pointer", textAlign: "left" }}>
                           <Avatar profile={o} size="sm" />
                           <span style={{ fontSize: 13, color: "var(--txt)" }}>{o.name}</span>
@@ -6365,6 +6387,37 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
         </div>
       )}
 
+      {detail && (
+        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 420, width: "100%", padding: "22px 22px", textAlign: "center" }}>
+            {detail.imagen_url
+              ? <img src={detail.imagen_url} alt="" style={{ width: "100%", borderRadius: 12, marginBottom: 14 }} />
+              : <div style={{ fontSize: 64 }}>{detail.emoji || "🎁"}</div>}
+            <div style={{ fontSize: 21, fontWeight: 800 }}>{detail.nombre}</div>
+            {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
+            <div style={{ fontSize: 19, fontWeight: 800, color: "var(--gold)", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><PetroCoin size={18} /> {detail.precio}</div>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "center" }}>
+              <button onClick={() => comprarItem(detail)} disabled={!isAdmin && saldo < detail.precio}
+                style={{ padding: "10px 22px", borderRadius: 9, border: "none", background: (!isAdmin && saldo < detail.precio) ? "var(--surface)" : "var(--gold)", color: (!isAdmin && saldo < detail.precio) ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: (!isAdmin && saldo < detail.precio) ? "not-allowed" : "pointer" }}>
+                {(!isAdmin && saldo < detail.precio) ? "Sin Petros" : detail.tipo === "frame" ? "Elegir" : detail.tipo === "espiar" ? "Espiar" : "Comprar"}
+              </button>
+              <button onClick={() => setDetail(null)} style={{ padding: "10px 18px", borderRadius: 9, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirm && (
+        <div onClick={() => setConfirm(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 340, width: "100%", padding: "22px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>{confirm.titulo}</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>{confirm.texto}</div>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "center" }}>
+              <button onClick={confirm.onOk} style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Confirmar</button>
+              <button onClick={() => setConfirm(null)} style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modal && (
         <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "24px 22px", textAlign: "center" }}>
