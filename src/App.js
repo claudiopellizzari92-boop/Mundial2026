@@ -6328,7 +6328,9 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
-                  {subiendo ? "Subiendo…" : nuevo.imagen_url ? "🖼️ Cambiar miniatura" : "🖼️ Subir miniatura (opcional)"}
+                  {subiendo ? "Subiendo…"
+                    : nuevo.imagen_url ? (nuevo.tipo === "poster" ? "🖼️ Cambiar imagen" : "🖼️ Cambiar miniatura")
+                    : (nuevo.tipo === "poster" ? "🖼️ Subir imagen del póster" : "🖼️ Subir miniatura (opcional)")}
                   <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagen(e.target.files[0]); }} />
                 </label>
                 {nuevo.imagen_url && <img src={nuevo.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />}
