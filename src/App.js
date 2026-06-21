@@ -6226,9 +6226,9 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <h2 style={{ margin: 0, fontSize: 20 }}>🛒 Tienda</h2>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Ganás 1 Petro por cada punto que sumás en los partidos.</div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: "var(--muted)" }}>TUS PETROS</div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}><PetroCoin size={22} /> {isAdmin ? "∞" : saldo}</div>
+          <div style={{ textAlign: "right", background: "rgba(245,183,49,0.12)", border: "1px solid rgba(245,183,49,0.35)", borderRadius: 12, padding: "8px 14px" }}>
+            <div style={{ fontSize: 12, color: "var(--txt)", fontWeight: 700, letterSpacing: 0.5 }}>TUS PETROS</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--gold)", lineHeight: 1.1, marginTop: 3, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={24} /> {isAdmin ? "∞" : saldo}</div>
           </div>
         </div>
         {isAdmin && (
@@ -6326,15 +6326,14 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                   <input style={{ ...inp, flex: "1 1 140px" }} placeholder="Texto del cartel" value={nuevo.texto} onChange={e => setNuevo(n => ({ ...n, texto: e.target.value }))} />
                 </div>
               )}
-              {nuevo.tipo === "poster" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
-                    {subiendo ? "Subiendo…" : "📷 Subir imagen"}
-                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagen(e.target.files[0]); }} />
-                  </label>
-                  {nuevo.imagen_url && <img src={nuevo.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />}
-                </div>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
+                  {subiendo ? "Subiendo…" : nuevo.imagen_url ? "🖼️ Cambiar miniatura" : "🖼️ Subir miniatura (opcional)"}
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagen(e.target.files[0]); }} />
+                </label>
+                {nuevo.imagen_url && <img src={nuevo.imagen_url} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />}
+                {nuevo.imagen_url && <button onClick={() => setNuevo(n => ({ ...n, imagen_url: "" }))} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer" }}>Quitar</button>}
+              </div>
               <button onClick={guardarNuevo} disabled={guardando} style={{ alignSelf: "flex-start", padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{guardando ? "Guardando…" : "Crear ítem"}</button>
             </div>
           </div>
