@@ -7276,19 +7276,23 @@ export default function App() {
       </nav>
 
       {avisos.length > 0 && (
-        <div onClick={cerrarAvisos} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: 22, textAlign: "center" }}>
-            <div style={{ fontSize: 40 }}>🔔</div>
-            <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{avisos.length === 1 ? "Tenés un aviso" : `Tenés ${avisos.length} avisos`}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14, textAlign: "left" }}>
-              {avisos.map(a => (
-                <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px" }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{a.emoji || "📩"}</span>
-                  <span style={{ fontSize: 13.5, color: "var(--txt)", lineHeight: 1.4 }}>{a.texto}</span>
-                </div>
-              ))}
+        <div onClick={cerrarAvisos} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
+            <div style={{ fontSize: 42, marginBottom: 6 }}>{avisos.length === 1 ? (avisos[0].emoji || "📩") : "🔔"}</div>
+            <div style={{ fontFamily: "Bebas Neue", fontSize: 25, color: "var(--gold)", letterSpacing: 1, marginBottom: 10 }}>
+              {avisos.length === 1 ? (avisos[0].titulo || "¡Tenés un aviso!") : `¡Tenés ${avisos.length} avisos!`}
             </div>
-            <button onClick={cerrarAvisos} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Entendido</button>
+            {avisos.length === 1
+              ? <p style={{ fontSize: 14.5, color: "var(--txt)", lineHeight: 1.55, marginBottom: 18 }}>{avisos[0].texto}</p>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 8, textAlign: "left", marginBottom: 18 }}>
+                  {avisos.map(a => (
+                    <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px" }}>
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{a.emoji || "📩"}</span>
+                      <span style={{ fontSize: 13.5, color: "var(--txt)", lineHeight: 1.4 }}>{a.texto}</span>
+                    </div>
+                  ))}
+                </div>}
+            <button onClick={cerrarAvisos} style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Entendido</button>
           </div>
         </div>
       )}
