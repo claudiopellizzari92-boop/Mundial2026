@@ -56,6 +56,21 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   }
 });
 
+// Trae TODAS las predicciones paginando de a 1000 (Supabase corta en 1000 por consulta)
+async function fetchAllPredictions(columns = "*") {
+  const pageSize = 1000;
+  let from = 0, all = [];
+  while (true) {
+    const { data, error } = await sb.from("predictions").select(columns).order("id", { ascending: true }).range(from, from + pageSize - 1);
+    if (error) return all;
+    if (!data || !data.length) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 // ─── World Cup 2026 Groups ────────────────────────────────────────────────────
 const FLAG = (code) => `https://flagcdn.com/24x18/${code}.png`;
 const GROUPS = {
@@ -435,6 +450,15 @@ function Avatar({ profile, size = "md" }) {
       <span style={{ position: "absolute", top: -5, right: -5, fontSize: size === "sm" ? 12 : 14, lineHeight: 1, filter: "brightness(0) drop-shadow(0 0 1.5px rgba(255,255,255,.85))" }} title="Difunto">🎗️</span>
     </div>
   );
+}
+
+// ── Foto de cromo (foto dedicada → avatar → iniciales) ────────────────────────
+function CromoFoto({ profile, size = 56 }) {
+  const src = profile?.cromo_foto || profile?.avatar_url;
+  const difunto = !!profile?.is_difunto;
+  const luto = difunto ? { filter: "grayscale(1)", opacity: .6 } : {};
+  if (src) return <img src={src} alt={profile?.name || ""} style={{ width: size, height: size, borderRadius: 10, objectFit: "cover", flexShrink: 0, ...luto }} />;
+  return <div style={{ width: size, height: size, borderRadius: 10, background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(size * 0.34), fontWeight: 700, color: "var(--muted)", flexShrink: 0, ...luto }}>{initials(profile?.name)}</div>;
 }
 
 // ── Title helpers ─────────────────────────────────────────────────────────────
@@ -3077,8 +3101,8 @@ function Matches({ user, matches, predictions, allPredictions, onSave, profiles 
         setHistory(h);
       });
     // Cargar encuestas (todas las predicciones para calcular % de ganador)
-    sb.from("predictions").select("match_id, home_score, away_score")
-      .then(({ data }) => {
+    fetchAllPredictions("match_id, home_score, away_score")
+      .then((data) => {
         if (!data) return;
         const p = {};
         data.forEach(pr => {
@@ -4987,7 +5011,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   async function takeSnapshot() {
     setTakingSnapshot(true);
     const today = new Date().toISOString().slice(0,10);
-    const { data: preds } = await sb.from("predictions").select("*");
+    const preds = await fetchAllPredictions();
     const { data: prePreds } = await sb.from("pretournament_predictions").select("*");
     const { data: profs } = await sb.from("profiles").select("*");
     const rows = (profs||[]).map(p => {
@@ -5150,7 +5174,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
         setGroupResults(gr);
       }
     });
-    sb.from("predictions").select("user_id, match_id").then(({ data }) => setHealthPreds(data || []));
+    fetchAllPredictions("user_id, match_id").then((data) => setHealthPreds(data || []));
   }, []);
 
   async function saveGroupResults() {
@@ -6137,6 +6161,7 @@ const TIPO_INFO = {
   gag:      { label: "Estafa con mensaje (gag)" },
   poster:   { label: "Póster (con imagen)" },
   caja:     { label: "Caja misteriosa (premio al azar)" },
+  sobre:    { label: "Sobre de cromos (álbum)" },
   generico: { label: "Genérico (solo descuenta Petros)" },
 };
 
@@ -6148,6 +6173,118 @@ const PETRO_PACKS = [
   { cant: 950, precio: "$59.99" },
   { cant: 2000, precio: "$119.99", badge: "MEJOR VALOR" },
 ];
+
+// ── Álbum de cromos de participantes ──────────────────────────────────────────
+function Album({ user, profiles, allPredictions, isAdmin, onRefresh }) {
+  const [col, setCol] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showFotos, setShowFotos] = useState(false);
+  const [subiendoId, setSubiendoId] = useState(null);
+  const [fotoMsg, setFotoMsg] = useState("");
+  useEffect(() => {
+    (async () => {
+      const { data } = await sb.from("album_cromos").select("cromo_id, cantidad").eq("user_id", user.id);
+      const m = {};
+      (data || []).forEach(r => { m[r.cromo_id] = r.cantidad; });
+      setCol(m);
+      setLoading(false);
+    })();
+  }, []);
+
+  async function subirCromoFoto(p, file) {
+    if (!file) return;
+    setFotoMsg("");
+    setSubiendoId(p.id);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `cromos/${p.id}-${Date.now()}.${ext}`;
+      const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      if (up.error) throw up.error;
+      const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+      const { data, error } = await sb.rpc("set_cromo_foto", { p_user_id: p.id, p_url: pub.publicUrl });
+      if (error || !data || !data.ok) throw new Error((data && data.error) || "No se pudo guardar");
+      if (onRefresh) await onRefresh();
+    } catch (e) {
+      setFotoMsg("No se pudo subir la foto de " + (p.name || "") + ": " + (e.message || e));
+    }
+    setSubiendoId(null);
+  }
+
+  const cromos = [...(profiles || [])].sort((a, b) => (a.cromo_numero || 999) - (b.cromo_numero || 999));
+  const total = cromos.length;
+  const tengo = cromos.filter(c => (col[c.id] || 0) > 0).length;
+  const pct = total ? Math.round((tengo / total) * 100) : 0;
+  const repes = cromos.reduce((s, c) => s + Math.max(0, (col[c.id] || 0) - 1), 0);
+
+  return (
+    <div>
+      <div className="card" style={{ padding: "16px 18px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontFamily: "Bebas Neue", fontSize: 26, color: "var(--gold)", letterSpacing: 1 }}>📒 Álbum del Mundial</div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>Tenés <b style={{ color: "var(--gold)" }}>{tengo}</b> de {total} · {repes} repetidos</div>
+        </div>
+        <div style={{ marginTop: 10, height: 10, borderRadius: 6, background: "var(--surface)", overflow: "hidden" }}>
+          <div style={{ width: pct + "%", height: "100%", background: "linear-gradient(90deg,var(--gold),#ffe066)", transition: "width .5s" }} />
+        </div>
+        {pct === 100
+          ? <div style={{ marginTop: 10, fontSize: 13, color: "var(--gold)", fontWeight: 700, textAlign: "center" }}>🏆 ¡Álbum completo! Sos un capo.</div>
+          : <div style={{ marginTop: 12, fontSize: 12, color: "var(--muted)" }}>Conseguí sobres en la 🛒 Tienda para completar la colección.</div>}
+      </div>
+
+      {isAdmin && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
+          <button onClick={() => setShowFotos(s => !s)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", color: "var(--txt)", cursor: "pointer", fontSize: 14, fontWeight: 700, padding: 0 }}>
+            <span>📸 Fotos de cromos (admin)</span>
+            <span style={{ color: "var(--muted)" }}>{showFotos ? "▲" : "▼"}</span>
+          </button>
+          {showFotos && (<>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>Subí la foto de cada cromo. Si no cargás ninguna, se usa el avatar (o las iniciales).</div>
+            {fotoMsg && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 8 }}>{fotoMsg}</div>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12, maxHeight: 420, overflowY: "auto" }}>
+              {cromos.map(p => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px" }}>
+                  <CromoFoto profile={p} size={44} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>#{p.cromo_numero || "?"} · {p.name}</div>
+                    <div style={{ fontSize: 11, color: p.cromo_foto ? "var(--green)" : "var(--muted)", marginTop: 2 }}>{p.cromo_foto ? "Foto cargada ✓" : (p.avatar_url ? "Usando avatar" : "Sin foto")}</div>
+                  </div>
+                  <label style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--gold)", background: "var(--gold-dim)", color: "var(--gold)", fontSize: 12, fontWeight: 700, cursor: subiendoId === p.id ? "wait" : "pointer" }}>
+                    {subiendoId === p.id ? "Subiendo…" : "Subir"}
+                    <input type="file" accept="image/*" disabled={subiendoId === p.id} onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; subirCromoFoto(p, f); }} style={{ display: "none" }} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </>)}
+        </div>
+      )}
+
+      {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 10 }}>
+          {cromos.map(c => {
+            const n = col[c.id] || 0;
+            const tiene = n > 0;
+            const raro = c.cromo_rareza === "raro";
+            return (
+              <div key={c.id} style={{ position: "relative", borderRadius: 12, padding: "14px 6px 12px", textAlign: "center", border: raro ? "1px solid var(--gold)" : "1px solid var(--border)", background: tiene ? (raro ? "linear-gradient(160deg,rgba(245,183,49,.18),var(--card))" : "var(--card)") : "var(--surface)", opacity: tiene ? 1 : 0.55 }}>
+                <div style={{ position: "absolute", top: 6, left: 8, fontSize: 10, fontWeight: 800, color: "var(--muted)" }}>#{c.cromo_numero || "?"}</div>
+                {raro && <div style={{ position: "absolute", top: 6, right: 8, fontSize: 11 }} title="Raro">⭐</div>}
+                {tiene ? (<>
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}><CromoFoto profile={c} size={62} /></div>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginTop: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                  {n > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, fontSize: 10, fontWeight: 800, color: "var(--green)" }}>x{n}</div>}
+                </>) : (<>
+                  <div style={{ width: 62, height: 62, borderRadius: 10, background: "var(--border)", margin: "4px auto 0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, color: "var(--muted)" }}>?</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>—</div>
+                </>)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin }) {
   const [sub, setSub] = useState("comprar");
@@ -6289,6 +6426,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
     if (it.tipo === "frame") { setFramePicker(it.key); setSpyPicker(null); return; }
     if (it.tipo === "espiar") { setSpyPicker(it.key); setFramePicker(null); return; }
     if (it.tipo === "caja") { abrirCaja(it); return; }
+    if (it.tipo === "sobre") { abrirSobre(it); return; }
     setConfirm({
       titulo: `¿Comprar "${it.nombre}"?`,
       texto: txtCosto(it.precio),
@@ -6315,6 +6453,25 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
         await loadAll();
         if (onRefresh) onRefresh();
         setModal({ type: "caja", won: data.won, fase: "ruleta" });
+      },
+    });
+  }
+  function abrirSobre(it) {
+    setConfirm({
+      titulo: `¿Abrir "${it.nombre}"?`,
+      texto: txtCosto(it.precio),
+      onOk: async () => {
+        setConfirm(null);
+        setBusy(it.key);
+        const { data, error } = await sb.rpc("abrir_sobre", { p_sobre_key: it.key });
+        setBusy(null);
+        if (error || !data || !data.ok) {
+          setModal({ type: "error", msg: (data && data.error) || "No se pudo abrir el sobre." });
+          return;
+        }
+        await loadAll();
+        if (onRefresh) onRefresh();
+        setModal({ type: "sobre_ok", cromos: data.cromos || [] });
       },
     });
   }
@@ -6480,7 +6637,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     <span className="tienda-price"><PetroCoin size={14} /> {it.precio}</span>
                     <button onClick={() => comprarItem(it)} disabled={noPlata || cargando} className="tienda-buy"
                       style={{ background: noPlata ? "var(--surface)" : "linear-gradient(135deg,#f5d36b,#e0a92e)", color: noPlata ? "var(--muted)" : "#1a1a1a", cursor: noPlata ? "not-allowed" : "pointer", opacity: cargando ? .6 : 1 }}>
-                      {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : it.tipo === "caja" ? "Abrir" : "Comprar"}
+                      {cargando ? "…" : noPlata ? "Sin Petros" : it.tipo === "frame" ? "Elegir" : it.tipo === "espiar" ? "Espiar" : (it.tipo === "caja" || it.tipo === "sobre") ? "Abrir" : "Comprar"}
                     </button>
                   </div>
                 </div>
@@ -6734,7 +6891,7 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
             <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "center" }}>
               <button onClick={() => comprarItem(detail)} disabled={!isAdmin && saldo < detail.precio}
                 style={{ padding: "10px 22px", borderRadius: 9, border: "none", background: (!isAdmin && saldo < detail.precio) ? "var(--surface)" : "var(--gold)", color: (!isAdmin && saldo < detail.precio) ? "var(--muted)" : "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: (!isAdmin && saldo < detail.precio) ? "not-allowed" : "pointer" }}>
-                {(!isAdmin && saldo < detail.precio) ? "Sin Petros" : detail.tipo === "frame" ? "Elegir" : detail.tipo === "espiar" ? "Espiar" : detail.tipo === "caja" ? "Abrir" : "Comprar"}
+                {(!isAdmin && saldo < detail.precio) ? "Sin Petros" : detail.tipo === "frame" ? "Elegir" : detail.tipo === "espiar" ? "Espiar" : (detail.tipo === "caja" || detail.tipo === "sobre") ? "Abrir" : "Comprar"}
               </button>
               <button onClick={() => setDetail(null)} style={{ padding: "10px 18px", borderRadius: 9, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
             </div>
@@ -6815,6 +6972,27 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                     <div style={{ fontSize: 20, fontWeight: 800, marginTop: 10 }}>{modal.won.nombre}</div>
                     {modal.won.tipo === "frame" && modal.won.frame && <div style={{ fontSize: 13, color: "#a78bfa", marginTop: 6 }}>Marco <b>{modal.won.frame}</b> equipado en tu avatar.</div>}
                   </>)}
+            </>)}
+            {modal.type === "sobre_ok" && (<>
+              <style>{`@keyframes cajaPop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}`}</style>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "var(--gold)", letterSpacing: 1.5 }}>¡ABRISTE UN SOBRE!</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: 14 }}>
+                {modal.cromos.map((cr, i) => {
+                  const p = (profiles || []).find(x => x.id === cr.id);
+                  if (!p) return null;
+                  const raro = p.cromo_rareza === "raro";
+                  return (
+                    <div key={i} style={{ position: "relative", width: 84, borderRadius: 10, padding: "12px 4px 8px", textAlign: "center", border: raro ? "1px solid var(--gold)" : "1px solid var(--border)", background: raro ? "linear-gradient(160deg,rgba(245,183,49,.2),var(--card))" : "var(--card)", animation: `cajaPop .4s ease-out ${i * 0.12}s both` }}>
+                      <div style={{ position: "absolute", top: 4, left: 6, fontSize: 9, fontWeight: 800, color: "var(--muted)" }}>#{p.cromo_numero || "?"}</div>
+                      {raro && <div style={{ position: "absolute", top: 4, right: 6, fontSize: 10 }}>⭐</div>}
+                      <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}><CromoFoto profile={p} size={48} /></div>
+                      <div style={{ fontSize: 11, fontWeight: 700, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                      <div style={{ fontSize: 9, fontWeight: 800, marginTop: 3, color: cr.nuevo ? "var(--green)" : "var(--muted)" }}>{cr.nuevo ? "¡NUEVO!" : "REPE"}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 14 }}>Mirá tu progreso en la pestaña 📒 Álbum.</div>
             </>)}
             {!(modal.type === "caja" && modal.fase === "ruleta") && (
               <button onClick={() => setModal(null)} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
@@ -7085,7 +7263,7 @@ export default function App() {
     const [mq, myPq, allPq, profq, adminq, purchq] = await Promise.all([
       sb.from("matches").select("*").order("kickoff_at"),
       sb.from("predictions").select("*").eq("user_id", user.id),
-      sb.from("predictions").select("*"),
+      (async () => ({ data: await fetchAllPredictions() }))(),
       sb.from("profiles").select("*"),
       sb.from("admins").select("*").eq("user_id", user.id),
       sb.from("store_purchases").select("precio").eq("user_id", user.id),
@@ -7248,7 +7426,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["album","📒 Álbum"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
           <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7297,7 +7475,7 @@ export default function App() {
         </div>
       )}
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["album","📒 Álbum"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
         <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7328,6 +7506,7 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
+        {tab==="album"     && <Album user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />}
         {tab==="tienda"    && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
