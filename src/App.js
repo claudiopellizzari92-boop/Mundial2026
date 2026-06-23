@@ -443,6 +443,7 @@ input,button,select{font-family:inherit;}
 .nft-num{position:absolute;left:calc(var(--nx,50)*1%);top:calc(var(--ny,90)*1%);transform:translate(-50%,-50%);font-family:'DejaVu Serif',Georgia,'Times New Roman',serif;font-weight:700;font-size:calc(var(--ns,9)*1cqw);color:#eef7fa;text-shadow:0 0.4cqw 0.8cqw rgba(8,14,30,.95);white-space:nowrap;pointer-events:none;line-height:1;letter-spacing:.5px;}
 .nft-num-d{font-size:.62em;color:#c4d2ee;}
 .nft-num-leg{color:#fff;text-shadow:0 0 1.5cqw rgba(245,200,90,.9);}
+.nft-num-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
 .nftbig{width:min(74vw,320px);transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;transition:transform .12s ease-out;animation:nftFloat 6s ease-in-out infinite;will-change:transform;box-shadow:0 18px 50px rgba(0,0,0,.6);}
 @keyframes nftFloat{0%,100%{translate:0 0}50%{translate:0 -7px}}
 .nft-frame{position:absolute;inset:0;border-radius:14px;pointer-events:none;border:2px solid transparent;transition:.4s;}
@@ -7069,10 +7070,26 @@ function NFTCard({ nft, edition = null, big = false }) {
       {big && <div className="nft-sheen" />}
       {big && nft.rareza !== "common" && [0, 1, 2, 3].map(i => <span key={i} className={`nft-spark s${i}`} />)}
       <div className="nft-frame" />
-      {nft.rareza === "limited" && edition != null && (
-        <div className="nft-num">{String(edition).padStart(2, "0")}<span className="nft-num-d">/{nft.supply_max || 19}</span></div>
+      {nft.rareza === "limited" && edition != null && (() => {
+        const ns = nft.num_size != null ? Number(nft.num_size) : 8;
+        const nx = nft.num_x != null ? Number(nft.num_x) : 50;
+        const ny = nft.num_y != null ? Number(nft.num_y) : 90;
+        return (
+          <svg className="nft-num-svg" viewBox="0 0 100 127.83" preserveAspectRatio="none">
+            <text x={nx} y={(ny / 100) * 127.83} fontSize={ns} textAnchor="middle" dominantBaseline="central"
+              fontFamily="'DejaVu Serif',Georgia,'Times New Roman',serif" fontWeight="700"
+              fill="#eef7fa" stroke="#0a0f1e" strokeWidth={ns * 0.06} paintOrder="stroke" style={{ letterSpacing: ".3px" }}>
+              {String(edition).padStart(2, "0")}<tspan fontSize={ns * 0.62} fill="#c4d2ee">/{nft.supply_max || 19}</tspan>
+            </text>
+          </svg>
+        );
+      })()}
+      {nft.rareza === "legendary" && big && (
+        <svg className="nft-num-svg" viewBox="0 0 100 127.83" preserveAspectRatio="none">
+          <text x="84" y={(92 / 100) * 127.83} fontSize="7.5" textAnchor="middle" dominantBaseline="central"
+            fontFamily="'DejaVu Serif',Georgia,serif" fontWeight="700" fill="#ffffff" stroke="#0a0f1e" strokeWidth="0.4" paintOrder="stroke">1/1</text>
+        </svg>
       )}
-      {nft.rareza === "legendary" && big && <div className="nft-num nft-num-leg" style={{ "--nx": 84, "--ny": 92, "--ns": 8 }}>1/1</div>}
     </div>
   );
 }
@@ -7347,7 +7364,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                       <label style={{ fontSize: 11, color: "var(--muted)" }}>Vertical: {nuevo.num_y}%
                         <input type="range" min="0" max="100" value={nuevo.num_y} onChange={e => setNuevo(n => ({ ...n, num_y: e.target.value }))} style={{ width: "100%" }} /></label>
                       <label style={{ fontSize: 11, color: "var(--muted)" }}>Tamaño: {nuevo.num_size}
-                        <input type="range" min="4" max="16" step="0.5" value={nuevo.num_size} onChange={e => setNuevo(n => ({ ...n, num_size: e.target.value }))} style={{ width: "100%" }} /></label>
+                        <input type="range" min="2" max="16" step="0.5" value={nuevo.num_size} onChange={e => setNuevo(n => ({ ...n, num_size: e.target.value }))} style={{ width: "100%" }} /></label>
                     </div>
                   </div>
                 </div>
