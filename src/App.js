@@ -433,7 +433,7 @@ input,button,select{font-family:inherit;}
 .reaction-wrap:hover .reaction-tooltip{display:block;}
 /* ===== NFT ===== */
 .nftgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;}
-.nftcard,.nftbig{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:600/767;container-type:inline-size;background:var(--card2);}
+.nftcard,.nftbig{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:1792/2400;container-type:inline-size;background:var(--card2);}
 .nftcard{cursor:pointer;transition:transform .15s;}
 .nftcard:hover{transform:translateY(-3px);}
 .nftimg,.nftbig-art{position:absolute;inset:0;background-size:cover;background-position:center;}
@@ -7075,8 +7075,8 @@ function NFTCard({ nft, edition = null, big = false }) {
         const nx = nft.num_x != null ? Number(nft.num_x) : 50;
         const ny = nft.num_y != null ? Number(nft.num_y) : 90;
         return (
-          <svg className="nft-num-svg" viewBox="0 0 100 127.83" preserveAspectRatio="none">
-            <text x={nx} y={(ny / 100) * 127.83} fontSize={ns} textAnchor="middle" dominantBaseline="central"
+          <svg className="nft-num-svg" viewBox="0 0 100 133.93" preserveAspectRatio="none">
+            <text x={nx} y={(ny / 100) * 133.93} fontSize={ns} textAnchor="middle" dominantBaseline="central"
               fontFamily="'DejaVu Serif',Georgia,'Times New Roman',serif" fontWeight="700"
               fill="#eef7fa" stroke="#0a0f1e" strokeWidth={ns * 0.06} paintOrder="stroke" style={{ letterSpacing: ".3px" }}>
               {String(edition).padStart(2, "0")}<tspan fontSize={ns * 0.62} fill="#c4d2ee">/{nft.supply_max || 19}</tspan>
