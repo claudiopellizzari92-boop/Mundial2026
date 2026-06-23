@@ -7424,7 +7424,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
-            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={null} big /></div>
+            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={detail.rareza === "limited" ? (((owned.find(o => o.nft_id === detail.id) || allOwned.find(o => o.nft_id === detail.id) || {}).edition) ?? 1) : null} big /></div>
             <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
             {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
