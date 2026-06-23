@@ -7139,6 +7139,15 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   }
   useEffect(() => { loadAll(); }, []);
   useEffect(() => { if (cfg && !probEdit) setProbEdit({ ...cfg }); }, [cfg]);
+  const [detEd, setDetEd] = useState(null);
+  useEffect(() => {
+    if (!detail) { setDetEd(null); return; }
+    if (detail.rareza === "limited") {
+      const myEds = owned.filter(o => o.nft_id === detail.id).map(o => o.edition).sort((a, b) => a - b);
+      const anyEd = (allOwned.find(o => o.nft_id === detail.id) || {}).edition;
+      setDetEd(myEds[0] != null ? myEds[0] : (anyEd != null ? anyEd : 1));
+    } else setDetEd(null);
+  }, [detail]);
 
   const countOwned = (nftId) => allOwned.filter(o => o.nft_id === nftId).length;
 
@@ -7424,9 +7433,25 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
-            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={detail.rareza === "limited" ? (((owned.find(o => o.nft_id === detail.id) || allOwned.find(o => o.nft_id === detail.id) || {}).edition) ?? 1) : null} big /></div>
+            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={detail.rareza === "limited" ? detEd : null} big /></div>
             <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
+            {(() => {
+              const myEds = owned.filter(o => o.nft_id === detail.id).map(o => o.edition).sort((a, b) => a - b);
+              if (detail.rareza !== "limited" || myEds.length < 2) return null;
+              return (
+                <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>Tus ediciones:</span>
+                  {myEds.map(e => (
+                    <button key={e} onClick={() => setDetEd(e)}
+                      style={{ padding: "4px 11px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        border: "1px solid " + (detEd === e ? "var(--gold)" : "var(--border)"),
+                        background: detEd === e ? "var(--gold)" : "none",
+                        color: detEd === e ? "#1a1a1a" : "var(--txt)" }}>#{String(e).padStart(2, "0")}</button>
+                  ))}
+                </div>
+              );
+            })()}
             {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
             <div style={{ marginTop: 14, textAlign: "left" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>DUEÑOS</div>
