@@ -7116,6 +7116,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [probEdit, setProbEdit] = useState(null);
+  const [editForm, setEditForm] = useState(null);
 
   const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const bonus = user.profile?.monedas_bonus || 0;
@@ -7191,6 +7192,38 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     if (error) { setModal({ msg: "No se pudo crear: " + error.message }); return; }
     setNuevo({ nombre: "", descripcion: "", rareza: "common", supply: 19, num_x: 84, num_y: 27, num_size: 8, imagen_url: "" });
     loadAll();
+  }
+  function openEdit(n) {
+    setEditForm({
+      id: n.id, nombre: n.nombre || "", descripcion: n.descripcion || "", rareza: n.rareza,
+      supply: n.supply_max || (n.rareza === "limited" ? 19 : 1),
+      num_x: n.num_x != null ? n.num_x : 84, num_y: n.num_y != null ? n.num_y : 27, num_size: n.num_size != null ? n.num_size : 8,
+      imagen_url: n.imagen_url,
+    });
+  }
+  async function subirArteEdit(file) {
+    setSubiendo(true);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `nfts/${Date.now()}.${ext}`;
+    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    if (up.error) { setSubiendo(false); setModal({ msg: "No se pudo subir la imagen: " + up.error.message }); return; }
+    const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+    setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
+    setSubiendo(false);
+  }
+  async function guardarEdit() {
+    const f = editForm;
+    if (!f.nombre.trim() || !f.imagen_url) { setModal({ msg: "Falta el nombre o la imagen." }); return; }
+    const supply = f.rareza === "legendary" ? 1 : f.rareza === "limited" ? (Number(f.supply) || 19) : null;
+    const payload = {
+      nombre: f.nombre.trim(), descripcion: f.descripcion || null, imagen_url: f.imagen_url, rareza: f.rareza, supply_max: supply,
+      num_x: f.rareza === "limited" ? Number(f.num_x) : null,
+      num_y: f.rareza === "limited" ? Number(f.num_y) : null,
+      num_size: f.rareza === "limited" ? Number(f.num_size) : null,
+    };
+    const { error } = await sb.from("nfts").update(payload).eq("id", f.id);
+    if (error) { setModal({ msg: "No se pudo guardar: " + error.message }); return; }
+    setEditForm(null); loadAll();
   }
   async function toggleActivo(n) { await sb.from("nfts").update({ activo: !n.activo }).eq("id", n.id); loadAll(); }
   async function borrarNft(n) { if (countOwned(n.id) > 0) { setModal({ msg: "No se puede borrar: ya hay ediciones en circulación. Desactivalo en su lugar." }); return; } await sb.from("nfts").delete().eq("id", n.id); loadAll(); }
@@ -7396,6 +7429,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                       <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.nombre}</div>
                       <div style={{ fontSize: 10, color: NFT_RAR[n.rareza].c, fontWeight: 700 }}>{NFT_RAR[n.rareza].t} · {cnt}/{cap}{!n.activo ? " · off" : ""}</div>
                     </div>
+                    <button onClick={() => openEdit(n)} style={{ padding: "5px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>✏️</button>
                     <button onClick={() => toggleActivo(n)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: n.activo ? "var(--green)" : "var(--muted)", fontSize: 12, cursor: "pointer" }}>{n.activo ? "Activo" : "Off"}</button>
                     <button onClick={() => borrarNft(n)} style={{ padding: "5px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
                   </div>
@@ -7407,6 +7441,60 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       )}
 
       </>}
+
+      {/* Editar carta */}
+      {editForm && (() => {
+        const ownedN = countOwned(editForm.id);
+        return (
+          <div onClick={() => setEditForm(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1250, padding: 18, overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 460, width: "100%", padding: "20px 18px", margin: "auto" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>✏️ Editar carta</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <input style={inp} placeholder="Nombre" value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+                <input style={inp} placeholder="Descripción (opcional)" value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <select style={{ ...inp, flex: "1 1 140px", opacity: ownedN > 0 ? 0.5 : 1 }} disabled={ownedN > 0} value={editForm.rareza} onChange={e => setEditForm(f => ({ ...f, rareza: e.target.value }))}>
+                    <option value="common">Común (ilimitada)</option>
+                    <option value="limited">Limited (numerada)</option>
+                    <option value="legendary">Legendary (1 de 1)</option>
+                  </select>
+                  {editForm.rareza === "limited" && <input type="number" disabled={ownedN > 0} style={{ ...inp, flex: "0 1 130px", opacity: ownedN > 0 ? 0.5 : 1 }} placeholder="cantidad" value={editForm.supply} onChange={e => setEditForm(f => ({ ...f, supply: e.target.value }))} />}
+                </div>
+                {ownedN > 0 && <div style={{ fontSize: 10, color: "var(--muted)" }}>Ya hay {ownedN} edición(es) en circulación: no se puede cambiar rareza ni cupo.</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
+                    {subiendo ? "Subiendo…" : "🖼️ Cambiar arte"}
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirArteEdit(e.target.files[0]); }} />
+                  </label>
+                  {editForm.imagen_url && <img src={editForm.imagen_url} alt="" style={{ width: 30, height: 38, borderRadius: 5, objectFit: "cover" }} />}
+                </div>
+                {editForm.rareza === "limited" && (
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Posición del número:</div>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                      <div style={{ width: 150 }}>
+                        <NFTCard nft={{ imagen_url: editForm.imagen_url, rareza: "limited", supply_max: Number(editForm.supply) || 19, num_x: Number(editForm.num_x), num_y: Number(editForm.num_y), num_size: Number(editForm.num_size) }} edition={7} />
+                      </div>
+                      <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        <label style={{ fontSize: 11, color: "var(--muted)" }}>Horizontal: {editForm.num_x}%
+                          <input type="range" min="0" max="100" step="0.5" value={editForm.num_x} onChange={e => setEditForm(f => ({ ...f, num_x: e.target.value }))} style={{ width: "100%" }} /></label>
+                        <label style={{ fontSize: 11, color: "var(--muted)" }}>Vertical: {editForm.num_y}%
+                          <input type="range" min="0" max="100" step="0.5" value={editForm.num_y} onChange={e => setEditForm(f => ({ ...f, num_y: e.target.value }))} style={{ width: "100%" }} /></label>
+                        <label style={{ fontSize: 11, color: "var(--muted)" }}>Tamaño: {editForm.num_size}
+                          <input type="range" min="2" max="16" step="0.5" value={editForm.num_size} onChange={e => setEditForm(f => ({ ...f, num_size: e.target.value }))} style={{ width: "100%" }} /></label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button onClick={guardarEdit} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Guardar cambios</button>
+                  <button onClick={() => setEditForm(null)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Reveal de sobre */}
       {reveal && (
