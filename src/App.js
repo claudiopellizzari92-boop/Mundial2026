@@ -7084,12 +7084,6 @@ function NFTCard({ nft, edition = null, big = false }) {
           </svg>
         );
       })()}
-      {nft.rareza === "legendary" && big && (
-        <svg className="nft-num-svg" viewBox="0 0 100 127.83" preserveAspectRatio="none">
-          <text x="84" y={(92 / 100) * 127.83} fontSize="7.5" textAnchor="middle" dominantBaseline="central"
-            fontFamily="'DejaVu Serif',Georgia,serif" fontWeight="700" fill="#ffffff" stroke="#0a0f1e" strokeWidth="0.4" paintOrder="stroke">1/1</text>
-        </svg>
-      )}
     </div>
   );
 }
