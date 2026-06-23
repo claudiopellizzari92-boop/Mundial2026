@@ -7360,9 +7360,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                     </div>
                     <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 10 }}>
                       <label style={{ fontSize: 11, color: "var(--muted)" }}>Horizontal: {nuevo.num_x}%
-                        <input type="range" min="0" max="100" value={nuevo.num_x} onChange={e => setNuevo(n => ({ ...n, num_x: e.target.value }))} style={{ width: "100%" }} /></label>
+                        <input type="range" min="0" max="100" step="0.5" value={nuevo.num_x} onChange={e => setNuevo(n => ({ ...n, num_x: e.target.value }))} style={{ width: "100%" }} /></label>
                       <label style={{ fontSize: 11, color: "var(--muted)" }}>Vertical: {nuevo.num_y}%
-                        <input type="range" min="0" max="100" value={nuevo.num_y} onChange={e => setNuevo(n => ({ ...n, num_y: e.target.value }))} style={{ width: "100%" }} /></label>
+                        <input type="range" min="0" max="100" step="0.5" value={nuevo.num_y} onChange={e => setNuevo(n => ({ ...n, num_y: e.target.value }))} style={{ width: "100%" }} /></label>
                       <label style={{ fontSize: 11, color: "var(--muted)" }}>Tamaño: {nuevo.num_size}
                         <input type="range" min="2" max="16" step="0.5" value={nuevo.num_size} onChange={e => setNuevo(n => ({ ...n, num_size: e.target.value }))} style={{ width: "100%" }} /></label>
                     </div>
