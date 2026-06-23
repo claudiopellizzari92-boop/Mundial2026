@@ -431,6 +431,45 @@ input,button,select{font-family:inherit;}
 .reaction-wrap{display:inline-block;}
 .reaction-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--txt);white-space:nowrap;z-index:10;pointer-events:none;}
 .reaction-wrap:hover .reaction-tooltip{display:block;}
+/* ===== NFT ===== */
+.nftgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;}
+.nftcard,.nftbig{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:600/767;container-type:inline-size;background:var(--card2);}
+.nftcard{cursor:pointer;transition:transform .15s;}
+.nftcard:hover{transform:translateY(-3px);}
+.nftimg,.nftbig-art{position:absolute;inset:0;background-size:cover;background-position:center;}
+.nftcard.r-common{box-shadow:inset 0 0 0 1px var(--border);}
+.nftcard.r-limited{box-shadow:inset 0 0 0 2px rgba(200,215,240,.75),0 0 14px rgba(120,150,210,.4);}
+.nftcard.r-legendary{box-shadow:inset 0 0 0 2px rgba(245,217,122,.85),0 0 18px rgba(245,183,49,.5);}
+.nft-num{position:absolute;left:calc(var(--nx,50)*1%);top:calc(var(--ny,90)*1%);transform:translate(-50%,-50%);font-family:'DejaVu Serif',Georgia,'Times New Roman',serif;font-weight:700;font-size:calc(var(--ns,9)*1cqw);color:#eef7fa;text-shadow:0 0.4cqw 0.8cqw rgba(8,14,30,.95);white-space:nowrap;pointer-events:none;line-height:1;letter-spacing:.5px;}
+.nft-num-d{font-size:.62em;color:#c4d2ee;}
+.nft-num-leg{color:#fff;text-shadow:0 0 1.5cqw rgba(245,200,90,.9);}
+.nftbig{width:min(74vw,320px);transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;transition:transform .12s ease-out;animation:nftFloat 6s ease-in-out infinite;will-change:transform;box-shadow:0 18px 50px rgba(0,0,0,.6);}
+@keyframes nftFloat{0%,100%{translate:0 0}50%{translate:0 -7px}}
+.nft-frame{position:absolute;inset:0;border-radius:14px;pointer-events:none;border:2px solid transparent;transition:.4s;}
+.nftbig.r-limited .nft-frame{border-color:rgba(200,215,240,.7);box-shadow:0 0 26px rgba(120,150,210,.45);}
+.nftbig.r-legendary .nft-frame{border-color:rgba(245,217,122,.8);box-shadow:0 0 30px rgba(245,183,49,.55);}
+.nftbig::before{content:"";position:absolute;inset:-3px;border-radius:17px;z-index:-1;filter:blur(9px);opacity:0;background-size:300% 300%;}
+.nftbig.r-limited::before{opacity:.85;background:linear-gradient(135deg,#cfe0ff,#7c93c7,#cfe0ff,#5a6da0);animation:nftAura 5s linear infinite;}
+.nftbig.r-legendary::before{opacity:.95;background:linear-gradient(135deg,#f5d97a,#a855f7,#f5d97a,#7c3aed);animation:nftAura 5s linear infinite;}
+@keyframes nftAura{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+.nft-holo{position:absolute;inset:0;border-radius:14px;pointer-events:none;opacity:0;mix-blend-mode:color-dodge;background:repeating-linear-gradient(115deg,rgba(255,0,132,.28) 0%,rgba(255,214,0,.28) 14%,rgba(0,255,170,.28) 28%,rgba(0,168,255,.28) 42%,rgba(168,85,247,.28) 56%,rgba(255,0,132,.28) 70%);background-size:220% 220%;}
+.nftbig.r-legendary .nft-holo{opacity:.5;animation:nftHolo 4.5s linear infinite;}
+@keyframes nftHolo{0%{background-position:0% 0%}100%{background-position:220% 0%}}
+.nft-glare{position:absolute;inset:0;border-radius:14px;pointer-events:none;opacity:0;mix-blend-mode:soft-light;background:radial-gradient(circle at var(--mx,50%) var(--my,40%),rgba(255,255,255,.85) 0%,rgba(255,255,255,.22) 18%,rgba(255,255,255,0) 45%);}
+.nftbig.r-limited .nft-glare,.nftbig.r-legendary .nft-glare{opacity:1;}
+.nft-sheen{position:absolute;inset:0;border-radius:14px;pointer-events:none;overflow:hidden;opacity:0;}
+.nftbig.r-limited .nft-sheen,.nftbig.r-legendary .nft-sheen{opacity:1;}
+.nft-sheen::after{content:"";position:absolute;top:-60%;left:-150%;width:60%;height:220%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:rotate(8deg);animation:nftSweep 4.3s ease-in-out infinite;}
+@keyframes nftSweep{0%{left:-150%}35%,100%{left:160%}}
+.nft-spark{position:absolute;width:4cqw;height:4cqw;pointer-events:none;opacity:0;background:radial-gradient(circle,#fff 0%,rgba(255,255,255,.6) 22%,transparent 60%);}
+.nftbig .nft-spark{animation:nftTwinkle 1.9s ease-in-out infinite;}
+.nft-spark.s0{left:7%;top:6%;}.nft-spark.s1{right:7%;top:6%;left:auto;animation-delay:.3s;}.nft-spark.s2{left:7%;bottom:6%;top:auto;animation-delay:.6s;}.nft-spark.s3{right:7%;bottom:6%;left:auto;top:auto;animation-delay:.9s;}
+@keyframes nftTwinkle{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:1;transform:scale(1)}}
+.nft-pop{animation:nftPop .5s ease-out both;}
+@keyframes nftPop{0%{transform:scale(.3) rotate(-8deg);opacity:0}60%{transform:scale(1.12) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+.nft-godray{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,rgba(245,200,90,.28),transparent 60%);pointer-events:none;animation:nftGod 2.4s ease-in-out infinite;}
+@keyframes nftGod{0%,100%{opacity:.5}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.nftbig,.nft-holo,.nft-sheen::after,.nftbig::before,.nft-spark,.nft-pop,.nft-godray{animation:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7003,6 +7042,403 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   );
 }
 
+// ── NFT: carta con efectos por rareza y número dinámico ───────────────────────
+function NFTCard({ nft, edition = null, big = false }) {
+  const rc = nft.rareza === "legendary" ? "r-legendary" : nft.rareza === "limited" ? "r-limited" : "r-common";
+  const ref = React.useRef(null);
+  function onMove(e) {
+    if (!big) return;
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--rx", ((0.5 - py) * 14).toFixed(2) + "deg");
+    el.style.setProperty("--ry", ((px - 0.5) * 16).toFixed(2) + "deg");
+    el.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
+    el.style.setProperty("--my", (py * 100).toFixed(1) + "%");
+  }
+  function onLeave() {
+    const el = ref.current; if (!el) return;
+    el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg");
+  }
+  const st = { "--nx": nft.num_x != null ? nft.num_x : 50, "--ny": nft.num_y != null ? nft.num_y : 90, "--ns": nft.num_size != null ? nft.num_size : 9 };
+  return (
+    <div ref={ref} className={`${big ? "nftbig" : "nftcard"} ${rc}`} onPointerMove={onMove} onPointerLeave={onLeave} style={st}>
+      <div className={big ? "nftbig-art" : "nftimg"} style={{ backgroundImage: `url(${nft.imagen_url})` }} />
+      {big && nft.rareza === "legendary" && <div className="nft-holo" />}
+      {big && <div className="nft-glare" />}
+      {big && <div className="nft-sheen" />}
+      {big && nft.rareza !== "common" && [0, 1, 2, 3].map(i => <span key={i} className={`nft-spark s${i}`} />)}
+      <div className="nft-frame" />
+      {nft.rareza === "limited" && edition != null && (
+        <div className="nft-num">{String(edition).padStart(2, "0")}<span className="nft-num-d">/{nft.supply_max || 19}</span></div>
+      )}
+      {nft.rareza === "legendary" && big && <div className="nft-num nft-num-leg" style={{ "--nx": 84, "--ny": 92, "--ns": 8 }}>1/1</div>}
+    </div>
+  );
+}
+
+// ── Colección de NFT ──────────────────────────────────────────────────────────
+const NFT_RAR = { common: { t: "Común", c: "#9fb0c9" }, limited: { t: "Limited", c: "#bcd0f5" }, legendary: { t: "Legendary", c: "#f5d97a" } };
+const rarRank = { legendary: 0, limited: 1, common: 2 };
+
+function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
+  const [sub, setSub] = useState("sobres");
+  const [nfts, setNfts] = useState([]);
+  const [owned, setOwned] = useState([]);
+  const [allOwned, setAllOwned] = useState([]);
+  const [cfg, setCfg] = useState(null);
+  const [spent, setSpent] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [opening, setOpening] = useState(null);
+  const [reveal, setReveal] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [modal, setModal] = useState(null);
+
+  // admin
+  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", rareza: "common", supply: 19, num_x: 84, num_y: 27, num_size: 8, imagen_url: "" });
+  const [subiendo, setSubiendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [probEdit, setProbEdit] = useState(null);
+
+  const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
+  const bonus = user.profile?.monedas_bonus || 0;
+  const saldo = myPts + bonus - spent;
+  const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
+
+  async function loadAll() {
+    const [nRes, oRes, aRes, cRes, pRes] = await Promise.all([
+      sb.from("nfts").select("*").order("created_at", { ascending: true }),
+      sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
+      sb.from("nft_owned").select("nft_id,user_id,edition"),
+      sb.from("nft_config").select("*").eq("id", 1).maybeSingle(),
+      sb.from("store_purchases").select("precio").eq("user_id", user.id),
+    ]);
+    setNfts(nRes.data || []);
+    setOwned(oRes.data || []);
+    setAllOwned(aRes.data || []);
+    setCfg(cRes.data || null);
+    setSpent((pRes.data || []).reduce((s, p) => s + (p.precio || 0), 0));
+    setLoading(false);
+  }
+  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { if (cfg && !probEdit) setProbEdit({ ...cfg }); }, [cfg]);
+
+  const countOwned = (nftId) => allOwned.filter(o => o.nft_id === nftId).length;
+
+  async function abrirSobre(tipo) {
+    setOpening(tipo);
+    const { data, error } = await sb.rpc("abrir_sobre_nft", { p_tipo: tipo });
+    setOpening(null);
+    if (error || !data || !data.ok) {
+      setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo abrir el sobre." });
+      return;
+    }
+    await loadAll();
+    if (onRefresh) onRefresh();
+    setReveal({ items: data.items || [], godpack: !!data.godpack });
+  }
+
+  // ── admin ──
+  async function subirImagen(file) {
+    setSubiendo(true);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `nfts/${Date.now()}.${ext}`;
+    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    if (up.error) { setSubiendo(false); setModal({ msg: "No se pudo subir la imagen: " + up.error.message }); return; }
+    const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+    setNuevo(n => ({ ...n, imagen_url: pub.publicUrl }));
+    setSubiendo(false);
+  }
+  async function crearNft() {
+    if (!nuevo.nombre.trim() || !nuevo.imagen_url) { setModal({ msg: "Falta el nombre o la imagen." }); return; }
+    setGuardando(true);
+    const supply = nuevo.rareza === "legendary" ? 1 : nuevo.rareza === "limited" ? (Number(nuevo.supply) || 19) : null;
+    const payload = {
+      nombre: nuevo.nombre.trim(), descripcion: nuevo.descripcion || null, imagen_url: nuevo.imagen_url,
+      rareza: nuevo.rareza, supply_max: supply, activo: true,
+      num_x: nuevo.rareza === "limited" ? Number(nuevo.num_x) : null,
+      num_y: nuevo.rareza === "limited" ? Number(nuevo.num_y) : null,
+      num_size: nuevo.rareza === "limited" ? Number(nuevo.num_size) : null,
+    };
+    const { error } = await sb.from("nfts").insert(payload);
+    setGuardando(false);
+    if (error) { setModal({ msg: "No se pudo crear: " + error.message }); return; }
+    setNuevo({ nombre: "", descripcion: "", rareza: "common", supply: 19, num_x: 84, num_y: 27, num_size: 8, imagen_url: "" });
+    loadAll();
+  }
+  async function toggleActivo(n) { await sb.from("nfts").update({ activo: !n.activo }).eq("id", n.id); loadAll(); }
+  async function borrarNft(n) { if (countOwned(n.id) > 0) { setModal({ msg: "No se puede borrar: ya hay ediciones en circulación. Desactivalo en su lugar." }); return; } await sb.from("nfts").delete().eq("id", n.id); loadAll(); }
+  async function guardarProb() {
+    const p = probEdit;
+    const payload = {
+      w_common: Number(p.w_common), w_limited: Number(p.w_limited), w_legendary: Number(p.w_legendary),
+      godpack_chance: Number(p.godpack_chance), godpack_legendary: Number(p.godpack_legendary), godpack_limited: Number(p.godpack_limited),
+      precio_simple: Number(p.precio_simple), precio_triple: Number(p.precio_triple),
+    };
+    const { error } = await sb.from("nft_config").update(payload).eq("id", 1);
+    if (error) { setModal({ msg: "No se pudo guardar: " + error.message }); return; }
+    setModal({ msg: "✅ Probabilidades y precios guardados." });
+    loadAll();
+  }
+
+  const inp = { padding: "7px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--txt)", fontSize: 13, outline: "none", width: "100%" };
+  const precioSimple = cfg ? cfg.precio_simple : 15;
+  const precioTriple = cfg ? cfg.precio_triple : 40;
+
+  // mi colección agrupada por nft
+  const mine = {};
+  owned.forEach(o => { if (!o.nft) return; if (!mine[o.nft_id]) mine[o.nft_id] = { nft: o.nft, eds: [] }; mine[o.nft_id].eds.push(o.edition); });
+  const mineList = Object.values(mine).sort((a, b) => (rarRank[a.nft.rareza] - rarRank[b.nft.rareza]) || a.nft.nombre.localeCompare(b.nft.nombre));
+  mineList.forEach(m => m.eds.sort((x, y) => x - y));
+
+  const galLista = (isAdmin ? nfts : nfts.filter(n => n.activo)).slice().sort((a, b) => (rarRank[a.rareza] - rarRank[b.rareza]) || a.nombre.localeCompare(b.nombre));
+
+  return (
+    <div className="container">
+      <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>🃏 Colección NFT</h2>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Abrí sobres con Petros y junta cartas: comunes, limited numeradas y legendary 1 de 1.</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>TUS PETROS</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}><PetroCoin size={22} /> {isAdmin ? "∞" : saldo}</div>
+          </div>
+        </div>
+        <div className="pre-tabs" style={{ marginTop: 14, flexWrap: "wrap" }}>
+          <button className={`pre-tab ${sub === "sobres" ? "active" : ""}`} onClick={() => setSub("sobres")}>🎁 Sobres</button>
+          <button className={`pre-tab ${sub === "mia" ? "active" : ""}`} onClick={() => setSub("mia")}>🎒 Mi colección</button>
+          <button className={`pre-tab ${sub === "galeria" ? "active" : ""}`} onClick={() => setSub("galeria")}>🌐 Galería</button>
+          {isAdmin && <button className={`pre-tab ${sub === "admin" ? "active" : ""}`} onClick={() => setSub("admin")}>⚙️ Gestión</button>}
+        </div>
+      </div>
+
+      {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div> : <>
+
+      {sub === "sobres" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {[{ tipo: "simple", nombre: "Sobre Simple", emoji: "🎴", cant: "1 carta", precio: precioSimple, desc: "Una carta al azar." },
+            { tipo: "triple", nombre: "Sobre Triple", emoji: "🎁", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar. Con suerte… God Pack." }].map(pk => {
+            const noPlata = !isAdmin && saldo < pk.precio;
+            return (
+              <div key={pk.tipo} className="card" style={{ padding: "16px 18px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ fontSize: 40, flexShrink: 0 }}>{pk.emoji}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>{pk.nombre} <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>· {pk.cant}</span></div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{pk.desc}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--gold)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={15} /> {pk.precio}</div>
+                    <button onClick={() => abrirSobre(pk.tipo)} disabled={noPlata || opening === pk.tipo}
+                      style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: noPlata ? "var(--surface)" : "var(--gold)", color: noPlata ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: noPlata ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                      {opening === pk.tipo ? "Abriendo…" : noPlata ? "Sin Petros" : "Abrir"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>El Sobre Triple tiene una chance secreta de convertirse en <b style={{ color: "var(--gold)" }}>God Pack</b> ✨</div>
+        </div>
+      )}
+
+      {sub === "mia" && (
+        mineList.length === 0
+          ? <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía no tenés cartas. Abrí un sobre para empezar tu colección. 🎁</div>
+          : <div className="nftgrid">
+              {mineList.map(m => (
+                <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer" }}>
+                  <NFTCard nft={m.nft} edition={m.eds[0]} />
+                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nft.nombre}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[m.nft.rareza].c }}>{NFT_RAR[m.nft.rareza].t}{m.eds.length > 1 ? ` · x${m.eds.length}` : ""}</div>
+                  {m.nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{m.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
+                </div>
+              ))}
+            </div>
+      )}
+
+      {sub === "galeria" && (
+        <div className="nftgrid">
+          {galLista.map(n => {
+            const owners = allOwned.filter(o => o.nft_id === n.id);
+            let info;
+            if (n.rareza === "legendary") info = owners.length ? "👑 " + nameOf(owners[0].user_id) : "Sin dueño aún";
+            else if (n.rareza === "limited") info = `${owners.length}/${n.supply_max || 19} repartidas`;
+            else info = `${owners.length} en circulación`;
+            return (
+              <div key={n.id} onClick={() => setDetail(n)} style={{ cursor: "pointer", opacity: n.activo ? 1 : 0.5 }}>
+                <NFTCard nft={n} edition={n.rareza === "limited" && owners.length ? owners[0].edition : null} />
+                <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.nombre}</div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[n.rareza].c }}>{NFT_RAR[n.rareza].t}</div>
+                <div style={{ fontSize: 10, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sub === "admin" && isAdmin && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Probabilidades */}
+          {probEdit && (
+            <div className="card" style={{ padding: "16px 18px" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>⚙️ Probabilidades y precios</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                {[["w_common", "Peso común"], ["w_limited", "Peso limited"], ["w_legendary", "Peso legendary"]].map(([k, l]) => (
+                  <label key={k} style={{ fontSize: 11, color: "var(--muted)" }}>{l}
+                    <input type="number" style={inp} value={probEdit[k]} onChange={e => setProbEdit(p => ({ ...p, [k]: e.target.value }))} /></label>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+                <label style={{ fontSize: 11, color: "var(--muted)" }}>% God Pack (ej 0.5)
+                  <input type="number" step="0.1" style={inp} value={probEdit.godpack_chance} onChange={e => setProbEdit(p => ({ ...p, godpack_chance: e.target.value }))} /></label>
+                <label style={{ fontSize: 11, color: "var(--muted)" }}>God: legendary
+                  <input type="number" style={inp} value={probEdit.godpack_legendary} onChange={e => setProbEdit(p => ({ ...p, godpack_legendary: e.target.value }))} /></label>
+                <label style={{ fontSize: 11, color: "var(--muted)" }}>God: limited
+                  <input type="number" style={inp} value={probEdit.godpack_limited} onChange={e => setProbEdit(p => ({ ...p, godpack_limited: e.target.value }))} /></label>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                <label style={{ fontSize: 11, color: "var(--muted)" }}>Precio Sobre Simple
+                  <input type="number" style={inp} value={probEdit.precio_simple} onChange={e => setProbEdit(p => ({ ...p, precio_simple: e.target.value }))} /></label>
+                <label style={{ fontSize: 11, color: "var(--muted)" }}>Precio Sobre Triple
+                  <input type="number" style={inp} value={probEdit.precio_triple} onChange={e => setProbEdit(p => ({ ...p, precio_triple: e.target.value }))} /></label>
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 8 }}>Los pesos son relativos (ej 88 / 11 / 1). El % de God Pack es sobre el Sobre Triple.</div>
+              <button onClick={guardarProb} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Guardar</button>
+            </div>
+          )}
+
+          {/* Crear NFT */}
+          <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>➕ Nueva carta</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input style={inp} placeholder="Nombre" value={nuevo.nombre} onChange={e => setNuevo(n => ({ ...n, nombre: e.target.value }))} />
+              <input style={inp} placeholder="Descripción (opcional)" value={nuevo.descripcion} onChange={e => setNuevo(n => ({ ...n, descripcion: e.target.value }))} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select style={{ ...inp, flex: "1 1 140px" }} value={nuevo.rareza} onChange={e => setNuevo(n => ({ ...n, rareza: e.target.value }))}>
+                  <option value="common">Común (ilimitada)</option>
+                  <option value="limited">Limited (numerada)</option>
+                  <option value="legendary">Legendary (1 de 1)</option>
+                </select>
+                {nuevo.rareza === "limited" && (
+                  <input type="number" style={{ ...inp, flex: "0 1 130px" }} placeholder="cantidad (19)" value={nuevo.supply} onChange={e => setNuevo(n => ({ ...n, supply: e.target.value }))} />
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <label style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 13, cursor: "pointer" }}>
+                  {subiendo ? "Subiendo…" : "🖼️ Subir arte"}
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) subirImagen(e.target.files[0]); }} />
+                </label>
+                {nuevo.imagen_url && <span style={{ fontSize: 11, color: "var(--green)" }}>Imagen lista ✓</span>}
+              </div>
+
+              {nuevo.imagen_url && nuevo.rareza === "limited" && (
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Ubicá el número (movés los sliders y mirás la vista previa):</div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <div style={{ width: 150 }}>
+                      <NFTCard nft={{ imagen_url: nuevo.imagen_url, rareza: "limited", supply_max: Number(nuevo.supply) || 19, num_x: Number(nuevo.num_x), num_y: Number(nuevo.num_y), num_size: Number(nuevo.num_size) }} edition={1} />
+                    </div>
+                    <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <label style={{ fontSize: 11, color: "var(--muted)" }}>Horizontal: {nuevo.num_x}%
+                        <input type="range" min="0" max="100" value={nuevo.num_x} onChange={e => setNuevo(n => ({ ...n, num_x: e.target.value }))} style={{ width: "100%" }} /></label>
+                      <label style={{ fontSize: 11, color: "var(--muted)" }}>Vertical: {nuevo.num_y}%
+                        <input type="range" min="0" max="100" value={nuevo.num_y} onChange={e => setNuevo(n => ({ ...n, num_y: e.target.value }))} style={{ width: "100%" }} /></label>
+                      <label style={{ fontSize: 11, color: "var(--muted)" }}>Tamaño: {nuevo.num_size}
+                        <input type="range" min="4" max="16" step="0.5" value={nuevo.num_size} onChange={e => setNuevo(n => ({ ...n, num_size: e.target.value }))} style={{ width: "100%" }} /></label>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <button onClick={crearNft} disabled={guardando} style={{ alignSelf: "flex-start", padding: "8px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{guardando ? "Creando…" : "Crear carta"}</button>
+            </div>
+          </div>
+
+          {/* Lista NFT */}
+          <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>🃏 Cartas ({nfts.length})</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {nfts.map(n => {
+                const cnt = countOwned(n.id);
+                const cap = n.rareza === "common" ? "∞" : (n.supply_max || (n.rareza === "legendary" ? 1 : 19));
+                return (
+                  <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", flexWrap: "wrap" }}>
+                    <img src={n.imagen_url} alt="" style={{ width: 34, height: 44, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
+                    <div style={{ flex: "1 1 120px", minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.nombre}</div>
+                      <div style={{ fontSize: 10, color: NFT_RAR[n.rareza].c, fontWeight: 700 }}>{NFT_RAR[n.rareza].t} · {cnt}/{cap}{!n.activo ? " · off" : ""}</div>
+                    </div>
+                    <button onClick={() => toggleActivo(n)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: n.activo ? "var(--green)" : "var(--muted)", fontSize: 12, cursor: "pointer" }}>{n.activo ? "Activo" : "Off"}</button>
+                    <button onClick={() => borrarNft(n)} style={{ padding: "5px 8px", borderRadius: 6, border: "none", background: "none", color: "var(--red)", fontSize: 14, cursor: "pointer" }}>🗑️</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      </>}
+
+      {/* Reveal de sobre */}
+      {reveal && (
+        <div onClick={() => setReveal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
+          {reveal.godpack && <div className="nft-godray" />}
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 520, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 1 }}>
+            {reveal.godpack && <div style={{ fontFamily: "Bebas Neue", fontSize: 30, color: "var(--gold)", letterSpacing: 2, textShadow: "0 0 16px rgba(245,200,90,.7)" }}>✨ GOD PACK ✨</div>}
+            <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 14 }}>{reveal.godpack ? "La suerte te sonrió." : "Abriste tu sobre…"}</div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {reveal.items.map((it, i) => (
+                <div key={i} className="nft-pop" style={{ width: reveal.items.length > 1 ? 140 : 250, animationDelay: (i * 0.18) + "s" }}>
+                  <NFTCard nft={it} edition={it.rareza === "limited" ? it.edition : null} />
+                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.nombre}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[it.rareza].c }}>{NFT_RAR[it.rareza].t}{it.rareza === "limited" ? ` · #${String(it.edition).padStart(2, "0")}` : ""}{it.nuevo ? " · ¡NUEVO!" : ""}</div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setReveal(null)} style={{ marginTop: 18, padding: "9px 24px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>¡Joya!</button>
+          </div>
+        </div>
+      )}
+
+      {/* Detalle de carta */}
+      {detail && (
+        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
+            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={null} big /></div>
+            <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
+            {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
+            <div style={{ marginTop: 14, textAlign: "left" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>DUEÑOS</div>
+              {allOwned.filter(o => o.nft_id === detail.id).sort((a, b) => a.edition - b.edition).map((o, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span>{nameOf(o.user_id)}</span>
+                  <span style={{ color: NFT_RAR[detail.rareza].c, fontWeight: 700 }}>{detail.rareza === "common" ? "✓" : "#" + String(o.edition).padStart(2, "0")}</span>
+                </div>
+              ))}
+              {allOwned.filter(o => o.nft_id === detail.id).length === 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}>Nadie la tiene todavía.</div>}
+            </div>
+            <button onClick={() => setDetail(null)} style={{ marginTop: 16, padding: "9px 22px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* mensajes */}
+      {modal && (
+        <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 340, width: "100%", padding: "22px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{modal.msg}</div>
+            <button onClick={() => setModal(null)} style={{ marginTop: 16, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -7425,7 +7861,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["coleccion","🃏 Colección"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
           <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7474,7 +7910,7 @@ export default function App() {
         </div>
       )}
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["coleccion","🃏 Colección"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
         <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7505,6 +7941,7 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
+        {tab==="coleccion" && <Coleccion user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />}
         {/* Álbum oculto temporalmente — para reactivar, descomentá esta línea y volvé a agregar ["album","📒 Álbum"] en los dos menús de arriba */}
         {/* {tab==="album"     && <Album user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />} */}
         {tab==="tienda"    && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
