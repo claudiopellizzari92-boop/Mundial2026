@@ -6992,7 +6992,6 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
                   );
                 })}
               </div>
-              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 14 }}>Mirá tu progreso en la pestaña 📒 Álbum.</div>
             </>)}
             {!(modal.type === "caja" && modal.fase === "ruleta") && (
               <button onClick={() => setModal(null)} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
@@ -7426,7 +7425,7 @@ export default function App() {
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
         <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["album","📒 Álbum"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
             <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
           ))}
           <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7475,7 +7474,7 @@ export default function App() {
         </div>
       )}
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["album","📒 Álbum"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
+        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
           <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
         ))}
         <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
@@ -7506,7 +7505,8 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
-        {tab==="album"     && <Album user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />}
+        {/* Álbum oculto temporalmente — para reactivar, descomentá esta línea y volvé a agregar ["album","📒 Álbum"] en los dos menús de arriba */}
+        {/* {tab==="album"     && <Album user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />} */}
         {tab==="tienda"    && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
         {/* Overlay moroso — se muestra al abrir la app si el usuario tiene deuda */}
         {user && profiles.find(p => p.id === user.id)?.is_debtor && showDebtorOverlay && (
