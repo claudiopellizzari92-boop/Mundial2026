@@ -5296,7 +5296,7 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   async function calculatePreTournamentPoints() {
     setCalculatingPts(true); setGroupResultsMsg(null);
 
-    // 1) Guardar primero lo cargado en pantalla (así no hace falta apretar "Guardar" aparte)
+    // 1) Guardar primero lo cargado en pantalla
     let saveErr = null;
     for (const group of Object.keys(groupResults)) {
       for (const pos of [1, 2, 3]) {
@@ -5312,40 +5312,17 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       return;
     }
 
-    // 2) Leer predicciones, resultados y reglas
-    const { data: preds } = await sb.from("pretournament_predictions").select("*");
-    const { data: results } = await sb.from("group_results").select("*");
-    const { data: rules2 } = await sb.from("scoring_rules").select("*");
-    const rMap = {};
-    (rules2 || []).forEach(r => { rMap[r.rule_key] = r.rule_value; });
-    const pts1st = rMap["group_first"] || 2;
-    const pts2nd = rMap["group_second"] || 2;
-    const pts3rd = rMap["third_place_qualifier"] || 2;
-    const resultMap = {};
-    (results || []).forEach(r => { if (!resultMap[r.group_name]) resultMap[r.group_name] = {}; resultMap[r.group_name][r.position] = r.team; });
-
-    // 3) Calcular y escribir (resetea a 0 los que ya no aciertan)
-    let aciertos = 0, totalPts = 0; const usersConPts = new Set();
-    for (const pred of (preds || [])) {
-      let pts = 0;
-      if (pred.prediction_type === "group_standing") {
-        const real = resultMap[pred.group_name]?.[pred.position];
-        if (real && real === pred.team) { pts = pred.position === 1 ? pts1st : pts2nd; }
-      } else if (pred.prediction_type === "third_place") {
-        const isClassified = Object.values(resultMap).some(g => g[3] === pred.team);
-        if (isClassified) pts = pts3rd;
-      }
-      if ((pred.points || 0) !== pts) {
-        await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id);
-      }
-      if (pts > 0) { aciertos++; totalPts += pts; usersConPts.add(pred.user_id); }
-    }
-
+    // 2) Calcular en el servidor (bypassa RLS y actualiza a TODOS los jugadores)
+    const { data, error } = await sb.rpc("calcular_clasificados");
     setCalculatingPts(false);
-    if (aciertos === 0) {
+    if (error || !data || !data.ok) {
+      setGroupResultsMsg({ type: "error", text: (data && data.error) || (error && error.message) || "No se pudo calcular." });
+      return;
+    }
+    if ((data.aciertos || 0) === 0) {
       setGroupResultsMsg({ type: "error", text: "Calculado, pero 0 aciertos. Revisá que cargaste los resultados correctos y que los jugadores ya hicieron sus predicciones." });
     } else {
-      setGroupResultsMsg({ type: "ok", text: `✅ ${aciertos} aciertos · +${totalPts} pts repartidos entre ${usersConPts.size} jugador${usersConPts.size === 1 ? "" : "es"}` });
+      setGroupResultsMsg({ type: "ok", text: `✅ ${data.aciertos} aciertos · +${data.total} pts repartidos entre ${data.jugadores} jugador${data.jugadores === 1 ? "" : "es"}` });
     }
     if (onRefresh) onRefresh();
     setTimeout(() => setGroupResultsMsg(null), 6000);
