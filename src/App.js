@@ -8360,6 +8360,7 @@ export default function App() {
         <div className="nav-user">
           <button onClick={()=>goTab("tienda")} title="Mi cartera" style={{display:"inline-flex",alignItems:"center",gap:5,background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"6px 10px",color:"var(--gold)",fontWeight:800,fontSize:14,lineHeight:1}}><PetroCoin size={16}/> {isAdmin ? "∞" : myWallet}</button>
           <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>
+          <button onClick={()=>goTab("coleccion")} title="Colección NFT" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 11px",color:"var(--gold)",fontWeight:800,fontSize:13,lineHeight:1,letterSpacing:0.5,alignItems:"center"}}>NFT</button>
           <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
             <Avatar profile={user.profile} />
           </div>
