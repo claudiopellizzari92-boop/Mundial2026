@@ -7171,6 +7171,37 @@ function ResetCountdown({ style }) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return <span style={style}>{h}h {String(m).padStart(2, "0")}m {String(sec).padStart(2, "0")}s</span>;
 }
+
+// Sobre de cartas dibujado (foil con borde crimpado), tematizado por variante
+function PackIcon({ variant }) {
+  const themes = {
+    cinco: { c1: "#60a5fa", c2: "#1d4ed8", crimp: "#bfdbfe", band: "#1e3a8a", star: "#eaf2ff" },
+    triple: { c1: "#f472b6", c2: "#7c3aed", crimp: "#fbcfe8", band: "#6d28d9", star: "#fde68a" },
+  };
+  const t = themes[variant] || themes.cinco;
+  const id = "pk_" + variant;
+  let zig = "M6,7 L60,7 L60,14 ";
+  let down = true;
+  for (let x = 60; x >= 6; x -= 4) { zig += `L${x},${down ? 17.5 : 14} `; down = !down; }
+  zig += "Z";
+  return (
+    <svg viewBox="0 0 66 86" width="66" height="86" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+      <defs>
+        <linearGradient id={id + "_b"} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={t.c1} /><stop offset="1" stopColor={t.c2} />
+        </linearGradient>
+        <linearGradient id={id + "_s"} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.5" /><stop offset="0.55" stopColor="#fff" stopOpacity="0.05" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect x="6" y="6" width="54" height="74" rx="8" fill={`url(#${id}_b)`} stroke="rgba(255,255,255,.28)" strokeWidth="1" />
+      <path d={zig} fill={t.crimp} />
+      <rect x="6" y="40" width="54" height="13" fill={t.band} opacity="0.55" />
+      <path d="M33 41.3 l1.8 3.9 l4.2 .4 l-3.2 2.8 l1 4.1 l-3.8-2.3 l-3.8 2.3 l1-4.1 l-3.2-2.8 l4.2-.4 Z" fill={t.star} />
+      <path d="M12 6 L22 6 L13 80 L6 80 L6 70 Z" fill={`url(#${id}_s)`} />
+    </svg>
+  );
+}
 const rarRank = { legendary: 0, limited: 1, common: 2 };
 
 // ── Dorso de carta (boca abajo) ───────────────────────────────────────────────
@@ -7990,7 +8021,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                 <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${pk.tint}, transparent 62%)`, pointerEvents: "none" }} />
                 <div style={{ position: "absolute", top: -44, right: -34, width: 150, height: 150, borderRadius: "50%", background: pk.glow, filter: "blur(42px)", opacity: 0.32, pointerEvents: "none" }} />
                 <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
-                  <div style={{ width: 66, height: 86, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, background: pk.badge, boxShadow: "0 8px 20px rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.14)" }}>{pk.emoji}</div>
+                  <div style={{ width: 66, height: 86, flexShrink: 0, filter: "drop-shadow(0 8px 16px rgba(0,0,0,.45))" }}><PackIcon variant={pk.tipo} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 17, fontWeight: 800 }}>{pk.nombre}</span>
