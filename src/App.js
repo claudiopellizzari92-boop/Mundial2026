@@ -7162,6 +7162,17 @@ const NFT_GRUPOS = [
   { key: "gestion", label: "Gestión", emoji: "⚙️", adminOnly: true, subs: [["admin", "⚙️", "Gestión"]] },
 ];
 
+// Agrupación de la barra principal en secciones con toggle interno
+const APP_GRUPOS = [
+  { key: "inicio", label: "Inicio", emoji: "🏠", tabs: [["home", "🏠", "Inicio"]] },
+  { key: "jugar", label: "Predicciones", emoji: "🎯", tabs: [["predicciones", "🎯", "Predicciones"]] },
+  { key: "resultados", label: "Resultados", emoji: "🏆", tabs: [["standings", "📊", "Posiciones"], ["stats", "🌟", "Stats"], ["compare", "👁️", "Comparar"]] },
+  { key: "comunidad", label: "Comunidad", emoji: "📰", tabs: [["cronica", "📰", "Crónica"], ["fame", "🏅", "Salón de la Fama"]] },
+  { key: "coleccionables", label: "Coleccionables", emoji: "🃏", tabs: [["coleccion", "🃏", "Colección"], ["tienda", "🛒", "Tienda"]] },
+  { key: "info", label: "Info", emoji: "📋", tabs: [["info", "📋", "Info"]] },
+  { key: "adminG", label: "Admin", emoji: "🔧", adminOnly: true, tabs: [["admin", "🔧", "Admin"]] },
+];
+
 // ms hasta la próxima medianoche de Aruba (UTC-4), que es cuando se resetean los sobres
 function msUntilArubaMidnight() {
   const now = new Date();
@@ -8596,14 +8607,18 @@ export default function App() {
   const [prePreds, setPrePreds] = useState([]);
 
   const hasNewChronicle = !!latestChronicleKey && latestChronicleKey !== chronicaSeenKey;
+  const [appLastTab, setAppLastTab] = useState({ inicio: "home", jugar: "predicciones", resultados: "standings", comunidad: "cronica", coleccionables: "coleccion", info: "info", adminG: "admin" });
   function goTab(t) {
     setTab(t);
     setMenuOpen(false);
+    const g = APP_GRUPOS.find(gr => gr.tabs.some(x => x[0] === t));
+    if (g) setAppLastTab(prev => ({ ...prev, [g.key]: t }));
     if (t === "cronica" && latestChronicleKey) {
       setChronicaSeenKey(latestChronicleKey);
       localStorage.setItem("cronica-seen", latestChronicleKey);
     }
   }
+  const grupoActivoApp = APP_GRUPOS.find(g => g.tabs.some(t => t[0] === tab)) || APP_GRUPOS[0];
 
   function toggleTheme() {
     const next = !darkMode;
@@ -8965,12 +8980,30 @@ export default function App() {
       )}
       <nav className="nav">
         <div className="nav-brand">🏆 QUINIELA 2026</div>
-        <div className="nav-tabs">
-          {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["coleccion","🃏 Colección"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
-            <button key={k} className={`nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 0 2px var(--bg)"}}/>}</button>
-          ))}
-          <button className={`nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
-          {isAdmin && <button className={`nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
+        <div className="nav-tabs" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+            {APP_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => {
+              const on = grupoActivoApp.key === g.key;
+              const dot = g.tabs.some(t => t[0] === "cronica") && hasNewChronicle;
+              return (
+                <button key={g.key} className={`nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`} onClick={() => goTab(appLastTab[g.key] || g.tabs[0][0])} style={{ position: "relative" }}>
+                  {g.emoji} {g.label}{dot && <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "var(--red)", boxShadow: "0 0 0 2px var(--bg)" }} />}
+                </button>
+              );
+            })}
+          </div>
+          {grupoActivoApp.tabs.length > 1 && (
+            <div style={{ display: "inline-flex", background: "var(--card2)", border: "1px solid var(--border)", borderRadius: 999, padding: 3, gap: 2, flexWrap: "wrap" }}>
+              {grupoActivoApp.tabs.map(([k, emo, lab]) => {
+                const on = tab === k; const dot = k === "cronica" && hasNewChronicle;
+                return (
+                  <button key={k} onClick={() => goTab(k)} style={{ position: "relative", padding: "6px 13px", borderRadius: 999, border: "none", background: on ? "var(--gold)" : "transparent", color: on ? "#1a1a1a" : "var(--muted)", fontSize: 12, fontWeight: on ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {emo} {lab}{dot && <span style={{ position: "absolute", top: 2, right: 4, width: 7, height: 7, borderRadius: "50%", background: "var(--red)" }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="nav-user">
           <button onClick={()=>goTab("tienda")} title="Mi cartera" style={{display:"inline-flex",alignItems:"center",gap:5,background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"6px 10px",color:"var(--gold)",fontWeight:800,fontSize:14,lineHeight:1}}><PetroCoin size={16}/> {isAdmin ? "∞" : myWallet}</button>
@@ -9016,11 +9049,18 @@ export default function App() {
         </div>
       )}
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
-        {[["home","🏠 Inicio"],["cronica","📰 Crónica"],["predicciones","🎯 Predicciones"],["compare","👁️ Comparar"],["standings","📊 Posiciones"],["stats","🌟 Stats"],["coleccion","🃏 Colección"],["fame","🏅 Salón de la Fama"],["info","📋 Info"]].map(([k,l])=>(
-          <button key={k} className={`mobile-nav-tab ${tab===k?"active":""}`} onClick={()=>goTab(k)} style={{position:"relative"}}>{l}{k==="cronica" && hasNewChronicle && <span style={{position:"absolute",top:8,right:14,width:8,height:8,borderRadius:"50%",background:"var(--red)"}}/>}</button>
-        ))}
-        <button className={`mobile-nav-tab ${tab==="tienda"?"active":""}`} onClick={()=>goTab("tienda")}>🛒 Tienda</button>
-        {isAdmin && <button className={`mobile-nav-tab admin-tab ${tab==="admin"?"active":""}`} onClick={()=>goTab("admin")}>🔧 Admin</button>}
+        {APP_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => {
+          const on = grupoActivoApp.key === g.key;
+          const dot = g.tabs.some(t => t[0] === "cronica") && hasNewChronicle;
+          return (
+            <React.Fragment key={g.key}>
+              <button className={`mobile-nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`} onClick={() => goTab(appLastTab[g.key] || g.tabs[0][0])} style={{ position: "relative" }}>{g.emoji} {g.label}{dot && <span style={{ position: "absolute", top: 8, right: 14, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}</button>
+              {on && g.tabs.length > 1 && g.tabs.map(([k, emo, lab]) => (
+                <button key={k} className={`mobile-nav-tab ${tab === k ? "active" : ""}`} onClick={() => goTab(k)} style={{ paddingLeft: 34, fontSize: 14, position: "relative" }}>{emo} {lab}{k === "cronica" && hasNewChronicle && <span style={{ position: "absolute", top: 8, right: 14, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}</button>
+              ))}
+            </React.Fragment>
+          );
+        })}
         <div style={{borderTop:"1px solid var(--border)",marginTop:4,paddingTop:8,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px"}}>
           <span style={{fontSize:13,color:"var(--muted)"}}>{user.profile?.name||user.email}</span>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
