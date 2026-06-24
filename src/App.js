@@ -7130,6 +7130,7 @@ function NFTCard({ nft, edition = null, big = false }) {
 
 // ── Colección de NFT ──────────────────────────────────────────────────────────
 const NFT_RAR = { common: { t: "Común", c: "#9fb0c9" }, limited: { t: "Limited", c: "#bcd0f5" }, legendary: { t: "Legendary", c: "#f5d97a" } };
+const REACT_EMOJIS = ["🔥", "❤️", "😍", "👀", "😂", "🐐"];
 const rarRank = { legendary: 0, limited: 1, common: 2 };
 
 // ── Dorso de carta (boca abajo) ───────────────────────────────────────────────
@@ -7693,6 +7694,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [probEdit, setProbEdit] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [recConfirm, setRecConfirm] = useState(null);
+  const [nftReacts, setNftReacts] = useState([]);
 
   const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const bonus = user.profile?.monedas_bonus || 0;
@@ -7700,17 +7702,19 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
       sb.from("nft_config").select("*").eq("id", 1).maybeSingle(),
       sb.from("store_purchases").select("precio, item_key, created_at").eq("user_id", user.id),
+      sb.from("nft_reactions").select("nft_id,user_id,emoji"),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
     setAllOwned(aRes.data || []);
     setCfg(cRes.data || null);
+    setNftReacts(rRes.data || []);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -7795,6 +7799,16 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
     setSubiendo(false);
+  }
+  async function toggleReaction(nftId, emoji) {
+    const mine = nftReacts.some(r => r.nft_id === nftId && r.user_id === user.id && r.emoji === emoji);
+    if (mine) {
+      setNftReacts(rs => rs.filter(r => !(r.nft_id === nftId && r.user_id === user.id && r.emoji === emoji)));
+      await sb.from("nft_reactions").delete().eq("nft_id", nftId).eq("user_id", user.id).eq("emoji", emoji);
+    } else {
+      setNftReacts(rs => [...rs, { nft_id: nftId, user_id: user.id, emoji }]);
+      await sb.from("nft_reactions").insert({ nft_id: nftId, user_id: user.id, emoji });
+    }
   }
   async function toggleFeatured(nft) {
     const exists = featured.some(f => f.nft_id === nft.id);
@@ -8244,6 +8258,18 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                 </button>
               );
             })()}
+            <div style={{ marginTop: 14, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+              {REACT_EMOJIS.map(em => {
+                const cnt = nftReacts.filter(r => r.nft_id === detail.id && r.emoji === em).length;
+                const mine = nftReacts.some(r => r.nft_id === detail.id && r.user_id === user.id && r.emoji === em);
+                return (
+                  <button key={em} onClick={() => toggleReaction(detail.id, em)} title={mine ? "Sacar reacción" : "Reaccionar"}
+                    style={{ padding: "5px 11px", borderRadius: 999, fontSize: 15, cursor: "pointer", border: "1px solid " + (mine ? "var(--gold)" : "var(--border)"), background: mine ? "rgba(245,183,49,.16)" : "var(--surface)", display: "flex", alignItems: "center", gap: 5, lineHeight: 1 }}>
+                    <span>{em}</span>{cnt > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: mine ? "var(--gold)" : "var(--muted)" }}>{cnt}</span>}
+                  </button>
+                );
+              })}
+            </div>
             <div style={{ marginTop: 14, textAlign: "left" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>DUEÑOS</div>
               {allOwned.filter(o => o.nft_id === detail.id).sort((a, b) => a.edition - b.edition).map((o, i) => (
