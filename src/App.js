@@ -7251,6 +7251,7 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [listSel, setListSel] = useState(null);     // {nft, owned_id, edition, eds}
+  const [targetUser, setTargetUser] = useState(""); // destinatario opcional del intercambio
   const [offerModal, setOfferModal] = useState(null); // trade
   const [offerCard, setOfferCard] = useState(null);   // {nft, owned_id, edition, eds}
   const [offerPetros, setOfferPetros] = useState("");
@@ -7279,15 +7280,17 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
   const sortG = (arr) => arr.sort((a, b) => (rarRank[a.nft.rareza] - rarRank[b.nft.rareza]) || a.nft.nombre.localeCompare(b.nft.nombre));
   const dupList = sortG(Object.values(grouped).filter(d => d.eds.length >= 2));
   const allMine = sortG(Object.values(grouped));
+  const visibleTrades = trades.filter(t => !t.target_user || t.from_user === user.id || t.target_user === user.id);
 
   async function publicar() {
     if (!listSel) return;
     setBusy(true);
-    const { data, error } = await sb.rpc("proponer_trade", { p_offer_owned_id: listSel.owned_id });
+    const { data, error } = await sb.rpc("proponer_trade", { p_offer_owned_id: listSel.owned_id, p_target: targetUser || null });
     setBusy(false);
     if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo publicar."); return; }
-    setListSel(null); await loadTrades(); if (onRefresh) onRefresh();
-    setMsg("✅ ¡Carta publicada! Ahora pueden hacerte ofertas.");
+    const wasDirected = !!targetUser;
+    setListSel(null); setTargetUser(""); await loadTrades(); if (onRefresh) onRefresh();
+    setMsg(wasDirected ? "🎯 ¡Carta ofrecida! Le avisamos a la persona." : "✅ ¡Carta publicada! Ahora pueden hacerte ofertas.");
   }
   async function enviarOferta() {
     const p = parseInt(offerPetros) || 0;
@@ -7354,30 +7357,41 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
             ))}
           </div>
         )}
+        {listSel && (
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>🎯 ¿Dirigir a alguien? (opcional)</span>
+            <select value={targetUser} onChange={e => setTargetUser(e.target.value)}
+              style={{ background: "var(--surface)", color: "var(--txt)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 12 }}>
+              <option value="">Abierto a todos</option>
+              {profiles.filter(p => p.id !== user.id).sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        )}
         <button onClick={publicar} disabled={!listSel || busy}
           style={{ marginTop: 14, padding: "9px 20px", borderRadius: 8, border: "none", background: !listSel ? "var(--surface)" : "var(--gold)", color: !listSel ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: !listSel ? "not-allowed" : "pointer" }}>
-          {busy ? "..." : "Publicar"}
+          {busy ? "..." : (targetUser ? "Ofrecer a esa persona" : "Publicar")}
         </button>
       </div>
 
       {/* Publicaciones abiertas */}
       <div>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Publicaciones abiertas {trades.length > 0 ? `(${trades.length})` : ""}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Publicaciones abiertas {visibleTrades.length > 0 ? `(${visibleTrades.length})` : ""}</div>
         {loading ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Cargando…</div>
-          : trades.length === 0 ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay publicaciones. ¡Publicá la primera!</div>
+          : visibleTrades.length === 0 ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay publicaciones. ¡Publicá la primera!</div>
           : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {trades.map(t => {
+              {visibleTrades.map(t => {
                 const card = nftById[t.offer_nft_id];
                 if (!card) return null;
                 const mine = t.from_user === user.id;
                 const tOffers = offers.filter(o => o.trade_id === t.id);
                 const myOffer = tOffers.find(o => o.from_user === user.id);
                 return (
-                  <div key={t.id} className="card" style={{ padding: "14px 16px" }}>
+                  <div key={t.id} className="card" style={{ padding: "14px 16px", border: t.target_user === user.id ? "1px solid var(--gold)" : undefined }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 78, flexShrink: 0 }}><NFTCard nft={card} edition={card.rareza === "limited" ? t.offer_edition : null} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.nombre}</div>
+                        {t.target_user && <div style={{ fontSize: 10, fontWeight: 800, color: "var(--gold)", marginTop: 2 }}>{t.target_user === user.id ? "🎯 Para vos" : mine ? `🎯 Dirigida a ${nameOf(t.target_user)}` : ""}</div>}
                         <div style={{ fontSize: 11, color: NFT_RAR[card.rareza].c, fontWeight: 700 }}>{NFT_RAR[card.rareza].t}{card.rareza === "limited" ? ` · #${String(t.offer_edition).padStart(2, "0")}` : ""}</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{mine ? "Tu publicación" : "de " + nameOf(t.from_user)}{tOffers.length ? ` · ${tOffers.length} oferta${tOffers.length > 1 ? "s" : ""}` : ""}</div>
                       </div>
@@ -7717,6 +7731,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [editForm, setEditForm] = useState(null);
   const [recConfirm, setRecConfirm] = useState(null);
   const [nftReacts, setNftReacts] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
 
   const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const bonus = user.profile?.monedas_bonus || 0;
@@ -7724,19 +7739,21 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
       sb.from("nft_config").select("*").eq("id", 1).maybeSingle(),
       sb.from("store_purchases").select("precio, item_key, created_at").eq("user_id", user.id),
       sb.from("nft_reactions").select("nft_id,user_id,emoji"),
+      sb.from("nft_wishlist").select("nft_id").eq("user_id", user.id),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
     setAllOwned(aRes.data || []);
     setCfg(cRes.data || null);
     setNftReacts(rRes.data || []);
+    setWishlist((wRes.data || []).map(r => r.nft_id));
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -7821,6 +7838,16 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
     setSubiendo(false);
+  }
+  async function toggleWishlist(nftId) {
+    const has = wishlist.includes(nftId);
+    if (has) {
+      setWishlist(w => w.filter(x => x !== nftId));
+      await sb.from("nft_wishlist").delete().eq("user_id", user.id).eq("nft_id", nftId);
+    } else {
+      setWishlist(w => [...w, nftId]);
+      await sb.from("nft_wishlist").insert({ user_id: user.id, nft_id: nftId });
+    }
   }
   async function toggleReaction(nftId, emoji) {
     const mine = nftReacts.some(r => r.nft_id === nftId && r.user_id === user.id && r.emoji === emoji);
@@ -8292,6 +8319,10 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                 );
               })}
             </div>
+            <button onClick={() => toggleWishlist(detail.id)}
+              style={{ marginTop: 12, padding: "7px 14px", borderRadius: 999, border: "1px solid " + (wishlist.includes(detail.id) ? "var(--gold)" : "var(--border)"), background: wishlist.includes(detail.id) ? "rgba(245,183,49,.16)" : "var(--surface)", color: wishlist.includes(detail.id) ? "var(--gold)" : "var(--txt)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {wishlist.includes(detail.id) ? "📌 En tu wishlist ✓" : "📌 Agregar a wishlist"}
+            </button>
             <div style={{ marginTop: 14, textAlign: "left" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>DUEÑOS</div>
               {allOwned.filter(o => o.nft_id === detail.id).sort((a, b) => a.edition - b.edition).map((o, i) => (
