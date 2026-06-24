@@ -7291,18 +7291,18 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
       {/* Publicar */}
       <div className="card" style={{ padding: "16px 18px" }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔄 Publicar una carta</div>
-        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>Ofrecé una repetida. La gente te hace ofertas (otra carta, Petros, o las dos) y vos elegís.</div>
-        {dupList.length === 0
-          ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no tenés cartas repetidas para publicar.</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>Ofrecé cualquier carta tuya. La gente te hace ofertas (otra carta, Petros, o las dos) y vos elegís.</div>
+        {allMine.length === 0
+          ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no tenés cartas para publicar.</div>
           : <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
-              {dupList.map(d => {
+              {allMine.map(d => {
                 const sel = listSel && listSel.nft.id === d.nft.id;
                 return (
                   <div key={d.nft.id} onClick={() => setListSel({ nft: d.nft, owned_id: d.eds[0].id, edition: d.eds[0].edition, eds: d.eds })}
                     style={{ width: 84, flexShrink: 0, cursor: "pointer", border: "2px solid " + (sel ? "var(--gold)" : "transparent"), borderRadius: 12, padding: 2 }}>
                     <NFTCard nft={d.nft} edition={d.nft.rareza === "limited" ? d.eds[0].edition : null} />
                     <div style={{ fontSize: 9, fontWeight: 700, textAlign: "center", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nft.nombre}</div>
-                    <div style={{ fontSize: 9, color: NFT_RAR[d.nft.rareza].c, textAlign: "center", fontWeight: 800 }}>x{d.eds.length}</div>
+                    <div style={{ fontSize: 9, color: NFT_RAR[d.nft.rareza].c, textAlign: "center", fontWeight: 800 }}>{d.eds.length > 1 ? `x${d.eds.length}` : NFT_RAR[d.nft.rareza].t}</div>
                   </div>
                 );
               })}
@@ -7429,6 +7429,205 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
                 <button onClick={enviarOferta} disabled={busy || (!offerCard && p <= 0) || (!isAdmin && p > saldo)}
                   style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: (!offerCard && p <= 0) ? "var(--surface)" : "var(--gold)", color: (!offerCard && p <= 0) ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: (!offerCard && p <= 0) ? "not-allowed" : "pointer" }}>{busy ? "..." : "Enviar oferta"}</button>
                 <button onClick={() => setOfferModal(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {msg && (
+        <div onClick={() => setMsg(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1350, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 340, width: "100%", padding: "22px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{msg}</div>
+            <button onClick={() => setMsg(null)} style={{ marginTop: 16, padding: "8px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Subastas de NFT ───────────────────────────────────────────────────────────
+function Subastas({ user, nfts, owned, profiles, saldo, isAdmin, onRefresh }) {
+  const [auctions, setAuctions] = useState([]);
+  const [bids, setBids] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(Date.now());
+  const [sel, setSel] = useState(null);        // {nft, owned_id, edition, eds}
+  const [price, setPrice] = useState("");
+  const [hours, setHours] = useState(24);
+  const [bidModal, setBidModal] = useState(null); // auction
+  const [bidAmount, setBidAmount] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const nftById = {}; nfts.forEach(n => { nftById[n.id] = n; });
+  const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
+
+  async function loadAll() {
+    const { data: au } = await sb.from("nft_auctions").select("*").eq("status", "open").order("end_at", { ascending: true });
+    const list = au || [];
+    setAuctions(list);
+    if (list.length) {
+      const { data: bd } = await sb.from("nft_bids").select("*").in("auction_id", list.map(a => a.id));
+      setBids(bd || []);
+    } else setBids([]);
+    setLoading(false);
+  }
+  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 20000); return () => clearInterval(t); }, []);
+
+  const grouped = {};
+  owned.forEach(o => { if (!o.nft) return; if (!grouped[o.nft_id]) grouped[o.nft_id] = { nft: o.nft, eds: [] }; grouped[o.nft_id].eds.push({ id: o.id, edition: o.edition }); });
+  Object.values(grouped).forEach(g => g.eds.sort((a, b) => a.edition - b.edition));
+  const allMine = Object.values(grouped).sort((a, b) => (rarRank[a.nft.rareza] - rarRank[b.nft.rareza]) || a.nft.nombre.localeCompare(b.nft.nombre));
+
+  const topBid = (aid) => { const bs = bids.filter(b => b.auction_id === aid); return bs.length ? Math.max(...bs.map(b => b.amount)) : null; };
+  const topBidder = (aid) => { const bs = bids.filter(b => b.auction_id === aid).sort((a, b) => b.amount - a.amount || new Date(a.created_at) - new Date(b.created_at)); return bs.length ? bs[0].bidder : null; };
+  function remaining(end) { const ms = new Date(end).getTime() - now; if (ms <= 0) return null; const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; }
+
+  async function crear() {
+    if (!sel) return;
+    setBusy(true);
+    const { data, error } = await sb.rpc("crear_subasta", { p_owned_id: sel.owned_id, p_min_price: parseInt(price) || 1, p_hours: hours });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo crear."); return; }
+    setSel(null); setPrice(""); await loadAll(); if (onRefresh) onRefresh();
+    setMsg("🔨 ¡Subasta creada!");
+  }
+  async function ofertar() {
+    const amt = parseInt(bidAmount) || 0;
+    setBusy(true);
+    const { data, error } = await sb.rpc("ofertar_subasta", { p_auction_id: bidModal.id, p_amount: amt });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo ofertar."); return; }
+    setBidModal(null); setBidAmount(""); await loadAll(); if (onRefresh) onRefresh();
+    setMsg("✅ ¡Oferta enviada!");
+  }
+  async function finalizar(a) {
+    setBusy(true);
+    const { data, error } = await sb.rpc("finalizar_subasta", { p_auction_id: a.id });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo finalizar."); return; }
+    await loadAll(); if (onRefresh) onRefresh();
+    setMsg(data.sold ? "🔨 ¡Subasta vendida!" : "La subasta terminó sin ofertas válidas.");
+  }
+  async function cancelar(a) { setBusy(true); const { data } = await sb.rpc("cancelar_subasta", { p_auction_id: a.id }); setBusy(false); if (data && !data.ok) setMsg(data.error); await loadAll(); if (onRefresh) onRefresh(); }
+
+  const minBid = bidModal ? ((topBid(bidModal.id) != null ? topBid(bidModal.id) + 1 : bidModal.min_price)) : 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Crear subasta */}
+      <div className="card" style={{ padding: "16px 18px" }}>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔨 Subastar una carta</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>Elegí una carta, poné el precio inicial y la duración. Gana la oferta más alta.</div>
+        {allMine.length === 0
+          ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no tenés cartas para subastar.</div>
+          : <>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+              {allMine.map(d => {
+                const s = sel && sel.nft.id === d.nft.id;
+                return (
+                  <div key={d.nft.id} onClick={() => setSel({ nft: d.nft, owned_id: d.eds[0].id, edition: d.eds[0].edition, eds: d.eds })}
+                    style={{ width: 84, flexShrink: 0, cursor: "pointer", border: "2px solid " + (s ? "var(--gold)" : "transparent"), borderRadius: 12, padding: 2 }}>
+                    <NFTCard nft={d.nft} edition={d.nft.rareza === "limited" ? d.eds[0].edition : null} />
+                    <div style={{ fontSize: 9, fontWeight: 700, textAlign: "center", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nft.nombre}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {sel && sel.nft.rareza === "limited" && sel.eds.length > 1 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>Subastás la #:</span>
+                {sel.eds.map(e => (
+                  <button key={e.id} onClick={() => setSel(x => ({ ...x, owned_id: e.id, edition: e.edition }))}
+                    style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid " + (sel.owned_id === e.id ? "var(--gold)" : "var(--border)"), background: sel.owned_id === e.id ? "var(--gold)" : "none", color: sel.owned_id === e.id ? "#1a1a1a" : "var(--txt)" }}>#{String(e.edition).padStart(2, "0")}</button>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
+              <label style={{ fontSize: 11, color: "var(--muted)" }}>Precio inicial (Petros)
+                <input type="number" min="1" value={price} onChange={e => setPrice(e.target.value)} placeholder="1"
+                  style={{ display: "block", marginTop: 4, width: 130, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--txt)", fontSize: 14, outline: "none" }} /></label>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Duración</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[6, 12, 24, 48].map(h => (
+                    <button key={h} onClick={() => setHours(h)} style={{ padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid " + (hours === h ? "var(--gold)" : "var(--border)"), background: hours === h ? "var(--gold)" : "none", color: hours === h ? "#1a1a1a" : "var(--txt)" }}>{h}h</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={crear} disabled={!sel || busy} style={{ marginTop: 14, padding: "9px 20px", borderRadius: 8, border: "none", background: !sel ? "var(--surface)" : "var(--gold)", color: !sel ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: !sel ? "not-allowed" : "pointer" }}>{busy ? "..." : "Crear subasta"}</button>
+          </>}
+      </div>
+
+      {/* Subastas activas */}
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Subastas activas {auctions.length > 0 ? `(${auctions.length})` : ""}</div>
+        {loading ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Cargando…</div>
+          : auctions.length === 0 ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay subastas activas. ¡Creá la primera!</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {auctions.map(a => {
+                const card = nftById[a.nft_id]; if (!card) return null;
+                const mine = a.seller === user.id;
+                const tb = topBid(a.id), tbr = topBidder(a.id);
+                const rem = remaining(a.end_at);
+                const ended = rem === null;
+                const aBids = bids.filter(b => b.auction_id === a.id).sort((x, y) => y.amount - x.amount);
+                return (
+                  <div key={a.id} className="card" style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 78, flexShrink: 0 }}><NFTCard nft={card} edition={card.rareza === "limited" ? a.edition : null} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.nombre}</div>
+                        <div style={{ fontSize: 11, color: NFT_RAR[card.rareza].c, fontWeight: 700 }}>{NFT_RAR[card.rareza].t}{card.rareza === "limited" ? ` · #${String(a.edition).padStart(2, "0")}` : ""}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{mine ? "Tu subasta" : "de " + nameOf(a.seller)} · {ended ? <b style={{ color: "var(--red)" }}>Finalizada</b> : <>⏳ {rem}</>}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "var(--gold)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                          <PetroCoin size={14} /> {tb != null ? tb : a.min_price}<span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 500 }}>{tb != null ? ` · ${nameOf(tbr)}` : " (base)"}</span>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0 }}>
+                        {ended
+                          ? <button onClick={() => finalizar(a)} disabled={busy} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Finalizar</button>
+                          : mine
+                            ? (aBids.length === 0 && <button onClick={() => cancelar(a)} disabled={busy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--red)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>)
+                            : <button onClick={() => { setBidAmount(""); setBidModal(a); }} disabled={busy} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Ofertar</button>}
+                      </div>
+                    </div>
+                    {mine && aBids.length > 0 && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Ofertas ({aBids.length}):</div>
+                        {aBids.slice(0, 5).map(b => (
+                          <div key={b.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+                            <span>{nameOf(b.bidder)}</span>
+                            <span style={{ color: "var(--gold)", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}><PetroCoin size={12} />{b.amount}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>}
+      </div>
+
+      {/* Modal ofertar */}
+      {bidModal && (() => {
+        const card = nftById[bidModal.id ? bidModal.nft_id : null];
+        return (
+          <div onClick={() => setBidModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 18 }}>
+            <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 360, width: "100%", padding: "20px 18px", textAlign: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Tu oferta</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>por <b>{card?.nombre}</b></div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Oferta mínima: <b style={{ color: "var(--gold)" }}>{minBid}</b> · Tu saldo: {isAdmin ? "∞" : saldo}</div>
+              <input type="number" min={minBid} value={bidAmount} onChange={e => setBidAmount(e.target.value)} placeholder={String(minBid)} autoFocus
+                style={{ width: "100%", padding: "10px 12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--txt)", fontSize: 16, outline: "none", textAlign: "center", marginBottom: 14 }} />
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                <button onClick={ofertar} disabled={busy || (parseInt(bidAmount) || 0) < minBid || (!isAdmin && (parseInt(bidAmount) || 0) > saldo)}
+                  style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>{busy ? "..." : "Ofertar"}</button>
+                <button onClick={() => setBidModal(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
               </div>
             </div>
           </div>
@@ -7630,6 +7829,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
           <button className={`pre-tab ${sub === "mia" ? "active" : ""}`} onClick={() => setSub("mia")}>🎒 Mi colección</button>
           <button className={`pre-tab ${sub === "galeria" ? "active" : ""}`} onClick={() => setSub("galeria")}>🌐 Galería</button>
           <button className={`pre-tab ${sub === "trades" ? "active" : ""}`} onClick={() => setSub("trades")}>🔄 Intercambios</button>
+          <button className={`pre-tab ${sub === "subastas" ? "active" : ""}`} onClick={() => setSub("subastas")}>🔨 Subastas</button>
           {isAdmin && <button className={`pre-tab ${sub === "admin" ? "active" : ""}`} onClick={() => setSub("admin")}>⚙️ Gestión</button>}
         </div>
       </div>
@@ -7715,6 +7915,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       )}
 
       {sub === "trades" && <Trades user={user} nfts={nfts} owned={owned} allOwned={allOwned} profiles={profiles} saldo={saldo} isAdmin={isAdmin} onRefresh={loadAll} />}
+      {sub === "subastas" && <Subastas user={user} nfts={nfts} owned={owned} profiles={profiles} saldo={saldo} isAdmin={isAdmin} onRefresh={loadAll} />}
 
       {sub === "admin" && isAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
