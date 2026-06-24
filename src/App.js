@@ -2022,6 +2022,27 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
       .filter(p => (p.cronista_perfil || "").trim().length > 0)
       .map(p => ({ nombre: p.name, perfil: p.cronista_perfil.trim() }));
 
+    // Hitos NFT recientes (munición extra para el Cronista): desde la crónica anterior
+    let hitos_nft = [];
+    try {
+      const idxN = allDates.indexOf(matchDate);
+      const prevN = chronicles
+        .filter(c => c.published && c.created_at && allDates.indexOf(c.match_date) > -1 && allDates.indexOf(c.match_date) < idxN)
+        .sort((a, b) => allDates.indexOf(b.match_date) - allDates.indexOf(a.match_date))[0];
+      const cutoff = (prevN && prevN.created_at) ? prevN.created_at : new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const { data: evs } = await sb.from("nft_events").select("*").gt("created_at", cutoff).order("created_at", { ascending: true });
+      if (evs && evs.length) {
+        const nm = id => (profiles.find(p => p.id === id) || {}).name || "alguien";
+        hitos_nft = evs.map(e => {
+          const d = e.detail || {};
+          if (e.tipo === "legendary_sobre") return `${nm(e.user_id)} sacó de un sobre la legendary "${d.nombre || "?"}" 🃏`;
+          if (e.tipo === "subasta_vendida") return `${nm(d.comprador_id)} le ganó a ${nm(d.vendedor_id)} la subasta de "${d.nombre || "?"}" por ${d.precio} Petros`;
+          if (e.tipo === "legendary_reciclada") return `${nm(e.user_id)} mandó al reciclador la legendary "${d.nombre || "?"}" por ${d.reward} Petros`;
+          return null;
+        }).filter(Boolean);
+      }
+    } catch (_e) {}
+
     return {
       jornada: jornadaLabel(matchDate),
       partidos, comodines, tabla_fecha,
@@ -2031,6 +2052,7 @@ function CronistaTab({ user, isAdmin, matches, allPredictions, profiles }) {
       tabla_general, lider: tabla_general[0] || null, colista,
       morosos, eliminados,
       perfiles_jugadores,
+      hitos_nft,
     };
   }
 
