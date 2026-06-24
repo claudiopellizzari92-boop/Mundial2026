@@ -7153,6 +7153,24 @@ function NFTCard({ nft, edition = null, big = false }) {
 // ── Colección de NFT ──────────────────────────────────────────────────────────
 const NFT_RAR = { common: { t: "Común", c: "#9fb0c9" }, limited: { t: "Limited", c: "#bcd0f5" }, legendary: { t: "Legendary", c: "#f5d97a" } };
 const REACT_EMOJIS = ["🔥", "❤️", "😍", "👀", "😂", "🐐"];
+
+// ms hasta la próxima medianoche de Aruba (UTC-4), que es cuando se resetean los sobres
+function msUntilArubaMidnight() {
+  const now = new Date();
+  const aruba = new Date(now.getTime() - 4 * 3600 * 1000);
+  const nextMid = Date.UTC(aruba.getUTCFullYear(), aruba.getUTCMonth(), aruba.getUTCDate() + 1, 0, 0, 0);
+  return (nextMid + 4 * 3600 * 1000) - now.getTime();
+}
+function ResetCountdown({ style }) {
+  const [ms, setMs] = useState(() => msUntilArubaMidnight());
+  useEffect(() => {
+    const id = setInterval(() => setMs(msUntilArubaMidnight()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return <span style={style}>{h}h {String(m).padStart(2, "0")}m {String(sec).padStart(2, "0")}s</span>;
+}
 const rarRank = { legendary: 0, limited: 1, common: 2 };
 
 // ── Dorso de carta (boca abajo) ───────────────────────────────────────────────
@@ -7959,35 +7977,51 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div> : <>
 
       {sub === "sobres" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1 },
-            { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar. Con suerte… God Pack.", lim: 2 }].map(pk => {
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1, badge: "linear-gradient(160deg,#3b82f6,#1e3a8a)", glow: "#3b82f6", tint: "rgba(59,130,246,.16)" },
+            { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar.", lim: 2, badge: "linear-gradient(160deg,#ec4899,#7c3aed)", glow: "#ec4899", tint: "rgba(236,72,153,.16)" }].map(pk => {
             const used = usedToday[pk.tipo] || 0;
             const restante = pk.lim - used;
             const sinLimite = restante <= 0;
             const noPlata = !isAdmin && saldo < pk.precio;
             const dis = sinLimite || noPlata || opening === pk.tipo;
             return (
-              <div key={pk.tipo} className="card" style={{ padding: "16px 18px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ fontSize: 40, flexShrink: 0 }}>{pk.emoji}</div>
+              <div key={pk.tipo} className="card" style={{ position: "relative", overflow: "hidden", padding: 18 }}>
+                <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${pk.tint}, transparent 62%)`, pointerEvents: "none" }} />
+                <div style={{ position: "absolute", top: -44, right: -34, width: 150, height: 150, borderRadius: "50%", background: pk.glow, filter: "blur(42px)", opacity: 0.32, pointerEvents: "none" }} />
+                <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ width: 66, height: 86, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, background: pk.badge, boxShadow: "0 8px 20px rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.14)" }}>{pk.emoji}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800 }}>{pk.nombre} <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>· {pk.cant}</span></div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{pk.desc}</div>
-                    <div style={{ fontSize: 11, color: sinLimite ? "var(--red)" : "var(--muted)", marginTop: 4 }}>{`Hoy: ${used}/${pk.lim}`}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 17, fontWeight: 800 }}>{pk.nombre}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", background: "var(--surface)", borderRadius: 999, padding: "2px 9px" }}>{pk.cant}</span>
+                      {pk.tipo === "triple" && <span style={{ fontSize: 10, fontWeight: 800, color: "#1a1a1a", background: "linear-gradient(90deg,#f7d774,#f5b731)", borderRadius: 999, padding: "2px 9px" }}>✨ chance de God Pack</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{pk.desc}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9 }}>
+                      {Array.from({ length: pk.lim }).map((_, i) => (
+                        <span key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: i < used ? "var(--muted)" : pk.glow, opacity: i < used ? 0.5 : 1, boxShadow: i < used ? "none" : `0 0 6px ${pk.glow}` }} />
+                      ))}
+                      <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: 3 }}>{restante > 0 ? `${restante} disponible${restante > 1 ? "s" : ""} hoy` : "agotado por hoy"}</span>
+                    </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--gold)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={15} /> {pk.precio}</div>
-                    <button onClick={() => abrirSobre(pk.tipo)} disabled={dis}
-                      style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: dis ? "var(--surface)" : "var(--gold)", color: dis ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: dis ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-                      {opening === pk.tipo ? "Abriendo…" : sinLimite ? "Volvé mañana" : noPlata ? "Sin Petros" : "Abrir"}
-                    </button>
-                  </div>
+                </div>
+                <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, gap: 10, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", display: "flex", alignItems: "center", gap: 6 }}><PetroCoin size={16} />{isAdmin ? "Gratis (admin)" : pk.precio}</div>
+                  {sinLimite
+                    ? <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.6 }}>⏳ Próximo sobre en</div>
+                        <ResetCountdown style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", fontVariantNumeric: "tabular-nums" }} />
+                      </div>
+                    : <button onClick={() => abrirSobre(pk.tipo)} disabled={dis}
+                        style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: dis ? "var(--surface)" : "var(--gold)", color: dis ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: dis ? "not-allowed" : "pointer", whiteSpace: "nowrap", boxShadow: dis ? "none" : "0 4px 14px rgba(245,183,49,.35)" }}>
+                        {opening === pk.tipo ? "Abriendo…" : noPlata ? "Sin Petros" : "Abrir sobre"}
+                      </button>}
                 </div>
               </div>
             );
           })}
-          <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>El Sobre Triple tiene una chance secreta de convertirse en <b style={{ color: "var(--gold)" }}>God Pack</b> ✨</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 2 }}>El Sobre Triple tiene una chance secreta de convertirse en <b style={{ color: "var(--gold)" }}>God Pack</b> ✨</div>
         </div>
       )}
 
