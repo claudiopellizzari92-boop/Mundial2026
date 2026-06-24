@@ -5295,36 +5295,60 @@ function AdminPanel({ matches, profiles, onRefresh }) {
 
   async function calculatePreTournamentPoints() {
     setCalculatingPts(true); setGroupResultsMsg(null);
+
+    // 1) Guardar primero lo cargado en pantalla (así no hace falta apretar "Guardar" aparte)
+    let saveErr = null;
+    for (const group of Object.keys(groupResults)) {
+      for (const pos of [1, 2, 3]) {
+        const team = groupResults[group]?.[pos];
+        if (!team) continue;
+        const { error } = await sb.from("group_results").upsert({ group_name: group, position: pos, team }, { onConflict: "group_name,position" });
+        if (error) saveErr = error;
+      }
+    }
+    if (saveErr) {
+      setCalculatingPts(false);
+      setGroupResultsMsg({ type: "error", text: `❌ No se pudieron guardar los resultados: ${saveErr.message}` });
+      return;
+    }
+
+    // 2) Leer predicciones, resultados y reglas
     const { data: preds } = await sb.from("pretournament_predictions").select("*");
     const { data: results } = await sb.from("group_results").select("*");
     const { data: rules2 } = await sb.from("scoring_rules").select("*");
     const rMap = {};
-    (rules2||[]).forEach(r => { rMap[r.rule_key] = r.rule_value; });
+    (rules2 || []).forEach(r => { rMap[r.rule_key] = r.rule_value; });
     const pts1st = rMap["group_first"] || 2;
     const pts2nd = rMap["group_second"] || 2;
     const pts3rd = rMap["third_place_qualifier"] || 2;
     const resultMap = {};
-    (results||[]).forEach(r => { if (!resultMap[r.group_name]) resultMap[r.group_name] = {}; resultMap[r.group_name][r.position] = r.team; });
-    const userPreds = {};
-    (preds||[]).forEach(p => { if (!userPreds[p.user_id]) userPreds[p.user_id] = []; userPreds[p.user_id].push(p); });
-    let totalUpdated = 0;
-    for (const userId of Object.keys(userPreds)) {
-      for (const pred of userPreds[userId]) {
-        let pts = 0;
-        if (pred.prediction_type === "group_standing") {
-          const real = resultMap[pred.group_name]?.[pred.position];
-          if (real && real === pred.team) { pts = pred.position === 1 ? pts1st : pts2nd; }
-        } else if (pred.prediction_type === "third_place") {
-          const isClassified = Object.values(resultMap).some(g => g[3] === pred.team);
-          if (isClassified) pts = pts3rd;
-        }
-        if (pts > 0) { await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id); }
+    (results || []).forEach(r => { if (!resultMap[r.group_name]) resultMap[r.group_name] = {}; resultMap[r.group_name][r.position] = r.team; });
+
+    // 3) Calcular y escribir (resetea a 0 los que ya no aciertan)
+    let aciertos = 0, totalPts = 0; const usersConPts = new Set();
+    for (const pred of (preds || [])) {
+      let pts = 0;
+      if (pred.prediction_type === "group_standing") {
+        const real = resultMap[pred.group_name]?.[pred.position];
+        if (real && real === pred.team) { pts = pred.position === 1 ? pts1st : pts2nd; }
+      } else if (pred.prediction_type === "third_place") {
+        const isClassified = Object.values(resultMap).some(g => g[3] === pred.team);
+        if (isClassified) pts = pts3rd;
       }
-      totalUpdated++;
+      if ((pred.points || 0) !== pts) {
+        await sb.from("pretournament_predictions").update({ points: pts }).eq("id", pred.id);
+      }
+      if (pts > 0) { aciertos++; totalPts += pts; usersConPts.add(pred.user_id); }
     }
+
     setCalculatingPts(false);
-    setGroupResultsMsg({ type: "ok", text: `✅ Puntos calculados para ${totalUpdated} usuarios` });
-    setTimeout(() => setGroupResultsMsg(null), 3000);
+    if (aciertos === 0) {
+      setGroupResultsMsg({ type: "error", text: "Calculado, pero 0 aciertos. Revisá que cargaste los resultados correctos y que los jugadores ya hicieron sus predicciones." });
+    } else {
+      setGroupResultsMsg({ type: "ok", text: `✅ ${aciertos} aciertos · +${totalPts} pts repartidos entre ${usersConPts.size} jugador${usersConPts.size === 1 ? "" : "es"}` });
+    }
+    if (onRefresh) onRefresh();
+    setTimeout(() => setGroupResultsMsg(null), 6000);
   }
 
   async function saveResult(match) {
