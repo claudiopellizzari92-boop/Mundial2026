@@ -7154,6 +7154,14 @@ function NFTCard({ nft, edition = null, big = false }) {
 const NFT_RAR = { common: { t: "Común", c: "#9fb0c9" }, limited: { t: "Limited", c: "#bcd0f5" }, legendary: { t: "Legendary", c: "#f5d97a" } };
 const REACT_EMOJIS = ["🔥", "❤️", "😍", "👀", "😂", "🐐"];
 
+// Agrupación de las subpestañas de Colección en secciones con toggle interno
+const NFT_GRUPOS = [
+  { key: "mis", label: "Mis cartas", emoji: "🎒", subs: [["sobres", "🎁", "Sobres"], ["mia", "🃏", "Mi colección"]] },
+  { key: "explorar", label: "Explorar", emoji: "🔎", subs: [["galeria", "🌐", "Galería"], ["ranking", "🏆", "Ranking"]] },
+  { key: "mercado", label: "Mercado", emoji: "🔁", subs: [["trades", "🔄", "Intercambios"], ["subastas", "🔨", "Subastas"]] },
+  { key: "gestion", label: "Gestión", emoji: "⚙️", adminOnly: true, subs: [["admin", "⚙️", "Gestión"]] },
+];
+
 // ms hasta la próxima medianoche de Aruba (UTC-4), que es cuando se resetean los sobres
 function msUntilArubaMidnight() {
   const now = new Date();
@@ -7769,6 +7777,12 @@ function Subastas({ user, nfts, owned, profiles, saldo, isAdmin, onRefresh }) {
 
 function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [sub, setSub] = useState("sobres");
+  const [lastSub, setLastSub] = useState({ mis: "sobres", explorar: "galeria", mercado: "trades", gestion: "admin" });
+  function pickSub(k) {
+    const g = NFT_GRUPOS.find(gr => gr.subs.some(s => s[0] === k));
+    setSub(k);
+    if (g) setLastSub(prev => ({ ...prev, [g.key]: k }));
+  }
   const [galFiltro, setGalFiltro] = useState("legendary");
   const [rankSort, setRankSort] = useState("valor");
   const [featured, setFeatured] = useState(Array.isArray(user.profile?.featured_nfts) ? user.profile.featured_nfts : []);
@@ -8013,15 +8027,26 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
             <div style={{ fontSize: 26, fontWeight: 800, color: "var(--gold)", lineHeight: 1, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}><PetroCoin size={22} /> {isAdmin ? "∞" : saldo}</div>
           </div>
         </div>
-        <div className="pre-tabs" style={{ marginTop: 14, flexWrap: "wrap" }}>
-          <button className={`pre-tab ${sub === "sobres" ? "active" : ""}`} onClick={() => setSub("sobres")}>🎁 Sobres</button>
-          <button className={`pre-tab ${sub === "mia" ? "active" : ""}`} onClick={() => setSub("mia")}>🎒 Mi colección</button>
-          <button className={`pre-tab ${sub === "galeria" ? "active" : ""}`} onClick={() => setSub("galeria")}>🌐 Galería</button>
-          <button className={`pre-tab ${sub === "ranking" ? "active" : ""}`} onClick={() => setSub("ranking")}>🏆 Ranking</button>
-          <button className={`pre-tab ${sub === "trades" ? "active" : ""}`} onClick={() => setSub("trades")}>🔄 Intercambios</button>
-          <button className={`pre-tab ${sub === "subastas" ? "active" : ""}`} onClick={() => setSub("subastas")}>🔨 Subastas</button>
-          {isAdmin && <button className={`pre-tab ${sub === "admin" ? "active" : ""}`} onClick={() => setSub("admin")}>⚙️ Gestión</button>}
-        </div>
+        {(() => {
+          const grupoActivo = NFT_GRUPOS.find(g => g.subs.some(s => s[0] === sub)) || NFT_GRUPOS[0];
+          return (
+            <>
+              <div className="pre-tabs" style={{ marginTop: 14, flexWrap: "wrap" }}>
+                {NFT_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => (
+                  <button key={g.key} className={`pre-tab ${grupoActivo.key === g.key ? "active" : ""}`} onClick={() => pickSub(lastSub[g.key] || g.subs[0][0])}>{g.emoji} {g.label}</button>
+                ))}
+              </div>
+              {grupoActivo.subs.length > 1 && (
+                <div style={{ display: "inline-flex", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 999, padding: 3, marginTop: 12, gap: 2, flexWrap: "wrap" }}>
+                  {grupoActivo.subs.map(([k, emo, lab]) => {
+                    const on = sub === k;
+                    return <button key={k} onClick={() => pickSub(k)} style={{ padding: "7px 15px", borderRadius: 999, border: "none", background: on ? "var(--gold)" : "transparent", color: on ? "#1a1a1a" : "var(--muted)", fontSize: 13, fontWeight: on ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>{emo} {lab}</button>;
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {loading ? <div style={{ color: "var(--muted)", fontSize: 13 }}>Cargando…</div> : <>
