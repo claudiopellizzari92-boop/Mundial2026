@@ -471,6 +471,30 @@ input,button,select{font-family:inherit;}
 .nft-godray{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,rgba(245,200,90,.28),transparent 60%);pointer-events:none;animation:nftGod 2.4s ease-in-out infinite;}
 @keyframes nftGod{0%,100%{opacity:.5}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.nftbig,.nft-holo,.nft-sheen::after,.nftbig::before,.nft-spark,.nft-pop,.nft-godray{animation:none!important;}}
+/* ===== Reveal: cartas volteadas + efectos por rareza ===== */
+.flipwrap{position:relative;perspective:1000px;cursor:pointer;aspect-ratio:1792/2400;}
+.flipinner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.7,.2,1);}
+.flipinner.flipped{transform:rotateY(180deg);}
+.flipface{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:14px;}
+.flipfront-nft{transform:rotateY(180deg);}
+.cardback{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#241a3a,#120c20 70%,#0a0712);border:2px solid rgba(245,217,122,.5);box-shadow:inset 0 0 30px rgba(245,200,90,.12);}
+.cardback::before{content:"";position:absolute;inset:6px;border:1px solid rgba(245,217,122,.28);border-radius:10px;pointer-events:none;}
+.flipwrap:not(.done):hover .flipinner:not(.flipped){transform:translateY(-5px);}
+.reveal-burst{position:absolute;inset:0;pointer-events:none;z-index:4;}
+.reveal-burst::after{content:"";position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);}
+.burst-limited::after{border:3px solid rgba(190,215,255,.95);box-shadow:0 0 22px rgba(150,190,255,.85);animation:ringOut .85s ease-out forwards;}
+.burst-legendary::after{border:4px solid rgba(245,210,110,.97);box-shadow:0 0 32px rgba(245,200,90,.95);animation:ringOut 1.05s ease-out forwards;}
+@keyframes ringOut{0%{width:8%;height:8%;opacity:1}100%{width:165%;height:165%;opacity:0}}
+.epic-overlay{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden;}
+.epic-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(255,240,200,.6),transparent 60%);animation:epicFlash 1.5s ease-out forwards;}
+@keyframes epicFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+.epic-rays{position:absolute;left:50%;top:45%;animation:epicSpinC 6s linear infinite;}
+@keyframes epicSpinC{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.epic-rays span{position:absolute;left:0;top:0;width:4px;height:62vh;margin-left:-2px;transform-origin:top center;background:linear-gradient(rgba(245,210,110,0),rgba(245,210,110,.5),rgba(245,210,110,0));animation:epicFade 1.7s ease-out forwards;}
+@keyframes epicFade{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+.epic-word{position:absolute;left:0;right:0;top:15%;text-align:center;font-family:'Bebas Neue';font-size:46px;letter-spacing:5px;color:#f7e2a0;text-shadow:0 0 26px rgba(245,200,90,.95);animation:epicWord 1.7s ease-out forwards;}
+@keyframes epicWord{0%{transform:scale(.4);opacity:0}28%{transform:scale(1.12);opacity:1}82%{opacity:1}100%{transform:scale(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){.flipinner{transition:none}.reveal-burst::after,.epic-flash,.epic-rays span,.epic-word{animation:none!important;display:none}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7092,6 +7116,80 @@ function NFTCard({ nft, edition = null, big = false }) {
 const NFT_RAR = { common: { t: "Común", c: "#9fb0c9" }, limited: { t: "Limited", c: "#bcd0f5" }, legendary: { t: "Legendary", c: "#f5d97a" } };
 const rarRank = { legendary: 0, limited: 1, common: 2 };
 
+// ── Dorso de carta (boca abajo) ───────────────────────────────────────────────
+function CardBack() {
+  return (
+    <div className="cardback">
+      <svg viewBox="0 0 100 133.93" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <circle cx="50" cy="50" r="19" fill="none" stroke="rgba(245,217,122,.7)" strokeWidth="1.1" />
+        <text x="50" y="50.5" textAnchor="middle" dominantBaseline="central" fontFamily="'Bebas Neue',sans-serif" fontSize="24" fill="#f5d97a">?</text>
+        <text x="50" y="84" textAnchor="middle" fontFamily="'Bebas Neue',sans-serif" fontSize="6.5" letterSpacing="1.2" fill="rgba(245,217,122,.85)">QUINIELA MUNDIAL</text>
+        <text x="50" y="122" textAnchor="middle" fontFamily="sans-serif" fontSize="4.6" fill="rgba(255,255,255,.5)">Tocá para revelar</text>
+      </svg>
+    </div>
+  );
+}
+
+// ── Modal de apertura de sobre con volteo + animaciones por rareza ────────────
+function RevealModal({ items, godpack, onClose }) {
+  const [flipped, setFlipped] = useState(() => items.map(() => false));
+  const [epic, setEpic] = useState(false);
+  const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
+
+  function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); }
+  function flip(i) {
+    setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
+    if (items[i] && items[i].rareza === "legendary") fireEpic();
+  }
+  function flipAll() {
+    setFlipped(items.map(() => true));
+    if (items.some(it => it.rareza === "legendary")) fireEpic();
+  }
+  const allFlipped = flipped.every(Boolean);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
+      {godpack && <div className="nft-godray" />}
+      {epic && (
+        <div className="epic-overlay">
+          <div className="epic-flash" />
+          <div className="epic-rays">{[...Array(12)].map((_, i) => <span key={i} style={{ transform: `rotate(${i * 30}deg)` }} />)}</div>
+          <div className="epic-word">¡LEGENDARY!</div>
+        </div>
+      )}
+      <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 540, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 3 }}>
+        {godpack && <div style={{ fontFamily: "Bebas Neue", fontSize: 30, color: "var(--gold)", letterSpacing: 2, textShadow: "0 0 16px rgba(245,200,90,.7)" }}>✨ GOD PACK ✨</div>}
+        <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{allFlipped ? (godpack ? "La suerte te sonrió." : "¡Mirá lo que te tocó!") : "Tocá las cartas para revelarlas"}</div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ width: w }}>
+              <div className={`flipwrap ${flipped[i] ? "done" : ""}`} onClick={() => flip(i)}>
+                <div className={`flipinner ${flipped[i] ? "flipped" : ""}`}>
+                  <div className="flipface"><CardBack /></div>
+                  <div className="flipface flipfront-nft">
+                    <NFTCard nft={it} edition={it.rareza === "limited" ? it.edition : null} />
+                    {flipped[i] && it.rareza !== "common" && <div className={`reveal-burst burst-${it.rareza}`} />}
+                  </div>
+                </div>
+              </div>
+              {flipped[i] ? (
+                <>
+                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.nombre}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[it.rareza].c }}>{NFT_RAR[it.rareza].t}{it.rareza === "limited" ? ` · #${String(it.edition).padStart(2, "0")}` : ""}{it.nuevo ? " · ¡NUEVO!" : ""}</div>
+                </>
+              ) : <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>¿?</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 18, display: "flex", gap: 8, justifyContent: "center" }}>
+          {!allFlipped && <button onClick={flipAll} style={{ padding: "9px 20px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--txt)", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Dar vuelta todas</button>}
+          {allFlipped && <button onClick={onClose} style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>¡Joya!</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [sub, setSub] = useState("sobres");
   const [galFiltro, setGalFiltro] = useState("legendary");
@@ -7501,26 +7599,8 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
         );
       })()}
 
-      {/* Reveal de sobre */}
-      {reveal && (
-        <div onClick={() => setReveal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
-          {reveal.godpack && <div className="nft-godray" />}
-          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 520, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 1 }}>
-            {reveal.godpack && <div style={{ fontFamily: "Bebas Neue", fontSize: 30, color: "var(--gold)", letterSpacing: 2, textShadow: "0 0 16px rgba(245,200,90,.7)" }}>✨ GOD PACK ✨</div>}
-            <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 14 }}>{reveal.godpack ? "La suerte te sonrió." : "Abriste tu sobre…"}</div>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              {reveal.items.map((it, i) => (
-                <div key={i} className="nft-pop" style={{ width: reveal.items.length > 1 ? 140 : 250, animationDelay: (i * 0.18) + "s" }}>
-                  <NFTCard nft={it} edition={it.rareza === "limited" ? it.edition : null} />
-                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.nombre}</div>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[it.rareza].c }}>{NFT_RAR[it.rareza].t}{it.rareza === "limited" ? ` · #${String(it.edition).padStart(2, "0")}` : ""}{it.nuevo ? " · ¡NUEVO!" : ""}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setReveal(null)} style={{ marginTop: 18, padding: "9px 24px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>¡Joya!</button>
-          </div>
-        </div>
-      )}
+      {/* Reveal de sobre (cartas volteadas) */}
+      {reveal && <RevealModal items={reveal.items} godpack={reveal.godpack} onClose={() => setReveal(null)} />}
 
       {/* Detalle de carta */}
       {detail && (
