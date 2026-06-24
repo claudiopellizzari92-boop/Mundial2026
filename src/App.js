@@ -7207,14 +7207,15 @@ function RevealModal({ items, godpack, onClose }) {
   );
 }
 
-// ── Intercambios (trueque entre participantes) ────────────────────────────────
-function Trades({ user, nfts, owned, allOwned, profiles, onRefresh }) {
+// ── Intercambios: publicás una carta y recibís ofertas (carta y/o Petros) ─────
+function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefresh }) {
   const [trades, setTrades] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [offSel, setOffSel] = useState(null);   // {nft, owned_id, edition, eds}
-  const [wantSel, setWantSel] = useState(null); // nft_id
-  const [picker, setPicker] = useState(false);
-  const [accept, setAccept] = useState(null);   // {trade, giveId, copies}
+  const [listSel, setListSel] = useState(null);     // {nft, owned_id, edition, eds}
+  const [offerModal, setOfferModal] = useState(null); // trade
+  const [offerCard, setOfferCard] = useState(null);   // {nft, owned_id, edition, eds}
+  const [offerPetros, setOfferPetros] = useState("");
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -7222,63 +7223,82 @@ function Trades({ user, nfts, owned, allOwned, profiles, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadTrades() {
-    const { data } = await sb.from("nft_trades").select("*").eq("status", "open").order("created_at", { ascending: false });
-    setTrades(data || []); setLoading(false);
+    const { data: tr } = await sb.from("nft_trades").select("*").eq("status", "open").order("created_at", { ascending: false });
+    const list = tr || [];
+    setTrades(list);
+    if (list.length) {
+      const { data: of } = await sb.from("nft_offers").select("*").in("trade_id", list.map(t => t.id)).eq("status", "pending");
+      setOffers(of || []);
+    } else setOffers([]);
+    setLoading(false);
   }
   useEffect(() => { loadTrades(); }, []);
 
-  // mis duplicadas (2+)
-  const dupes = {};
-  owned.forEach(o => { if (!o.nft) return; if (!dupes[o.nft_id]) dupes[o.nft_id] = { nft: o.nft, eds: [] }; dupes[o.nft_id].eds.push({ id: o.id, edition: o.edition }); });
-  const dupList = Object.values(dupes).filter(d => d.eds.length >= 2).sort((a, b) => (rarRank[a.nft.rareza] - rarRank[b.nft.rareza]) || a.nft.nombre.localeCompare(b.nft.nombre));
-  dupList.forEach(d => d.eds.sort((x, y) => x.edition - y.edition));
+  // agrupar mis cartas por nft
+  const grouped = {};
+  owned.forEach(o => { if (!o.nft) return; if (!grouped[o.nft_id]) grouped[o.nft_id] = { nft: o.nft, eds: [] }; grouped[o.nft_id].eds.push({ id: o.id, edition: o.edition }); });
+  Object.values(grouped).forEach(g => g.eds.sort((a, b) => a.edition - b.edition));
+  const sortG = (arr) => arr.sort((a, b) => (rarRank[a.nft.rareza] - rarRank[b.nft.rareza]) || a.nft.nombre.localeCompare(b.nft.nombre));
+  const dupList = sortG(Object.values(grouped).filter(d => d.eds.length >= 2));
+  const allMine = sortG(Object.values(grouped));
 
-  const myCopies = (nftId) => owned.filter(o => o.nft_id === nftId).map(o => ({ id: o.id, edition: o.edition })).sort((a, b) => a.edition - b.edition);
+  async function publicar() {
+    if (!listSel) return;
+    setBusy(true);
+    const { data, error } = await sb.rpc("proponer_trade", { p_offer_owned_id: listSel.owned_id });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo publicar."); return; }
+    setListSel(null); await loadTrades(); if (onRefresh) onRefresh();
+    setMsg("✅ ¡Carta publicada! Ahora pueden hacerte ofertas.");
+  }
+  async function enviarOferta() {
+    const p = parseInt(offerPetros) || 0;
+    if (!offerCard && p <= 0) { setMsg("Ofrecé una carta o algunos Petros."); return; }
+    setBusy(true);
+    const { data, error } = await sb.rpc("hacer_oferta", { p_trade_id: offerModal.id, p_offer_owned_id: offerCard ? offerCard.owned_id : null, p_petros: p });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo ofertar."); return; }
+    setOfferModal(null); setOfferCard(null); setOfferPetros("");
+    await loadTrades(); if (onRefresh) onRefresh();
+    setMsg("📨 ¡Oferta enviada! Esperá que la acepten.");
+  }
+  async function aceptar(offerId) {
+    setBusy(true);
+    const { data, error } = await sb.rpc("aceptar_oferta", { p_offer_id: offerId });
+    setBusy(false);
+    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo aceptar."); return; }
+    await loadTrades(); if (onRefresh) onRefresh();
+    setMsg("🤝 ¡Intercambio cerrado!");
+  }
+  async function retirar(offerId) { setBusy(true); await sb.rpc("cancelar_oferta", { p_offer_id: offerId }); setBusy(false); await loadTrades(); if (onRefresh) onRefresh(); }
+  async function cancelarPub(t) { setBusy(true); await sb.rpc("cancelar_trade", { p_trade_id: t.id }); setBusy(false); await loadTrades(); if (onRefresh) onRefresh(); }
 
-  async function proponer() {
-    if (!offSel || !wantSel) return;
-    setBusy(true);
-    const { data, error } = await sb.rpc("proponer_trade", { p_offer_owned_id: offSel.owned_id, p_want_nft_id: wantSel });
-    setBusy(false);
-    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo proponer."); return; }
-    setOffSel(null); setWantSel(null);
-    await loadTrades(); if (onRefresh) onRefresh();
-    setMsg("✅ ¡Intercambio publicado! Esperá que alguien lo acepte.");
-  }
-  async function confirmarAccept() {
-    setBusy(true);
-    const { data, error } = await sb.rpc("aceptar_trade", { p_trade_id: accept.trade.id, p_give_owned_id: accept.giveId });
-    setBusy(false);
-    if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo aceptar."); setAccept(null); return; }
-    setAccept(null);
-    await loadTrades(); if (onRefresh) onRefresh();
-    setMsg("🔄 ¡Intercambio realizado! Ya tenés tu carta nueva.");
-  }
-  async function cancelar(t) {
-    setBusy(true);
-    await sb.rpc("cancelar_trade", { p_trade_id: t.id });
-    setBusy(false);
-    await loadTrades(); if (onRefresh) onRefresh();
-  }
+  function openOffer(t) { setOfferCard(null); setOfferPetros(""); setOfferModal(t); }
 
-  const wantNft = wantSel ? nftById[wantSel] : null;
-  const pickerCards = nfts.filter(n => n.activo && (!offSel || n.id !== offSel.nft.id)).sort((a, b) => (rarRank[a.rareza] - rarRank[b.rareza]) || a.nombre.localeCompare(b.nombre));
+  // mini para describir lo que ofrece una oferta
+  function OfferContents({ o, size = 54 }) {
+    const c = o.offer_nft_id ? nftById[o.offer_nft_id] : null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {c && <div style={{ width: size }}><NFTCard nft={c} edition={c.rareza === "limited" ? o.offer_edition : null} /></div>}
+        {o.petros > 0 && <span style={{ fontSize: 13, fontWeight: 800, color: "var(--gold)", display: "flex", alignItems: "center", gap: 4 }}><PetroCoin size={14} />{o.petros}</span>}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Proponer */}
+      {/* Publicar */}
       <div className="card" style={{ padding: "16px 18px" }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔄 Proponer un intercambio</div>
-        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>Ofrecé una repetida y pedí la carta que te falta.</div>
-
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Ofrecés (tus repetidas):</div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔄 Publicar una carta</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>Ofrecé una repetida. La gente te hace ofertas (otra carta, Petros, o las dos) y vos elegís.</div>
         {dupList.length === 0
-          ? <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Todavía no tenés cartas repetidas para ofrecer.</div>
-          : <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 4 }}>
+          ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no tenés cartas repetidas para publicar.</div>
+          : <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
               {dupList.map(d => {
-                const sel = offSel && offSel.nft.id === d.nft.id;
+                const sel = listSel && listSel.nft.id === d.nft.id;
                 return (
-                  <div key={d.nft.id} onClick={() => setOffSel({ nft: d.nft, owned_id: d.eds[0].id, edition: d.eds[0].edition, eds: d.eds })}
+                  <div key={d.nft.id} onClick={() => setListSel({ nft: d.nft, owned_id: d.eds[0].id, edition: d.eds[0].edition, eds: d.eds })}
                     style={{ width: 84, flexShrink: 0, cursor: "pointer", border: "2px solid " + (sel ? "var(--gold)" : "transparent"), borderRadius: 12, padding: 2 }}>
                     <NFTCard nft={d.nft} edition={d.nft.rareza === "limited" ? d.eds[0].edition : null} />
                     <div style={{ fontSize: 9, fontWeight: 700, textAlign: "center", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nft.nombre}</div>
@@ -7287,120 +7307,128 @@ function Trades({ user, nfts, owned, allOwned, profiles, onRefresh }) {
                 );
               })}
             </div>}
-
-        {offSel && offSel.nft.rareza === "limited" && offSel.eds.length > 1 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>Das la edición:</span>
-            {offSel.eds.map(e => (
-              <button key={e.id} onClick={() => setOffSel(s => ({ ...s, owned_id: e.id, edition: e.edition }))}
-                style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid " + (offSel.owned_id === e.id ? "var(--gold)" : "var(--border)"), background: offSel.owned_id === e.id ? "var(--gold)" : "none", color: offSel.owned_id === e.id ? "#1a1a1a" : "var(--txt)" }}>#{String(e.edition).padStart(2, "0")}</button>
+        {listSel && listSel.nft.rareza === "limited" && listSel.eds.length > 1 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>Publicás la edición:</span>
+            {listSel.eds.map(e => (
+              <button key={e.id} onClick={() => setListSel(s => ({ ...s, owned_id: e.id, edition: e.edition }))}
+                style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid " + (listSel.owned_id === e.id ? "var(--gold)" : "var(--border)"), background: listSel.owned_id === e.id ? "var(--gold)" : "none", color: listSel.owned_id === e.id ? "#1a1a1a" : "var(--txt)" }}>#{String(e.edition).padStart(2, "0")}</button>
             ))}
           </div>
         )}
-
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 6 }}>Pedís:</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {wantNft
-            ? <div onClick={() => setPicker(true)} style={{ width: 84, cursor: "pointer" }}>
-                <NFTCard nft={wantNft} edition={null} />
-                <div style={{ fontSize: 9, fontWeight: 700, textAlign: "center", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{wantNft.nombre}</div>
-              </div>
-            : <button onClick={() => setPicker(true)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px dashed var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>＋ Elegir carta</button>}
-        </div>
-
-        <button onClick={proponer} disabled={!offSel || !wantSel || busy}
-          style={{ marginTop: 14, padding: "9px 20px", borderRadius: 8, border: "none", background: (!offSel || !wantSel) ? "var(--surface)" : "var(--gold)", color: (!offSel || !wantSel) ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: (!offSel || !wantSel) ? "not-allowed" : "pointer" }}>
-          {busy ? "..." : "Publicar intercambio"}
+        <button onClick={publicar} disabled={!listSel || busy}
+          style={{ marginTop: 14, padding: "9px 20px", borderRadius: 8, border: "none", background: !listSel ? "var(--surface)" : "var(--gold)", color: !listSel ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: !listSel ? "not-allowed" : "pointer" }}>
+          {busy ? "..." : "Publicar"}
         </button>
       </div>
 
-      {/* Ofertas abiertas */}
+      {/* Publicaciones abiertas */}
       <div>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Ofertas abiertas {trades.length > 0 ? `(${trades.length})` : ""}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Publicaciones abiertas {trades.length > 0 ? `(${trades.length})` : ""}</div>
         {loading ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Cargando…</div>
-          : trades.length === 0 ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay intercambios abiertos. ¡Proponé el primero!</div>
-          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          : trades.length === 0 ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay publicaciones. ¡Publicá la primera!</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {trades.map(t => {
-                const off = nftById[t.offer_nft_id], want = nftById[t.want_nft_id];
-                if (!off || !want) return null;
+                const card = nftById[t.offer_nft_id];
+                if (!card) return null;
                 const mine = t.from_user === user.id;
-                const copies = myCopies(t.want_nft_id);
-                const puedo = !mine && copies.length > 0;
+                const tOffers = offers.filter(o => o.trade_id === t.id);
+                const myOffer = tOffers.find(o => o.from_user === user.id);
                 return (
-                  <div key={t.id} className="card" style={{ padding: "12px 14px" }}>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>{mine ? "Tu oferta" : "Oferta de " + nameOf(t.from_user)}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 70, textAlign: "center" }}>
-                        <NFTCard nft={off} edition={off.rareza === "limited" ? t.offer_edition : null} />
-                        <div style={{ fontSize: 9, marginTop: 3, color: NFT_RAR[off.rareza].c, fontWeight: 800 }}>OFRECE</div>
+                  <div key={t.id} className="card" style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 78, flexShrink: 0 }}><NFTCard nft={card} edition={card.rareza === "limited" ? t.offer_edition : null} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.nombre}</div>
+                        <div style={{ fontSize: 11, color: NFT_RAR[card.rareza].c, fontWeight: 700 }}>{NFT_RAR[card.rareza].t}{card.rareza === "limited" ? ` · #${String(t.offer_edition).padStart(2, "0")}` : ""}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{mine ? "Tu publicación" : "de " + nameOf(t.from_user)}{tOffers.length ? ` · ${tOffers.length} oferta${tOffers.length > 1 ? "s" : ""}` : ""}</div>
                       </div>
-                      <div style={{ fontSize: 24, color: "var(--muted)" }}>⇄</div>
-                      <div style={{ width: 70, textAlign: "center" }}>
-                        <NFTCard nft={want} edition={null} />
-                        <div style={{ fontSize: 9, marginTop: 3, color: NFT_RAR[want.rareza].c, fontWeight: 800 }}>PIDE</div>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{off.nombre}</div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>por {want.nombre}</div>
-                        {mine
-                          ? <button onClick={() => cancelar(t)} disabled={busy} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "none", color: "var(--red)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
-                          : puedo
-                            ? <button onClick={() => setAccept({ trade: t, giveId: copies[0].id, copies })} disabled={busy} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Aceptar</button>
-                            : <div style={{ fontSize: 10, color: "var(--muted)" }}>No tenés esta carta</div>}
-                      </div>
+                      {!mine && (
+                        myOffer
+                          ? <button onClick={() => retirar(myOffer.id)} disabled={busy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--red)", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Retirar</button>
+                          : <button onClick={() => openOffer(t)} disabled={busy} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>Ofertar</button>
+                      )}
                     </div>
+
+                    {/* Mi oferta enviada (vista del ofertante) */}
+                    {!mine && myOffer && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Tu oferta:</div>
+                        <OfferContents o={myOffer} size={46} />
+                      </div>
+                    )}
+
+                    {/* Ofertas recibidas (vista del dueño) */}
+                    {mine && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                        {tOffers.length === 0
+                          ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Todavía no recibiste ofertas.</div>
+                          : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              {tOffers.map(o => (
+                                <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>{nameOf(o.from_user)} ofrece:</div>
+                                    <OfferContents o={o} size={50} />
+                                  </div>
+                                  <button onClick={() => aceptar(o.id)} disabled={busy} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>Aceptar</button>
+                                </div>
+                              ))}
+                            </div>}
+                        <button onClick={() => cancelarPub(t)} disabled={busy} style={{ marginTop: 10, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "none", color: "var(--red)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar publicación</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>}
       </div>
 
-      {/* Picker de carta a pedir */}
-      {picker && (
-        <div onClick={() => setPicker(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 18 }}>
-          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 460, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", padding: "18px 16px" }}>
-            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>¿Qué carta querés?</div>
-            <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-              {pickerCards.map(n => (
-                <div key={n.id} onClick={() => { setWantSel(n.id); setPicker(false); }} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", cursor: "pointer" }}>
-                  <img src={n.imagen_url} alt="" style={{ width: 30, height: 40, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.nombre}</div>
-                    <div style={{ fontSize: 10, color: NFT_RAR[n.rareza].c, fontWeight: 700 }}>{NFT_RAR[n.rareza].t}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setPicker(false)} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cerrar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmar aceptar */}
-      {accept && (() => {
-        const t = accept.trade; const off = nftById[t.offer_nft_id]; const want = nftById[t.want_nft_id];
+      {/* Modal: hacer oferta */}
+      {offerModal && (() => {
+        const card = nftById[offerModal.offer_nft_id];
+        const p = parseInt(offerPetros) || 0;
         return (
-          <div onClick={() => setAccept(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 18 }}>
-            <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Confirmar intercambio</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", marginBottom: 12 }}>
-                <div style={{ width: 90 }}><NFTCard nft={want} edition={want.rareza === "limited" ? (accept.copies.find(c => c.id === accept.giveId)?.edition) : null} /><div style={{ fontSize: 10, marginTop: 3, color: "var(--red)", fontWeight: 800 }}>ENTREGÁS</div></div>
-                <div style={{ fontSize: 22, color: "var(--muted)" }}>⇄</div>
-                <div style={{ width: 90 }}><NFTCard nft={off} edition={off.rareza === "limited" ? t.offer_edition : null} /><div style={{ fontSize: 10, marginTop: 3, color: "var(--green)", fontWeight: 800 }}>RECIBÍS</div></div>
+          <div onClick={() => setOfferModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: 18, overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 460, width: "100%", padding: "20px 18px", margin: "auto" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Tu oferta</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>por <b>{card?.nombre}</b></div>
+
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Ofrecés una carta (opcional):</div>
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+                <div onClick={() => setOfferCard(null)} style={{ width: 70, flexShrink: 0, cursor: "pointer", borderRadius: 10, border: "2px solid " + (!offerCard ? "var(--gold)" : "var(--border)"), display: "flex", alignItems: "center", justifyContent: "center", aspectRatio: "1792/2400", fontSize: 11, color: "var(--muted)", textAlign: "center" }}>Sin carta</div>
+                {allMine.map(d => {
+                  const sel = offerCard && offerCard.nft.id === d.nft.id;
+                  return (
+                    <div key={d.nft.id} onClick={() => setOfferCard({ nft: d.nft, owned_id: d.eds[0].id, edition: d.eds[0].edition, eds: d.eds })}
+                      style={{ width: 70, flexShrink: 0, cursor: "pointer", border: "2px solid " + (sel ? "var(--gold)" : "transparent"), borderRadius: 10, padding: 2 }}>
+                      <NFTCard nft={d.nft} edition={d.nft.rareza === "limited" ? d.eds[0].edition : null} />
+                      <div style={{ fontSize: 8, fontWeight: 700, textAlign: "center", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nft.nombre}</div>
+                    </div>
+                  );
+                })}
               </div>
-              {accept.copies.length > 1 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>¿Qué edición de <b>{want.nombre}</b> entregás?</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-                    {accept.copies.map(c => (
-                      <button key={c.id} onClick={() => setAccept(a => ({ ...a, giveId: c.id }))} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid " + (accept.giveId === c.id ? "var(--gold)" : "var(--border)"), background: accept.giveId === c.id ? "var(--gold)" : "none", color: accept.giveId === c.id ? "#1a1a1a" : "var(--txt)" }}>{want.rareza === "limited" ? "#" + String(c.edition).padStart(2, "0") : "Una copia"}</button>
-                    ))}
-                  </div>
+              {offerCard && offerCard.nft.rareza === "limited" && offerCard.eds.length > 1 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>Das la #:</span>
+                  {offerCard.eds.map(e => (
+                    <button key={e.id} onClick={() => setOfferCard(s => ({ ...s, owned_id: e.id, edition: e.edition }))}
+                      style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid " + (offerCard.owned_id === e.id ? "var(--gold)" : "var(--border)"), background: offerCard.owned_id === e.id ? "var(--gold)" : "none", color: offerCard.owned_id === e.id ? "#1a1a1a" : "var(--txt)" }}>#{String(e.edition).padStart(2, "0")}</button>
+                  ))}
                 </div>
               )}
-              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                <button onClick={confirmarAccept} disabled={busy} style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>{busy ? "..." : "Confirmar"}</button>
-                <button onClick={() => setAccept(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
+
+              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 6 }}>Y/o Petros:</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input type="number" min="0" value={offerPetros} onChange={e => setOfferPetros(e.target.value)} placeholder="0"
+                  style={{ width: 120, padding: "8px 10px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--txt)", fontSize: 14, outline: "none" }} />
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>Tu saldo: {isAdmin ? "∞" : saldo}</span>
+              </div>
+              {!isAdmin && p > saldo && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 6 }}>No te alcanzan los Petros.</div>}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button onClick={enviarOferta} disabled={busy || (!offerCard && p <= 0) || (!isAdmin && p > saldo)}
+                  style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: (!offerCard && p <= 0) ? "var(--surface)" : "var(--gold)", color: (!offerCard && p <= 0) ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: (!offerCard && p <= 0) ? "not-allowed" : "pointer" }}>{busy ? "..." : "Enviar oferta"}</button>
+                <button onClick={() => setOfferModal(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
               </div>
             </div>
           </div>
@@ -7671,7 +7699,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
         </>
       )}
 
-      {sub === "trades" && <Trades user={user} nfts={nfts} owned={owned} allOwned={allOwned} profiles={profiles} onRefresh={loadAll} />}
+      {sub === "trades" && <Trades user={user} nfts={nfts} owned={owned} allOwned={allOwned} profiles={profiles} saldo={saldo} isAdmin={isAdmin} onRefresh={loadAll} />}
 
       {sub === "admin" && isAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
