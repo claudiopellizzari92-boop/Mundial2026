@@ -7642,7 +7642,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
             { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar. Con suerte… God Pack.", lim: 2 }].map(pk => {
             const used = usedToday[pk.tipo] || 0;
             const restante = pk.lim - used;
-            const sinLimite = !isAdmin && restante <= 0;
+            const sinLimite = restante <= 0;
             const noPlata = !isAdmin && saldo < pk.precio;
             const dis = sinLimite || noPlata || opening === pk.tipo;
             return (
@@ -7652,7 +7652,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 800 }}>{pk.nombre} <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>· {pk.cant}</span></div>
                     <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{pk.desc}</div>
-                    <div style={{ fontSize: 11, color: sinLimite ? "var(--red)" : "var(--muted)", marginTop: 4 }}>{isAdmin ? "Sin límite (admin)" : `Hoy: ${used}/${pk.lim}`}</div>
+                    <div style={{ fontSize: 11, color: sinLimite ? "var(--red)" : "var(--muted)", marginTop: 4 }}>{`Hoy: ${used}/${pk.lim}`}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "var(--gold)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={15} /> {pk.precio}</div>
