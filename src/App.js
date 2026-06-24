@@ -7657,6 +7657,7 @@ function Subastas({ user, nfts, owned, profiles, saldo, isAdmin, onRefresh }) {
 function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [sub, setSub] = useState("sobres");
   const [galFiltro, setGalFiltro] = useState("legendary");
+  const [rankSort, setRankSort] = useState("valor");
   const [nfts, setNfts] = useState([]);
   const [owned, setOwned] = useState([]);
   const [allOwned, setAllOwned] = useState([]);
@@ -7856,6 +7857,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
           <button className={`pre-tab ${sub === "sobres" ? "active" : ""}`} onClick={() => setSub("sobres")}>🎁 Sobres</button>
           <button className={`pre-tab ${sub === "mia" ? "active" : ""}`} onClick={() => setSub("mia")}>🎒 Mi colección</button>
           <button className={`pre-tab ${sub === "galeria" ? "active" : ""}`} onClick={() => setSub("galeria")}>🌐 Galería</button>
+          <button className={`pre-tab ${sub === "ranking" ? "active" : ""}`} onClick={() => setSub("ranking")}>🏆 Ranking</button>
           <button className={`pre-tab ${sub === "trades" ? "active" : ""}`} onClick={() => setSub("trades")}>🔄 Intercambios</button>
           <button className={`pre-tab ${sub === "subastas" ? "active" : ""}`} onClick={() => setSub("subastas")}>🔨 Subastas</button>
           {isAdmin && <button className={`pre-tab ${sub === "admin" ? "active" : ""}`} onClick={() => setSub("admin")}>⚙️ Gestión</button>}
@@ -7957,6 +7959,55 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
         </div>}
         </>
       )}
+
+      {sub === "ranking" && (() => {
+        const nbi = {}; nfts.forEach(n => { nbi[n.id] = n; });
+        const stats = {};
+        allOwned.forEach(o => {
+          const n = nbi[o.nft_id]; if (!n) return;
+          if (!stats[o.user_id]) stats[o.user_id] = { leg: 0, lim: 0, com: 0, set: new Set(), valor: 0 };
+          const s = stats[o.user_id];
+          if (n.rareza === "legendary") { s.leg++; s.valor += 100; }
+          else if (n.rareza === "limited") { s.lim++; s.valor += 10; }
+          else { s.com++; s.valor += 1; }
+          s.set.add(o.nft_id);
+        });
+        let rows = Object.entries(stats).map(([uid, s]) => ({ uid, name: (profiles.find(p => p.id === uid)?.name) || "Alguien", leg: s.leg, lim: s.lim, com: s.com, distintas: s.set.size, total: s.leg + s.lim + s.com, valor: s.valor }));
+        const key = rankSort === "leg" ? "leg" : rankSort === "distintas" ? "distintas" : "valor";
+        rows.sort((a, b) => (b[key] - a[key]) || (b.valor - a.valor));
+        return (
+          <div>
+            <div className="pre-tabs" style={{ marginBottom: 14, flexWrap: "wrap" }}>
+              <button className={`pre-tab ${rankSort === "valor" ? "active" : ""}`} onClick={() => setRankSort("valor")}>Valor</button>
+              <button className={`pre-tab ${rankSort === "leg" ? "active" : ""}`} onClick={() => setRankSort("leg")}>Legendarias</button>
+              <button className={`pre-tab ${rankSort === "distintas" ? "active" : ""}`} onClick={() => setRankSort("distintas")}>Distintas</button>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 10 }}>Valor = común 1 · limited 10 · legendary 100</div>
+            {rows.length === 0
+              ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía nadie tiene cartas.</div>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {rows.map((r, i) => {
+                    const me = r.uid === user.id;
+                    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
+                    const big = key === "valor" ? r.valor : key === "leg" ? r.leg : r.distintas;
+                    return (
+                      <div key={r.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: me ? "var(--gold-dim)" : "var(--surface)", border: "1px solid " + (me ? "var(--gold)" : "var(--border)") }}>
+                        <div style={{ width: 26, textAlign: "center", fontWeight: 800, fontSize: i < 3 ? 18 : 13, color: "var(--muted)" }}>{medal}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}{me ? " (vos)" : ""}</div>
+                          <div style={{ fontSize: 10, color: "var(--muted)" }}>🟡 {r.leg} · 🔵 {r.lim} · ⚪ {r.com} · {r.distintas} distintas</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}>{big}</div>
+                          <div style={{ fontSize: 9, color: "var(--muted)" }}>{key === "valor" ? "valor" : key === "leg" ? "legendarias" : "distintas"}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>}
+          </div>
+        );
+      })()}
 
       {sub === "trades" && <Trades user={user} nfts={nfts} owned={owned} allOwned={allOwned} profiles={profiles} saldo={saldo} isAdmin={isAdmin} onRefresh={loadAll} />}
       {sub === "subastas" && <Subastas user={user} nfts={nfts} owned={owned} profiles={profiles} saldo={saldo} isAdmin={isAdmin} onRefresh={loadAll} />}
