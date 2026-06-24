@@ -8187,6 +8187,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
 
       {sub === "ranking" && (() => {
         const nbi = {}; nfts.forEach(n => { nbi[n.id] = n; });
+        const total = nfts.length;
         const stats = {};
         allOwned.forEach(o => {
           const n = nbi[o.nft_id]; if (!n) return;
@@ -8198,38 +8199,60 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
           s.set.add(o.nft_id);
         });
         let rows = Object.entries(stats).map(([uid, s]) => ({ uid, name: (profiles.find(p => p.id === uid)?.name) || "Alguien", leg: s.leg, lim: s.lim, com: s.com, distintas: s.set.size, total: s.leg + s.lim + s.com, valor: s.valor }));
-        const key = rankSort === "leg" ? "leg" : rankSort === "distintas" ? "distintas" : "valor";
-        rows.sort((a, b) => (b[key] - a[key]) || (b.valor - a.valor));
+        const key = rankSort === "leg" ? "leg" : rankSort === "completitud" ? "completitud" : "valor";
+        const metric = r => key === "valor" ? r.valor : key === "leg" ? r.leg : r.distintas;
+        rows.sort((a, b) => (metric(b) - metric(a)) || (b.valor - a.valor));
+        const maxMetric = rows.length ? (metric(rows[0]) || 1) : 1;
         return (
           <div>
             <div className="pre-tabs" style={{ marginBottom: 14, flexWrap: "wrap" }}>
               <button className={`pre-tab ${rankSort === "valor" ? "active" : ""}`} onClick={() => setRankSort("valor")}>Valor</button>
               <button className={`pre-tab ${rankSort === "leg" ? "active" : ""}`} onClick={() => setRankSort("leg")}>Legendarias</button>
-              <button className={`pre-tab ${rankSort === "distintas" ? "active" : ""}`} onClick={() => setRankSort("distintas")}>Distintas</button>
+              <button className={`pre-tab ${rankSort === "completitud" ? "active" : ""}`} onClick={() => setRankSort("completitud")}>Completitud</button>
             </div>
-            <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 10 }}>Valor = común 1 · limited 10 · legendary 100</div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 10 }}>Valor = común 1 · limited 10 · legendary 100{total > 0 ? ` · álbum: ${total} cartas` : ""}</div>
             {rows.length === 0
               ? <div className="card" style={{ padding: 22, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía nadie tiene cartas.</div>
-              : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              : <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {rows.map((r, i) => {
                     const me = r.uid === user.id;
+                    const prof = profiles.find(p => p.id === r.uid);
                     const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
-                    const big = key === "valor" ? r.valor : key === "leg" ? r.leg : r.distintas;
+                    const pct = total > 0 ? Math.round(r.distintas / total * 100) : 0;
+                    const pctBar = Math.max(3, Math.round(metric(r) / maxMetric * 100));
+                    const bigDisplay = key === "completitud" ? `${pct}%` : metric(r);
+                    const bigLabel = key === "valor" ? "valor" : key === "leg" ? "legendarias" : "del álbum";
                     return (
-                      <div key={r.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: me ? "var(--gold-dim)" : "var(--surface)", border: "1px solid " + (me ? "var(--gold)" : "var(--border)") }}>
-                        <div style={{ width: 26, textAlign: "center", fontWeight: 800, fontSize: i < 3 ? 18 : 13, color: "var(--muted)" }}>{medal}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                      <div key={r.uid} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: me ? "var(--gold-dim)" : "var(--surface)", border: "1px solid " + (me ? "var(--gold)" : "var(--border)") }}>
+                        <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pctBar}%`, background: "var(--gold)", opacity: me ? 0.15 : 0.09, pointerEvents: "none" }} />
+                        <div style={{ position: "relative", width: 22, textAlign: "center", fontWeight: 800, fontSize: i < 3 ? 18 : 13, color: "var(--muted)", flexShrink: 0 }}>{medal}</div>
+                        <div style={{ position: "relative", flexShrink: 0 }}><Avatar profile={prof} size="sm" /></div>
+                        <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}{me ? " (vos)" : ""}</div>
-                          <div style={{ fontSize: 10, color: "var(--muted)" }}>🟡 {r.leg} · 🔵 {r.lim} · ⚪ {r.com} · {r.distintas} distintas</div>
+                          {r.valor > 0 && (
+                            <div style={{ display: "flex", height: 5, borderRadius: 99, overflow: "hidden", margin: "5px 0 3px", width: 150, maxWidth: "55vw", background: "var(--border)" }}>
+                              {r.leg > 0 && <div style={{ flexBasis: `${r.leg * 100 / r.valor}%`, background: "#f5d97a" }} />}
+                              {r.lim > 0 && <div style={{ flexBasis: `${r.lim * 10 / r.valor}%`, background: "#60a5fa" }} />}
+                              {r.com > 0 && <div style={{ flexBasis: `${r.com * 1 / r.valor}%`, background: "var(--muted)" }} />}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 10, color: "var(--muted)" }}>🟡 {r.leg} · 🔵 {r.lim} · ⚪ {r.com} · {r.distintas} distintas{total > 0 ? ` · ${pct}% del álbum` : ""}</div>
                         </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}>{big}</div>
-                          <div style={{ fontSize: 9, color: "var(--muted)" }}>{key === "valor" ? "valor" : key === "leg" ? "legendarias" : "distintas"}</div>
+                        <div style={{ position: "relative", textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)", lineHeight: 1 }}>{bigDisplay}</div>
+                          <div style={{ fontSize: 9, color: "var(--muted)" }}>{bigLabel}</div>
                         </div>
                       </div>
                     );
                   })}
-                </div>}
+                </div>
+                <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 10, color: "var(--muted)", flexWrap: "wrap" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: "#f5d97a" }} />legendary</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: "#60a5fa" }} />limited</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: "var(--muted)" }} />común</span>
+                </div>
+              </>}
           </div>
         );
       })()}
