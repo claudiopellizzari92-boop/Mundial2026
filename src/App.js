@@ -480,6 +480,7 @@ input,button,select{font-family:inherit;}
 .cardback{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#241a3a,#120c20 70%,#0a0712);border:2px solid rgba(245,217,122,.5);box-shadow:inset 0 0 30px rgba(245,200,90,.12);}
 .cardback::before{content:"";position:absolute;inset:6px;border:1px solid rgba(245,217,122,.28);border-radius:10px;pointer-events:none;}
 .flipwrap:not(.done):hover .flipinner:not(.flipped){transform:translateY(-5px);}
+.flipwrap.done:hover .flipinner.flipped{transform:rotateY(180deg) scale(1.04);}
 .reveal-burst{position:absolute;inset:0;pointer-events:none;z-index:4;}
 .reveal-burst::after{content:"";position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);}
 .burst-limited::after{border:3px solid rgba(190,215,255,.95);box-shadow:0 0 22px rgba(150,190,255,.85);animation:ringOut .85s ease-out forwards;}
@@ -7134,12 +7135,16 @@ function CardBack() {
 function RevealModal({ items, godpack, onClose }) {
   const [flipped, setFlipped] = useState(() => items.map(() => false));
   const [epic, setEpic] = useState(false);
+  const [big, setBig] = useState(null);
   const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
 
   function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); }
   function flip(i) {
     setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
     if (items[i] && items[i].rareza === "legendary") fireEpic();
+  }
+  function clickCard(i) {
+    if (flipped[i]) setBig(items[i]); else flip(i);
   }
   function flipAll() {
     setFlipped(items.map(() => true));
@@ -7148,6 +7153,7 @@ function RevealModal({ items, godpack, onClose }) {
   const allFlipped = flipped.every(Boolean);
 
   return (
+    <>
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
       {godpack && <div className="nft-godray" />}
       {epic && (
@@ -7159,11 +7165,11 @@ function RevealModal({ items, godpack, onClose }) {
       )}
       <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 540, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 3 }}>
         {godpack && <div style={{ fontFamily: "Bebas Neue", fontSize: 30, color: "var(--gold)", letterSpacing: 2, textShadow: "0 0 16px rgba(245,200,90,.7)" }}>✨ GOD PACK ✨</div>}
-        <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{allFlipped ? (godpack ? "La suerte te sonrió." : "¡Mirá lo que te tocó!") : "Tocá las cartas para revelarlas"}</div>
+        <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{allFlipped ? "Tocá una carta para verla en grande" : "Tocá las cartas para revelarlas"}</div>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           {items.map((it, i) => (
             <div key={i} style={{ width: w }}>
-              <div className={`flipwrap ${flipped[i] ? "done" : ""}`} onClick={() => flip(i)}>
+              <div className={`flipwrap ${flipped[i] ? "done" : ""}`} onClick={() => clickCard(i)}>
                 <div className={`flipinner ${flipped[i] ? "flipped" : ""}`}>
                   <div className="flipface"><CardBack /></div>
                   <div className="flipface flipfront-nft">
@@ -7187,6 +7193,17 @@ function RevealModal({ items, godpack, onClose }) {
         </div>
       </div>
     </div>
+    {big && (
+      <div onClick={() => setBig(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1400, padding: 18 }}>
+        <button onClick={() => setBig(null)} style={{ position: "absolute", top: 14, right: 16, width: 38, height: 38, borderRadius: "50%", border: "1px solid var(--border)", background: "rgba(0,0,0,.4)", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2 }}>✕</button>
+        <div onClick={e => e.stopPropagation()} style={{ textAlign: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={big} edition={big.rareza === "limited" ? big.edition : null} big /></div>
+          <div style={{ marginTop: 14, fontSize: 19, fontWeight: 800 }}>{big.nombre}</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[big.rareza].c, marginTop: 2 }}>{NFT_RAR[big.rareza].t}{big.rareza === "limited" ? ` · #${String(big.edition).padStart(2, "0")}` : big.rareza === "legendary" ? " · 1 de 1" : ""}</div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
