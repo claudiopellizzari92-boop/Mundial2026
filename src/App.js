@@ -7821,6 +7821,15 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [recRar, setRecRar] = useState("common");
   const [recSel, setRecSel] = useState([]);
   const [profCol, setProfCol] = useState(null); // uid del coleccionista que estoy mirando
+  const [saldos, setSaldos] = useState(null);
+  const [loadingSaldos, setLoadingSaldos] = useState(false);
+  async function cargarSaldos() {
+    setLoadingSaldos(true);
+    const { data, error } = await sb.rpc("saldos_todos");
+    setLoadingSaldos(false);
+    if (error) { setModal({ msg: "No se pudieron cargar los saldos." }); return; }
+    setSaldos(data || []);
+  }
   const [nftReacts, setNftReacts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
@@ -8263,6 +8272,29 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
 
       {sub === "admin" && isAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Petros de cada uno */}
+          <div className="card" style={{ padding: "16px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>💰 Petros de cada uno</div>
+              <button onClick={cargarSaldos} disabled={loadingSaldos} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{loadingSaldos ? "..." : (saldos ? "Actualizar" : "Cargar")}</button>
+            </div>
+            {!saldos && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Tocá "Cargar" para ver el saldo de Petros de todos los jugadores.</div>}
+            {saldos && (saldos.length === 0
+              ? <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>Sin datos.</div>
+              : <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {saldos.map((s, i) => (
+                    <div key={s.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: s.user_id === user.id ? "var(--gold-dim)" : "var(--surface)" }}>
+                      <div style={{ width: 22, textAlign: "center", fontSize: 12, fontWeight: 800, color: "var(--muted)" }}>{i + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name || "—"}</div>
+                        <div style={{ fontSize: 10, color: "var(--muted)" }}>+{Math.round(s.ganados)} jugando · +{Math.round(s.bonus)} bonus · −{Math.round(s.gastado)} gastado</div>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}><PetroCoin size={14} /> {Math.round(s.petros)}</div>
+                    </div>
+                  ))}
+                </div>)}
+          </div>
+
           {/* Probabilidades */}
           {probEdit && (
             <div className="card" style={{ padding: "16px 18px" }}>
