@@ -7172,6 +7172,18 @@ function ResetCountdown({ style }) {
   return <span style={style}>{h}h {String(m).padStart(2, "0")}m {String(sec).padStart(2, "0")}s</span>;
 }
 
+// Cuenta regresiva a un instante puntual (ms epoch)
+function Countdown({ targetMs, style }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force(x => x + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const s = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return <span style={style}>{h}h {String(m).padStart(2, "0")}m {String(sec).padStart(2, "0")}s</span>;
+}
+
 // Sobre de cartas dibujado (foil con borde crimpado), tematizado por variante
 function PackIcon({ variant }) {
   const themes = {
@@ -7766,6 +7778,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [cfg, setCfg] = useState(null);
   const [spent, setSpent] = useState(0);
   const [usedToday, setUsedToday] = useState({ cinco: 0, triple: 0 });
+  const [est, setEst] = useState(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(null);
   const [reveal, setReveal] = useState(null);
@@ -7788,7 +7801,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -7796,6 +7809,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       sb.from("store_purchases").select("precio, item_key, created_at").eq("user_id", user.id),
       sb.from("nft_reactions").select("nft_id,user_id,emoji"),
       sb.from("nft_wishlist").select("nft_id").eq("user_id", user.id),
+      sb.rpc("estado_sobres"),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -7803,6 +7817,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     setCfg(cRes.data || null);
     setNftReacts(rRes.data || []);
     setWishlist((wRes.data || []).map(r => r.nft_id));
+    setEst(eRes.data || null);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -8011,9 +8026,11 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1, badge: "linear-gradient(160deg,#3b82f6,#1e3a8a)", glow: "#3b82f6", tint: "rgba(59,130,246,.16)" },
             { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar.", lim: 2, badge: "linear-gradient(160deg,#ec4899,#7c3aed)", glow: "#ec4899", tint: "rgba(236,72,153,.16)" }].map(pk => {
-            const used = usedToday[pk.tipo] || 0;
-            const restante = pk.lim - used;
-            const sinLimite = restante <= 0;
+            const isTri = pk.tipo === "triple";
+            const max = isTri ? (est ? est.tri_max : 2) : (est ? est.cinco_lim : 1);
+            const avail = isTri ? (est ? est.tri_charges : 2) : (est ? (est.cinco_lim - est.cinco_used) : 1);
+            const nextAt = isTri ? (est && est.tri_next_at ? Date.parse(est.tri_next_at) : null) : null;
+            const sinLimite = avail <= 0;
             const noPlata = !isAdmin && saldo < pk.precio;
             const dis = sinLimite || noPlata || opening === pk.tipo;
             return (
@@ -8029,12 +8046,16 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                       {pk.tipo === "triple" && <span style={{ fontSize: 10, fontWeight: 800, color: "#1a1a1a", background: "linear-gradient(90deg,#f7d774,#f5b731)", borderRadius: 999, padding: "2px 9px" }}>✨ chance de God Pack</span>}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{pk.desc}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9 }}>
-                      {Array.from({ length: pk.lim }).map((_, i) => (
-                        <span key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: i < used ? "var(--muted)" : pk.glow, opacity: i < used ? 0.5 : 1, boxShadow: i < used ? "none" : `0 0 6px ${pk.glow}` }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+                      {Array.from({ length: max }).map((_, i) => (
+                        <span key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: i < avail ? pk.glow : "var(--muted)", opacity: i < avail ? 1 : 0.4, boxShadow: i < avail ? `0 0 6px ${pk.glow}` : "none" }} />
                       ))}
-                      <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: 3 }}>{restante > 0 ? `${restante} disponible${restante > 1 ? "s" : ""} hoy` : "agotado por hoy"}</span>
+                      <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: 3 }}>
+                        {isTri ? (avail > 0 ? `${avail} cargado${avail > 1 ? "s" : ""}` : "sin cargas") : (avail > 0 ? "disponible hoy" : "agotado por hoy")}
+                        {isTri && avail < max && nextAt ? <> · +1 en <Countdown targetMs={nextAt} style={{ color: "var(--gold)", fontWeight: 700 }} /></> : null}
+                      </span>
                     </div>
+                    {isTri && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, opacity: 0.8 }}>1 sobre cada 6 h · se acumulan hasta 2</div>}
                   </div>
                 </div>
                 <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, gap: 10, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
@@ -8042,7 +8063,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                   {sinLimite
                     ? <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.6 }}>⏳ Próximo sobre en</div>
-                        <ResetCountdown style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", fontVariantNumeric: "tabular-nums" }} />
+                        {isTri
+                          ? (nextAt ? <Countdown targetMs={nextAt} style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", fontVariantNumeric: "tabular-nums" }} /> : <span style={{ fontSize: 13, color: "var(--muted)" }}>—</span>)
+                          : <ResetCountdown style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", fontVariantNumeric: "tabular-nums" }} />}
                       </div>
                     : <button onClick={() => abrirSobre(pk.tipo)} disabled={dis}
                         style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: dis ? "var(--surface)" : "var(--gold)", color: dis ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: dis ? "not-allowed" : "pointer", whiteSpace: "nowrap", boxShadow: dis ? "none" : "0 4px 14px rgba(245,183,49,.35)" }}>
