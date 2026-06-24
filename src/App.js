@@ -7781,13 +7781,22 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   }
   async function reciclar(ownedId) {
     setGuardando(true);
-    const { data, error } = await sb.rpc("reciclar_nft", { p_owned_id: ownedId });
+    const { data, error } = await sb.rpc("reciclar_una", { p_owned_id: ownedId });
     setGuardando(false);
     setRecConfirm(null);
     if (error || !data || !data.ok) { setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo reciclar." }); return; }
     setDetail(null);
     await loadAll(); if (onRefresh) onRefresh();
     setModal({ msg: `♻️ Reciclaste la carta por ${data.reward} Petros.` });
+  }
+  async function reciclarComunes() {
+    setGuardando(true);
+    const { data, error } = await sb.rpc("reciclar_comunes");
+    setGuardando(false);
+    setRecConfirm(null);
+    if (error || !data || !data.ok) { setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo reciclar." }); return; }
+    await loadAll(); if (onRefresh) onRefresh();
+    setModal({ msg: `♻️ Reciclaste 5 comunes por ${data.reward} Petros.` });
   }
   async function guardarEdit() {
     const f = editForm;
@@ -7891,16 +7900,32 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       {sub === "mia" && (
         mineList.length === 0
           ? <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía no tenés cartas. Abrí un sobre para empezar tu colección. 🎁</div>
-          : <div className="nftgrid">
-              {mineList.map(m => (
-                <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer" }}>
-                  <NFTCard nft={m.nft} edition={m.eds[0]} />
-                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nft.nombre}</div>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[m.nft.rareza].c }}>{NFT_RAR[m.nft.rareza].t}{m.eds.length > 1 ? ` · x${m.eds.length}` : ""}</div>
-                  {m.nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{m.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
-                </div>
-              ))}
-            </div>
+          : <>
+              {(() => {
+                const comunes = owned.filter(o => o.nft && o.nft.rareza === "common").length;
+                const rew = (cfg && cfg.reciclar_common != null) ? cfg.reciclar_common : 3;
+                const puede = comunes >= 5;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>Reciclaje: 5 comunes → {rew} · 1 limited → {(cfg && cfg.reciclar_limited) || 10} · 1 legendary → {(cfg && cfg.reciclar_legendary) || 1000} Petros</div>
+                    <button onClick={() => puede && setRecConfirm({ tipo: "comunes", reward: rew })} disabled={!puede}
+                      style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: puede ? "var(--gold)" : "var(--surface)", color: puede ? "#1a1a1a" : "var(--muted)", fontSize: 12, fontWeight: 800, cursor: puede ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
+                      ♻️ Reciclar 5 comunes (+{rew}) {comunes > 0 ? `· tenés ${comunes}` : ""}
+                    </button>
+                  </div>
+                );
+              })()}
+              <div className="nftgrid">
+                {mineList.map(m => (
+                  <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer" }}>
+                    <NFTCard nft={m.nft} edition={m.eds[0]} />
+                    <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nft.nombre}</div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[m.nft.rareza].c }}>{NFT_RAR[m.nft.rareza].t}{m.eds.length > 1 ? ` · x${m.eds.length}` : ""}</div>
+                    {m.nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{m.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
+                  </div>
+                ))}
+              </div>
+            </>
       )}
 
       {sub === "galeria" && (
@@ -8121,17 +8146,16 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
               );
             })()}
             {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
-            {(() => {
+            {(detail.rareza === "limited" || detail.rareza === "legendary") && (() => {
               const myRows = owned.filter(o => o.nft_id === detail.id);
-              if (myRows.length < 2) return null;
-              const recRow = detail.rareza === "limited" ? myRows.find(o => o.edition === detEd) : myRows[0];
-              if (!recRow) return null;
-              const fb = { common: 3, limited: 12, legendary: 40 };
+              if (myRows.length === 0) return null;
+              const recRow = detail.rareza === "limited" ? (myRows.find(o => o.edition === detEd) || myRows[0]) : myRows[0];
+              const fb = { limited: 10, legendary: 1000 };
               const reward = (cfg && cfg[`reciclar_${detail.rareza}`] != null) ? cfg[`reciclar_${detail.rareza}`] : fb[detail.rareza];
               return (
-                <button onClick={() => setRecConfirm({ ownedId: recRow.id, edition: recRow.edition, reward, nombre: detail.nombre, rareza: detail.rareza })}
+                <button onClick={() => setRecConfirm({ tipo: "una", ownedId: recRow.id, edition: recRow.edition, reward, nombre: detail.nombre, rareza: detail.rareza })}
                   style={{ marginTop: 12, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  ♻️ Reciclar {detail.rareza === "limited" ? `la #${String(recRow.edition).padStart(2, "0")}` : "una repetida"} por {reward} Petros
+                  ♻️ Reciclar {detail.rareza === "limited" ? `la #${String(recRow.edition).padStart(2, "0")}` : "esta legendary"} por {reward} Petros
                 </button>
               );
             })()}
@@ -8155,12 +8179,14 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
         <div onClick={() => setRecConfirm(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1320, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 340, width: "100%", padding: "22px 20px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 6 }}>♻️</div>
-            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>¿Reciclar esta carta?</div>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>{recConfirm.tipo === "comunes" ? "¿Reciclar 5 comunes?" : "¿Reciclar esta carta?"}</div>
             <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
-              Vas a quemar <b style={{ color: "var(--txt)" }}>{recConfirm.nombre}{recConfirm.rareza === "limited" ? ` #${String(recConfirm.edition).padStart(2, "0")}` : ""}</b> y recibís <b style={{ color: "var(--gold)" }}>{recConfirm.reward} Petros</b>. Esto no se puede deshacer.
+              {recConfirm.tipo === "comunes"
+                ? <>Vas a quemar <b style={{ color: "var(--txt)" }}>5 cartas comunes</b> y recibís <b style={{ color: "var(--gold)" }}>{recConfirm.reward} Petros</b>. Esto no se puede deshacer.</>
+                : <>Vas a quemar <b style={{ color: "var(--txt)" }}>{recConfirm.nombre}{recConfirm.rareza === "limited" ? ` #${String(recConfirm.edition).padStart(2, "0")}` : ""}</b> y recibís <b style={{ color: "var(--gold)" }}>{recConfirm.reward} Petros</b>. Esto no se puede deshacer.</>}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-              <button onClick={() => reciclar(recConfirm.ownedId)} disabled={guardando} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>{guardando ? "..." : "Sí, reciclar"}</button>
+              <button onClick={() => recConfirm.tipo === "comunes" ? reciclarComunes() : reciclar(recConfirm.ownedId)} disabled={guardando} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>{guardando ? "..." : "Sí, reciclar"}</button>
               <button onClick={() => setRecConfirm(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
             </div>
           </div>
