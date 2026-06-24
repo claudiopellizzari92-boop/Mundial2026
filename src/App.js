@@ -3858,6 +3858,21 @@ function Standings({ user, predictions, matches, profiles, onRefresh, isAdmin, a
             <button onClick={() => { setHistoryUser(null); setShowH2hPicker(false); }} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
           </div>
 
+          {/* Cartas destacadas (NFT) */}
+          {Array.isArray(prof.featured_nfts) && prof.featured_nfts.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>⭐ Cartas destacadas</div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                {prof.featured_nfts.slice(0, 3).map((c, i) => (
+                  <div key={i} style={{ width: prof.featured_nfts.length === 1 ? 120 : 96 }}>
+                    <NFTCard nft={c} edition={c.rareza === "limited" ? c.edition : null} />
+                    <div style={{ fontSize: 9, fontWeight: 700, textAlign: "center", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Títulos anteriores */}
           {profTitles.length > 0 && (
             <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, border: "1px solid rgba(245,183,49,.2)" }}>
@@ -7658,6 +7673,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [sub, setSub] = useState("sobres");
   const [galFiltro, setGalFiltro] = useState("legendary");
   const [rankSort, setRankSort] = useState("valor");
+  const [featured, setFeatured] = useState(Array.isArray(user.profile?.featured_nfts) ? user.profile.featured_nfts : []);
   const [nfts, setNfts] = useState([]);
   const [owned, setOwned] = useState([]);
   const [allOwned, setAllOwned] = useState([]);
@@ -7779,6 +7795,19 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
     setSubiendo(false);
+  }
+  async function toggleFeatured(nft) {
+    const exists = featured.some(f => f.nft_id === nft.id);
+    let next;
+    if (exists) next = featured.filter(f => f.nft_id !== nft.id);
+    else {
+      if (featured.length >= 3) { setModal({ msg: "Solo podés destacar 3 cartas. Sacá una primero." }); return; }
+      const myEds = owned.filter(o => o.nft_id === nft.id).map(o => o.edition).sort((a, b) => a - b);
+      next = [...featured, { nft_id: nft.id, nombre: nft.nombre, imagen_url: nft.imagen_url, rareza: nft.rareza, num_x: nft.num_x, num_y: nft.num_y, num_size: nft.num_size, supply_max: nft.supply_max, edition: nft.rareza === "limited" ? (myEds[0] != null ? myEds[0] : null) : null }];
+    }
+    setFeatured(next);
+    await sb.from("profiles").update({ featured_nfts: next }).eq("id", user.id);
+    if (onRefresh) onRefresh();
   }
   async function reciclar(ownedId) {
     setGuardando(true);
@@ -7908,7 +7937,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                 const rew = (cfg && cfg.reciclar_common != null) ? cfg.reciclar_common : 3;
                 const puede = comunes >= 5;
                 return (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
                     <div style={{ fontSize: 11, color: "var(--muted)" }}>Reciclaje: 5 comunes → {rew} · 1 limited → {(cfg && cfg.reciclar_limited) || 10} · 1 legendary → {(cfg && cfg.reciclar_legendary) || 1000} Petros</div>
                     <button onClick={() => puede && setRecConfirm({ tipo: "comunes", reward: rew })} disabled={!puede}
                       style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: puede ? "var(--gold)" : "var(--surface)", color: puede ? "#1a1a1a" : "var(--muted)", fontSize: 12, fontWeight: 800, cursor: puede ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
@@ -7917,10 +7946,15 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                   </div>
                 );
               })()}
+              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>⭐ Tocá la estrella para destacar hasta 3 cartas en tu perfil ({featured.length}/3).</div>
               <div className="nftgrid">
                 {mineList.map(m => (
-                  <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer" }}>
+                  <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer", position: "relative" }}>
                     <NFTCard nft={m.nft} edition={m.eds[0]} />
+                    <button onClick={(e) => { e.stopPropagation(); toggleFeatured(m.nft); }} title="Destacar en tu perfil"
+                      style={{ position: "absolute", top: 6, right: 6, width: 27, height: 27, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.55)", color: featured.some(f => f.nft_id === m.nft.id) ? "#f5d97a" : "#fff", fontSize: 15, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+                      {featured.some(f => f.nft_id === m.nft.id) ? "★" : "☆"}
+                    </button>
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nft.nombre}</div>
                     <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[m.nft.rareza].c }}>{NFT_RAR[m.nft.rareza].t}{m.eds.length > 1 ? ` · x${m.eds.length}` : ""}</div>
                     {m.nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{m.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
