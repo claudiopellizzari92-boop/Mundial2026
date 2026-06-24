@@ -7820,6 +7820,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [recPick, setRecPick] = useState(false);
   const [recRar, setRecRar] = useState("common");
   const [recSel, setRecSel] = useState([]);
+  const [profCol, setProfCol] = useState(null); // uid del coleccionista que estoy mirando
   const [nftReacts, setNftReacts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
@@ -8224,7 +8225,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                     const bigDisplay = key === "completitud" ? `${pct}%` : metric(r);
                     const bigLabel = key === "valor" ? "valor" : key === "leg" ? "legendarias" : "del álbum";
                     return (
-                      <div key={r.uid} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: me ? "var(--gold-dim)" : "var(--surface)", border: "1px solid " + (me ? "var(--gold)" : "var(--border)") }}>
+                      <div key={r.uid} onClick={() => setProfCol(r.uid)} title="Ver su colección" style={{ position: "relative", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: me ? "var(--gold-dim)" : "var(--surface)", border: "1px solid " + (me ? "var(--gold)" : "var(--border)") }}>
                         <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pctBar}%`, background: "var(--gold)", opacity: me ? 0.15 : 0.09, pointerEvents: "none" }} />
                         <div style={{ position: "relative", width: 22, textAlign: "center", fontWeight: 800, fontSize: i < 3 ? 18 : 13, color: "var(--muted)", flexShrink: 0 }}>{medal}</div>
                         <div style={{ position: "relative", flexShrink: 0 }}><Avatar profile={prof} size="sm" /></div>
@@ -8422,6 +8423,66 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       {reveal && <RevealModal items={reveal.items} godpack={reveal.godpack} onClose={() => setReveal(null)} />}
 
       {/* Detalle de carta */}
+      {/* perfil de coleccionista (al tocar una fila del ranking) */}
+      {profCol && (() => {
+        const prof = profiles.find(p => p.id === profCol);
+        const nbi = {}; nfts.forEach(n => { nbi[n.id] = n; });
+        const grouped = {};
+        allOwned.filter(o => o.user_id === profCol).forEach(o => {
+          const n = nbi[o.nft_id]; if (!n) return;
+          if (!grouped[o.nft_id]) grouped[o.nft_id] = { nft: n, eds: [] };
+          grouped[o.nft_id].eds.push(o.edition);
+        });
+        const rank = { legendary: 0, limited: 1, common: 2 };
+        const list = Object.values(grouped).sort((a, b) => (rank[a.nft.rareza] - rank[b.nft.rareza]) || (a.nft.nombre || "").localeCompare(b.nft.nombre || ""));
+        let leg = 0, lim = 0, com = 0, valor = 0;
+        list.forEach(g => { const c = g.eds.length; if (g.nft.rareza === "legendary") { leg += c; valor += c * 100; } else if (g.nft.rareza === "limited") { lim += c; valor += c * 10; } else { com += c; valor += c; } });
+        const distintas = list.length, total = nfts.length, pct = total > 0 ? Math.round(distintas / total * 100) : 0;
+        const me = profCol === user.id;
+        const featured = Array.isArray(prof?.featured_nfts) ? prof.featured_nfts : [];
+        const Stat = ({ v, l }) => <div style={{ textAlign: "center" }}><div style={{ fontSize: 18, fontWeight: 800, color: "var(--gold)" }}>{v}</div><div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: .4 }}>{l}</div></div>;
+        return (
+          <div onClick={() => setProfCol(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1080, padding: 16, overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 560, width: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+              <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Avatar profile={prof} size="md" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(prof && prof.name) || "Coleccionista"}{me ? " (vos)" : ""}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>🟡 {leg} · 🔵 {lim} · ⚪ {com}</div>
+                  </div>
+                  <button onClick={() => setProfCol(null)} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" }}>✕</button>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-around", marginTop: 14 }}>
+                  <Stat v={valor} l="valor" /><Stat v={distintas} l="distintas" /><Stat v={`${pct}%`} l="del álbum" />
+                </div>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
+                {featured.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>⭐ DESTACADAS</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {featured.slice(0, 3).map((c, i) => <div key={i} style={{ width: 84 }}><NFTCard nft={c} edition={c.rareza === "limited" ? c.edition : null} /></div>)}
+                    </div>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 8 }}>COLECCIÓN ({distintas})</div>
+                {list.length === 0
+                  ? <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", padding: "20px 0" }}>Todavía no tiene cartas.</div>
+                  : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(82px, 1fr))", gap: 10 }}>
+                      {list.map(g => (
+                        <div key={g.nft.id} onClick={() => { setProfCol(null); setDetail(g.nft); }} style={{ cursor: "pointer" }}>
+                          <NFTCard nft={g.nft} edition={g.eds[0]} />
+                          <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.nft.nombre}{g.eds.length > 1 ? ` ·x${g.eds.length}` : ""}</div>
+                        </div>
+                      ))}
+                    </div>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
