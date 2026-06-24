@@ -7465,8 +7465,16 @@ function Subastas({ user, nfts, owned, profiles, saldo, isAdmin, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const { data: au } = await sb.from("nft_auctions").select("*").eq("status", "open").order("end_at", { ascending: true });
-    const list = au || [];
+    let { data: au } = await sb.from("nft_auctions").select("*").eq("status", "open").order("end_at", { ascending: true });
+    let list = au || [];
+    // cierre automático: finalizo las vencidas y recargo
+    const vencidas = list.filter(a => new Date(a.end_at).getTime() <= Date.now());
+    if (vencidas.length) {
+      await Promise.all(vencidas.map(a => sb.rpc("finalizar_subasta", { p_auction_id: a.id })));
+      const r = await sb.from("nft_auctions").select("*").eq("status", "open").order("end_at", { ascending: true });
+      list = r.data || [];
+      if (onRefresh) onRefresh();
+    }
     setAuctions(list);
     if (list.length) {
       const { data: bd } = await sb.from("nft_bids").select("*").in("auction_id", list.map(a => a.id));
@@ -7667,6 +7675,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [guardando, setGuardando] = useState(false);
   const [probEdit, setProbEdit] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [recConfirm, setRecConfirm] = useState(null);
 
   const myPts = (allPredictions || []).filter(p => p.user_id === user.id).reduce((s, p) => s + (p.points || 0), 0);
   const bonus = user.profile?.monedas_bonus || 0;
@@ -7769,6 +7778,16 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
     setSubiendo(false);
+  }
+  async function reciclar(ownedId) {
+    setGuardando(true);
+    const { data, error } = await sb.rpc("reciclar_nft", { p_owned_id: ownedId });
+    setGuardando(false);
+    setRecConfirm(null);
+    if (error || !data || !data.ok) { setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo reciclar." }); return; }
+    setDetail(null);
+    await loadAll(); if (onRefresh) onRefresh();
+    setModal({ msg: `♻️ Reciclaste la carta por ${data.reward} Petros.` });
   }
   async function guardarEdit() {
     const f = editForm;
@@ -8102,6 +8121,20 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
               );
             })()}
             {detail.descripcion && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{detail.descripcion}</div>}
+            {(() => {
+              const myRows = owned.filter(o => o.nft_id === detail.id);
+              if (myRows.length < 2) return null;
+              const recRow = detail.rareza === "limited" ? myRows.find(o => o.edition === detEd) : myRows[0];
+              if (!recRow) return null;
+              const fb = { common: 3, limited: 12, legendary: 40 };
+              const reward = (cfg && cfg[`reciclar_${detail.rareza}`] != null) ? cfg[`reciclar_${detail.rareza}`] : fb[detail.rareza];
+              return (
+                <button onClick={() => setRecConfirm({ ownedId: recRow.id, edition: recRow.edition, reward, nombre: detail.nombre, rareza: detail.rareza })}
+                  style={{ marginTop: 12, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--txt)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  ♻️ Reciclar {detail.rareza === "limited" ? `la #${String(recRow.edition).padStart(2, "0")}` : "una repetida"} por {reward} Petros
+                </button>
+              );
+            })()}
             <div style={{ marginTop: 14, textAlign: "left" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>DUEÑOS</div>
               {allOwned.filter(o => o.nft_id === detail.id).sort((a, b) => a.edition - b.edition).map((o, i) => (
@@ -8113,6 +8146,23 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
               {allOwned.filter(o => o.nft_id === detail.id).length === 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}>Nadie la tiene todavía.</div>}
             </div>
             <button onClick={() => setDetail(null)} style={{ marginTop: 16, padding: "9px 22px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* confirmar reciclaje */}
+      {recConfirm && (
+        <div onClick={() => setRecConfirm(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1320, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 340, width: "100%", padding: "22px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 6 }}>♻️</div>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>¿Reciclar esta carta?</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
+              Vas a quemar <b style={{ color: "var(--txt)" }}>{recConfirm.nombre}{recConfirm.rareza === "limited" ? ` #${String(recConfirm.edition).padStart(2, "0")}` : ""}</b> y recibís <b style={{ color: "var(--gold)" }}>{recConfirm.reward} Petros</b>. Esto no se puede deshacer.
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+              <button onClick={() => reciclar(recConfirm.ownedId)} disabled={guardando} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>{guardando ? "..." : "Sí, reciclar"}</button>
+              <button onClick={() => setRecConfirm(null)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancelar</button>
+            </div>
           </div>
         </div>
       )}
