@@ -7786,7 +7786,7 @@ function Subastas({ user, nfts, owned, profiles, saldo, isAdmin, onRefresh }) {
   );
 }
 
-function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
+function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercadoPend = 0 }) {
   const [sub, setSub] = useState("sobres");
   const [lastSub, setLastSub] = useState({ mis: "sobres", explorar: "galeria", mercado: "trades", gestion: "admin" });
   function pickSub(k) {
@@ -7822,6 +7822,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [recSel, setRecSel] = useState([]);
   const [profCol, setProfCol] = useState(null); // uid del coleccionista que estoy mirando
   const [saldos, setSaldos] = useState(null);
+  const [wishTop, setWishTop] = useState([]);
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
     setLoadingSaldos(true);
@@ -7839,7 +7840,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -7848,6 +7849,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       sb.from("nft_reactions").select("nft_id,user_id,emoji"),
       sb.from("nft_wishlist").select("nft_id").eq("user_id", user.id),
       sb.rpc("estado_sobres"),
+      sb.rpc("wishlist_top", { p_limit: 6 }),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -7856,6 +7858,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     setNftReacts(rRes.data || []);
     setWishlist((wRes.data || []).map(r => r.nft_id));
     setEst(eRes.data || null);
+    setWishTop(tRes.data || []);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -8054,7 +8057,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
             <>
               <div className="pre-tabs" style={{ marginTop: 14, flexWrap: "wrap" }}>
                 {NFT_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => (
-                  <button key={g.key} className={`pre-tab ${grupoActivo.key === g.key ? "active" : ""}`} onClick={() => pickSub(lastSub[g.key] || g.subs[0][0])}>{g.emoji} {g.label}</button>
+                  <button key={g.key} className={`pre-tab ${grupoActivo.key === g.key ? "active" : ""}`} onClick={() => pickSub(lastSub[g.key] || g.subs[0][0])} style={{ position: "relative" }}>{g.emoji} {g.label}{g.key === "mercado" && mercadoPend > 0 && <span style={{ position: "absolute", top: 3, right: 3, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}</button>
                 ))}
               </div>
               {grupoActivo.subs.length > 1 && (
@@ -8167,6 +8170,24 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
 
       {sub === "galeria" && (
         <>
+        {wishTop.filter(w => w.n > 0).length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>🔥 Más codiciadas del grupo</div>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+              {wishTop.filter(w => w.n > 0).map(w => {
+                const n = nfts.find(x => x.id === w.nft_id);
+                if (!n) return null;
+                return (
+                  <div key={w.nft_id} onClick={() => setDetail(n)} style={{ cursor: "pointer", flex: "0 0 auto", width: 92, position: "relative" }}>
+                    <NFTCard nft={n} edition={null} />
+                    <div style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,.7)", color: "#ff8a5c", fontSize: 11, fontWeight: 800, borderRadius: 999, padding: "2px 7px" }}>🔥 {w.n}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.nombre}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="pre-tabs" style={{ marginBottom: 14, flexWrap: "wrap" }}>
           {[["common", "Common"], ["limited", "Limited"], ["legendary", "Legendary"]].map(([k, l]) => {
             const cnt = (isAdmin ? nfts : nfts.filter(x => x.activo)).filter(x => x.rareza === k).length;
@@ -8674,6 +8695,8 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
+  const [mercadoPend, setMercadoPend] = useState(0);
+  useEffect(() => { (async () => { try { const { data } = await sb.rpc("mercado_pendientes"); setMercadoPend(data || 0); } catch (e) {} })(); }, [tab]);
   const [booting, setBooting] = useState(true);
   const [matches, setMatches] = useState([]);
   const [loadError, setLoadError] = useState(false);
@@ -9101,7 +9124,7 @@ export default function App() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
             {APP_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => {
               const on = grupoActivoApp.key === g.key;
-              const dot = g.tabs.some(t => t[0] === "cronica") && hasNewChronicle;
+              const dot = (g.tabs.some(t => t[0] === "cronica") && hasNewChronicle) || (g.key === "coleccionables" && mercadoPend > 0);
               return (
                 <button key={g.key} className={`nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`} onClick={() => goTab(appLastTab[g.key] || g.tabs[0][0])} style={{ position: "relative" }}>
                   {g.emoji} {g.label}{dot && <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "var(--red)", boxShadow: "0 0 0 2px var(--bg)" }} />}
@@ -9170,7 +9193,7 @@ export default function App() {
           const on = grupoActivoApp.key === g.key;
           const multi = g.tabs.length > 1;
           const expanded = openGroup === null ? on : (openGroup === g.key);
-          const dot = g.tabs.some(t => t[0] === "cronica") && hasNewChronicle;
+          const dot = (g.tabs.some(t => t[0] === "cronica") && hasNewChronicle) || (g.key === "coleccionables" && mercadoPend > 0);
           return (
             <React.Fragment key={g.key}>
               <button className={`mobile-nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`}
@@ -9212,7 +9235,7 @@ export default function App() {
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
 {tab==="info"      && <InfoTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles} />}
-        {tab==="coleccion" && <Coleccion user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />}
+        {tab==="coleccion" && <Coleccion user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} mercadoPend={mercadoPend} />}
         {/* Álbum oculto temporalmente — para reactivar, descomentá esta línea y volvé a agregar ["album","📒 Álbum"] en los dos menús de arriba */}
         {/* {tab==="album"     && <Album user={user} profiles={profiles} allPredictions={allPredictions} isAdmin={isAdmin} onRefresh={loadData} />} */}
         {tab==="tienda"    && <Tienda user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin}/>}
