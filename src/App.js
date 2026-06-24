@@ -8608,6 +8608,7 @@ export default function App() {
 
   const hasNewChronicle = !!latestChronicleKey && latestChronicleKey !== chronicaSeenKey;
   const [appLastTab, setAppLastTab] = useState({ inicio: "home", jugar: "predicciones", resultados: "standings", comunidad: "cronica", coleccionables: "coleccion", info: "info", adminG: "admin" });
+  const [openGroup, setOpenGroup] = useState(null);
   function goTab(t) {
     setTab(t);
     setMenuOpen(false);
@@ -9051,11 +9052,19 @@ export default function App() {
       <div className={`mobile-menu ${menuOpen?"open":""}`}>
         {APP_GRUPOS.filter(g => !g.adminOnly || isAdmin).map(g => {
           const on = grupoActivoApp.key === g.key;
+          const multi = g.tabs.length > 1;
+          const expanded = openGroup === null ? on : (openGroup === g.key);
           const dot = g.tabs.some(t => t[0] === "cronica") && hasNewChronicle;
           return (
             <React.Fragment key={g.key}>
-              <button className={`mobile-nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`} onClick={() => goTab(appLastTab[g.key] || g.tabs[0][0])} style={{ position: "relative" }}>{g.emoji} {g.label}{dot && <span style={{ position: "absolute", top: 8, right: 14, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}</button>
-              {on && g.tabs.length > 1 && g.tabs.map(([k, emo, lab]) => (
+              <button className={`mobile-nav-tab ${g.adminOnly ? "admin-tab " : ""}${on ? "active" : ""}`}
+                onClick={() => multi ? setOpenGroup(expanded ? "" : g.key) : goTab(g.tabs[0][0])}
+                style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>{g.emoji} {g.label}</span>
+                {multi && <span style={{ fontSize: 12, color: "var(--muted)", transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "none" }}>▾</span>}
+                {dot && <span style={{ position: "absolute", top: 8, right: 32, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}
+              </button>
+              {multi && expanded && g.tabs.map(([k, emo, lab]) => (
                 <button key={k} className={`mobile-nav-tab ${tab === k ? "active" : ""}`} onClick={() => goTab(k)} style={{ paddingLeft: 34, fontSize: 14, position: "relative" }}>{emo} {lab}{k === "cronica" && hasNewChronicle && <span style={{ position: "absolute", top: 8, right: 14, width: 8, height: 8, borderRadius: "50%", background: "var(--red)" }} />}</button>
               ))}
             </React.Fragment>
