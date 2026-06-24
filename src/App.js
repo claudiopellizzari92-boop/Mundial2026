@@ -7094,6 +7094,7 @@ const rarRank = { legendary: 0, limited: 1, common: 2 };
 
 function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [sub, setSub] = useState("sobres");
+  const [galFiltro, setGalFiltro] = useState("legendary");
   const [nfts, setNfts] = useState([]);
   const [owned, setOwned] = useState([]);
   const [allOwned, setAllOwned] = useState([]);
@@ -7313,8 +7314,17 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       )}
 
       {sub === "galeria" && (
-        <div className="nftgrid">
-          {galLista.map(n => {
+        <>
+        <div className="pre-tabs" style={{ marginBottom: 14, flexWrap: "wrap" }}>
+          {[["common", "Common"], ["limited", "Limited"], ["legendary", "Legendary"]].map(([k, l]) => {
+            const cnt = (isAdmin ? nfts : nfts.filter(x => x.activo)).filter(x => x.rareza === k).length;
+            return <button key={k} className={`pre-tab ${galFiltro === k ? "active" : ""}`} onClick={() => setGalFiltro(k)}>{l} ({cnt})</button>;
+          })}
+        </div>
+        {galLista.filter(n => n.rareza === galFiltro).length === 0
+          ? <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No hay cartas de esta rareza todavía.</div>
+          : <div className="nftgrid">
+          {galLista.filter(n => n.rareza === galFiltro).map(n => {
             const owners = allOwned.filter(o => o.nft_id === n.id);
             let info;
             if (n.rareza === "legendary") info = owners.length ? "👑 " + nameOf(owners[0].user_id) : "Sin dueño aún";
@@ -7329,7 +7339,8 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
               </div>
             );
           })}
-        </div>
+        </div>}
+        </>
       )}
 
       {sub === "admin" && isAdmin && (
