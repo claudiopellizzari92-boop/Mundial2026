@@ -7455,6 +7455,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [allOwned, setAllOwned] = useState([]);
   const [cfg, setCfg] = useState(null);
   const [spent, setSpent] = useState(0);
+  const [usedToday, setUsedToday] = useState({ cinco: 0, triple: 0 });
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(null);
   const [reveal, setReveal] = useState(null);
@@ -7479,13 +7480,22 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
       sb.from("nft_config").select("*").eq("id", 1).maybeSingle(),
-      sb.from("store_purchases").select("precio").eq("user_id", user.id),
+      sb.from("store_purchases").select("precio, item_key, created_at").eq("user_id", user.id),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
     setAllOwned(aRes.data || []);
     setCfg(cRes.data || null);
-    setSpent((pRes.data || []).reduce((s, p) => s + (p.precio || 0), 0));
+    const compras = pRes.data || [];
+    setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
+    // sobres abiertos hoy (medianoche de Aruba, UTC-4)
+    const an = new Date(Date.now() - 4 * 3600 * 1000);
+    const dayStart = new Date(Date.UTC(an.getUTCFullYear(), an.getUTCMonth(), an.getUTCDate(), 4, 0, 0));
+    const hoy = compras.filter(c => c.created_at && new Date(c.created_at) >= dayStart);
+    setUsedToday({
+      cinco: hoy.filter(c => c.item_key === "nft_sobre_cinco").length,
+      triple: hoy.filter(c => c.item_key === "nft_sobre_triple").length,
+    });
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
@@ -7628,9 +7638,13 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
 
       {sub === "sobres" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {[{ tipo: "simple", nombre: "Sobre Simple", emoji: "🎴", cant: "1 carta", precio: precioSimple, desc: "Una carta al azar." },
-            { tipo: "triple", nombre: "Sobre Triple", emoji: "🎁", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar. Con suerte… God Pack." }].map(pk => {
+          {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1 },
+            { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar. Con suerte… God Pack.", lim: 2 }].map(pk => {
+            const used = usedToday[pk.tipo] || 0;
+            const restante = pk.lim - used;
+            const sinLimite = !isAdmin && restante <= 0;
             const noPlata = !isAdmin && saldo < pk.precio;
+            const dis = sinLimite || noPlata || opening === pk.tipo;
             return (
               <div key={pk.tipo} className="card" style={{ padding: "16px 18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -7638,12 +7652,13 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 800 }}>{pk.nombre} <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>· {pk.cant}</span></div>
                     <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{pk.desc}</div>
+                    <div style={{ fontSize: 11, color: sinLimite ? "var(--red)" : "var(--muted)", marginTop: 4 }}>{isAdmin ? "Sin límite (admin)" : `Hoy: ${used}/${pk.lim}`}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "var(--gold)", marginBottom: 6, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}><PetroCoin size={15} /> {pk.precio}</div>
-                    <button onClick={() => abrirSobre(pk.tipo)} disabled={noPlata || opening === pk.tipo}
-                      style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: noPlata ? "var(--surface)" : "var(--gold)", color: noPlata ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: noPlata ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-                      {opening === pk.tipo ? "Abriendo…" : noPlata ? "Sin Petros" : "Abrir"}
+                    <button onClick={() => abrirSobre(pk.tipo)} disabled={dis}
+                      style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: dis ? "var(--surface)" : "var(--gold)", color: dis ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: dis ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                      {opening === pk.tipo ? "Abriendo…" : sinLimite ? "Volvé mañana" : noPlata ? "Sin Petros" : "Abrir"}
                     </button>
                   </div>
                 </div>
