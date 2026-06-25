@@ -5191,6 +5191,39 @@ function AdminPanel({ matches, profiles, onRefresh }) {
     setOptMsg(`Listo: ${cartas.length} cartas + ${conFoto.length} participantes optimizados.`);
     if (onRefresh) await onRefresh();
   }
+
+  const [limpiando, setLimpiando] = useState(false);
+  const [limpMsg, setLimpMsg] = useState("");
+  async function limpiarImagenesViejas() {
+    setLimpiando(true); setLimpMsg("");
+    try {
+      const { data: files, error: le } = await sb.storage.from("tienda").list("nfts", { limit: 2000 });
+      if (le) throw le;
+      const { data: nftRows, error: ne } = await sb.from("nfts").select("imagen_url");
+      if (ne) throw ne;
+      // Red de seguridad: si no pude leer las cartas, no borro nada
+      if (!nftRows || nftRows.length === 0) { setLimpMsg("No pude leer las cartas; cancelado por seguridad."); setLimpiando(false); return; }
+      const enUso = new Set(nftRows.map(n => n.imagen_url).filter(Boolean));
+      const aBorrar = [];
+      for (const f of (files || [])) {
+        if (!f.name || f.id === null) continue;
+        const path = "nfts/" + f.name;
+        const url = sb.storage.from("tienda").getPublicUrl(path).data.publicUrl;
+        if (!enUso.has(url)) aBorrar.push(path);
+      }
+      if (aBorrar.length === 0) { setLimpMsg("No hay imágenes viejas para borrar. Todo limpio."); setLimpiando(false); return; }
+      let borradas = 0;
+      for (let i = 0; i < aBorrar.length; i += 50) {
+        const chunk = aBorrar.slice(i, i + 50);
+        const { error } = await sb.storage.from("tienda").remove(chunk);
+        if (!error) borradas += chunk.length;
+      }
+      setLimpMsg(`Listo: ${borradas} imágenes viejas borradas.`);
+    } catch (e) {
+      setLimpMsg("Error: " + (e.message || e));
+    }
+    setLimpiando(false);
+  }
   async function loadPlayerPreds(uid) {
     setApSaved({}); setApPreds({});
     const { data } = await sb.from("predictions").select("match_id, home_score, away_score").eq("user_id", uid);
@@ -5668,6 +5701,13 @@ function AdminPanel({ matches, profiles, onRefresh }) {
             {optim ? `Optimizando… ${optProg.done}/${optProg.total}` : "♻️ Optimizar todas las imágenes"}
           </button>
           {optMsg && <div style={{ fontSize: 12, color: "var(--green)", marginTop: 10 }}>{optMsg}</div>}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>Una vez optimizadas, borrá las imágenes viejas pesadas que ya no usa ninguna carta, para liberar espacio. (Seguro: solo borra archivos que no estén enlazados.)</p>
+            <button className="btn-small" onClick={limpiarImagenesViejas} disabled={limpiando} style={{ background: "var(--red-dim)", borderColor: "var(--red)", color: "var(--red)" }}>
+              {limpiando ? "Limpiando…" : "🗑️ Limpiar imágenes viejas"}
+            </button>
+            {limpMsg && <div style={{ fontSize: 12, color: "var(--green)", marginTop: 8 }}>{limpMsg}</div>}
+          </div>
         </div>}
       </div>
 
