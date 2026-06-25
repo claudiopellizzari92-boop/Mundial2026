@@ -5127,12 +5127,34 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [optMsg, setOptMsg] = useState("");
   async function optimizarImagenes() {
     const conFoto = (profiles || []).filter(p => p.cromo_foto || p.avatar_url);
-    if (conFoto.length === 0) { setOptMsg("No hay imágenes para optimizar."); return; }
-    setOptim(true); setOptMsg(""); setOptProg({ done: 0, total: conFoto.length });
-    let ok = 0;
-    for (let i = 0; i < conFoto.length; i++) {
-      const p = conFoto[i];
-      setOptProg({ done: i, total: conFoto.length });
+    const { data: nftList } = await sb.from("nfts").select("id, imagen_url");
+    const cartas = (nftList || []).filter(n => n.imagen_url);
+    const total = cartas.length + conFoto.length;
+    if (total === 0) { setOptMsg("No hay imágenes para optimizar."); return; }
+    setOptim(true); setOptMsg(""); setOptProg({ done: 0, total });
+    let done = 0;
+
+    // 1) Cartas NFT (las más pesadas)
+    for (const n of cartas) {
+      setOptProg({ done, total });
+      try {
+        const r = await fetch(n.imagen_url, { cache: "no-store" });
+        if (r.ok) {
+          const blob = await compressImg(await r.blob(), 600, 0.82);
+          const path = `nfts/opt-${n.id}-${Date.now()}.jpg`;
+          const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+          if (!up.error) {
+            const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+            await sb.from("nfts").update({ imagen_url: pub.publicUrl }).eq("id", n.id);
+          }
+        }
+      } catch (e) {}
+      done++;
+    }
+
+    // 2) Avatares y cromos de cada participante
+    for (const p of conFoto) {
+      setOptProg({ done, total });
       if (p.avatar_url) {
         try {
           const r = await fetch(p.avatar_url, { cache: "no-store" });
@@ -5161,11 +5183,12 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           }
         } catch (e) {}
       }
-      ok++;
+      done++;
     }
-    setOptProg({ done: conFoto.length, total: conFoto.length });
+
+    setOptProg({ done: total, total });
     setOptim(false);
-    setOptMsg(`Listo: ${ok} participantes procesados.`);
+    setOptMsg(`Listo: ${cartas.length} cartas + ${conFoto.length} participantes optimizados.`);
     if (onRefresh) await onRefresh();
   }
   async function loadPlayerPreds(uid) {
@@ -8087,9 +8110,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   // ── admin ──
   async function subirImagen(file) {
     setSubiendo(true);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `nfts/${Date.now()}.${ext}`;
-    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    const blob = await compressImg(file, 600, 0.82);
+    const path = `nfts/${Date.now()}.jpg`;
+    const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
     if (up.error) { setSubiendo(false); setModal({ msg: "No se pudo subir la imagen: " + up.error.message }); return; }
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setNuevo(n => ({ ...n, imagen_url: pub.publicUrl }));
@@ -8122,9 +8145,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   }
   async function subirArteEdit(file) {
     setSubiendo(true);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `nfts/${Date.now()}.${ext}`;
-    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    const blob = await compressImg(file, 600, 0.82);
+    const path = `nfts/${Date.now()}.jpg`;
+    const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
     if (up.error) { setSubiendo(false); setModal({ msg: "No se pudo subir la imagen: " + up.error.message }); return; }
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
