@@ -5122,6 +5122,52 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [apPreds, setApPreds] = useState({});
   const [apSaving, setApSaving] = useState({});
   const [apSaved, setApSaved] = useState({});
+  const [optim, setOptim] = useState(false);
+  const [optProg, setOptProg] = useState({ done: 0, total: 0 });
+  const [optMsg, setOptMsg] = useState("");
+  async function optimizarImagenes() {
+    const conFoto = (profiles || []).filter(p => p.cromo_foto || p.avatar_url);
+    if (conFoto.length === 0) { setOptMsg("No hay imágenes para optimizar."); return; }
+    setOptim(true); setOptMsg(""); setOptProg({ done: 0, total: conFoto.length });
+    let ok = 0;
+    for (let i = 0; i < conFoto.length; i++) {
+      const p = conFoto[i];
+      setOptProg({ done: i, total: conFoto.length });
+      if (p.avatar_url) {
+        try {
+          const r = await fetch(p.avatar_url, { cache: "no-store" });
+          if (r.ok) {
+            const blob = await compressImg(await r.blob(), 400, 0.82);
+            const path = `${p.id}-${Date.now()}.jpg`;
+            const up = await sb.storage.from("avatars").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+            if (!up.error) {
+              const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
+              await sb.from("profiles").update({ avatar_url: pub.publicUrl }).eq("id", p.id);
+            }
+          }
+        } catch (e) {}
+      }
+      if (p.cromo_foto) {
+        try {
+          const r = await fetch(p.cromo_foto, { cache: "no-store" });
+          if (r.ok) {
+            const blob = await compressImg(await r.blob(), 512, 0.82);
+            const path = `cromos/opt-${p.id}-${Date.now()}.jpg`;
+            const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+            if (!up.error) {
+              const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+              await sb.rpc("set_cromo_foto", { p_user_id: p.id, p_url: pub.publicUrl });
+            }
+          }
+        } catch (e) {}
+      }
+      ok++;
+    }
+    setOptProg({ done: conFoto.length, total: conFoto.length });
+    setOptim(false);
+    setOptMsg(`Listo: ${ok} participantes procesados.`);
+    if (onRefresh) await onRefresh();
+  }
   async function loadPlayerPreds(uid) {
     setApSaved({}); setApPreds({});
     const { data } = await sb.from("predictions").select("match_id, home_score, away_score").eq("user_id", uid);
@@ -5590,6 +5636,19 @@ function AdminPanel({ matches, profiles, onRefresh }) {
       })()}
 
       <div className="admin-section">
+        <div className="admin-section-hdr" style={{ cursor: "pointer" }} onClick={() => toggleSec("optimg")}>
+          <h3>🗜️ OPTIMIZAR IMÁGENES {openSec === "optimg" ? "▴" : "▾"}</h3>
+        </div>
+        {openSec === "optimg" && <div className="admin-section-body">
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Comprime las fotos de todos los participantes (avatares y cromos) para bajar el consumo de datos. Es una sola vez. Hacelo con buena señal y no cierres la pantalla mientras corre.</p>
+          <button className="btn-small" onClick={optimizarImagenes} disabled={optim} style={{ background: "var(--gold-dim)", borderColor: "var(--gold)", color: "var(--gold)" }}>
+            {optim ? `Optimizando… ${optProg.done}/${optProg.total}` : "♻️ Optimizar todas las imágenes"}
+          </button>
+          {optMsg && <div style={{ fontSize: 12, color: "var(--green)", marginTop: 10 }}>{optMsg}</div>}
+        </div>}
+      </div>
+
+      <div className="admin-section">
         <div className="admin-section-hdr" style={{ cursor: "pointer" }} onClick={() => toggleSec("cargarpred")}>
           <h3>✍️ CARGAR PREDICCIONES POR JUGADOR {openSec === "cargarpred" ? "▴" : "▾"}</h3>
         </div>
@@ -5702,9 +5761,9 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
     const file = e.target.files[0];
     if (!file) return;
-    const ext = file.name.split('.').pop();
-    const path = `${prof.id}.${ext}`;
-    await sb.storage.from("avatars").upload(path, file, { upsert: true });
+    const blob = await compressImg(file, 400, 0.82);
+    const path = `${prof.id}-${Date.now()}.jpg`;
+    await sb.storage.from("avatars").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
     const { data: { publicUrl } } = sb.storage.from("avatars").getPublicUrl(path);
     await sb.from("profiles").update({ avatar_url: publicUrl }).eq("id", prof.id);
     onRefresh();
