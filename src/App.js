@@ -73,6 +73,22 @@ async function fetchAllPredictions(columns = "*") {
 
 // ─── World Cup 2026 Groups ────────────────────────────────────────────────────
 const FLAG = (code) => `https://flagcdn.com/24x18/${code}.png`;
+
+// Comprime una imagen (File o Blob) a JPEG redimensionado. Si algo falla, devuelve el original.
+async function compressImg(input, maxW = 512, quality = 0.82) {
+  try {
+    const bitmap = await createImageBitmap(input, { imageOrientation: "from-image" });
+    const scale = Math.min(1, maxW / bitmap.width);
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
+    if (bitmap.close) bitmap.close();
+    return blob || input;
+  } catch (e) { return input; }
+}
 const GROUPS = {
   A: [{ name: "México", flag: FLAG("mx") }, { name: "Sudáfrica", flag: FLAG("za") }, { name: "Corea del Sur", flag: FLAG("kr") }, { name: "Chequia", flag: FLAG("cz") }],
   B: [{ name: "Canadá", flag: FLAG("ca") }, { name: "Bosnia", flag: FLAG("ba") }, { name: "Qatar", flag: FLAG("qa") }, { name: "Suiza", flag: FLAG("ch") }],
@@ -5102,6 +5118,27 @@ function AdminPanel({ matches, profiles, onRefresh }) {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
   const [groupResults, setGroupResults] = useState({});
+  const [apPlayer, setApPlayer] = useState("");
+  const [apPreds, setApPreds] = useState({});
+  const [apSaving, setApSaving] = useState({});
+  const [apSaved, setApSaved] = useState({});
+  async function loadPlayerPreds(uid) {
+    setApSaved({}); setApPreds({});
+    const { data } = await sb.from("predictions").select("match_id, home_score, away_score").eq("user_id", uid);
+    const map = {};
+    (data || []).forEach(p => { map[p.match_id] = { home: p.home_score, away: p.away_score }; });
+    setApPreds(map);
+  }
+  async function savePlayerPred(m) {
+    const v = apPreds[m.id] || {};
+    if (v.home === undefined || v.away === undefined || v.home === "" || v.away === "") return;
+    setApSaving(s => ({ ...s, [m.id]: true }));
+    const { data, error } = await sb.rpc("admin_guardar_pred", { p_user: apPlayer, p_match: m.id, p_home: parseInt(v.home), p_away: parseInt(v.away) });
+    setApSaving(s => ({ ...s, [m.id]: false }));
+    if (error || !data || !data.ok) { alert((data && data.error) || (error && error.message) || "No se pudo guardar."); return; }
+    setApSaved(s => ({ ...s, [m.id]: true }));
+    if (onRefresh) onRefresh();
+  }
   const [savingGroupResults, setSavingGroupResults] = useState(false);
   const [groupResultsMsg, setGroupResultsMsg] = useState(null);
   const [calculatingPts, setCalculatingPts] = useState(false);
@@ -5551,6 +5588,57 @@ function AdminPanel({ matches, profiles, onRefresh }) {
           </div>
         );
       })()}
+
+      <div className="admin-section">
+        <div className="admin-section-hdr" style={{ cursor: "pointer" }} onClick={() => toggleSec("cargarpred")}>
+          <h3>✍️ CARGAR PREDICCIONES POR JUGADOR {openSec === "cargarpred" ? "▴" : "▾"}</h3>
+        </div>
+        {openSec === "cargarpred" && <div className="admin-section-body">
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>Elegí un jugador y cargá sus pronósticos (por ejemplo si te los pasó por mensaje). Se guardan <strong style={{ color: "var(--gold)" }}>a su nombre</strong>. Sirve también para partidos ya cerrados.</p>
+          <select value={apPlayer} onChange={e => { setApPlayer(e.target.value); if (e.target.value) loadPlayerPreds(e.target.value); }}
+            style={{ width: "100%", maxWidth: 360, padding: "9px 12px", borderRadius: 8, background: "var(--surface)", color: "var(--txt)", border: "1px solid var(--border)", fontSize: 14, marginBottom: 16 }}>
+            <option value="">— Elegí jugador —</option>
+            {[...profiles].sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {apPlayer && (() => {
+            const upcoming = (matches || []).filter(m => m.status !== "finished");
+            const byDate = {};
+            upcoming.forEach(m => { const d = m.match_date || new Date(m.kickoff_at).toISOString().slice(0, 10); (byDate[d] = byDate[d] || []).push(m); });
+            const dates = Object.keys(byDate).sort();
+            if (dates.length === 0) return <div style={{ fontSize: 13, color: "var(--muted)" }}>No hay partidos pendientes.</div>;
+            return dates.map(d => {
+              let label = d;
+              try { label = new Date(d + "T12:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" }); } catch (e) {}
+              return (
+                <div key={d} style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "var(--gold)", textTransform: "capitalize", marginBottom: 8 }}>{label}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {byDate[d].sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at)).map(m => {
+                      const v = apPreds[m.id] || {};
+                      return (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "var(--surface)", borderRadius: 8, padding: "8px 10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 120, justifyContent: "flex-end" }}>
+                            <span style={{ fontSize: 13, textAlign: "right" }}>{m.home}</span>
+                            <img src={m.home_flag} alt="" style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+                          </div>
+                          <input type="number" inputMode="numeric" value={v.home ?? ""} onChange={e => setApPreds(s => ({ ...s, [m.id]: { ...s[m.id], home: e.target.value } }))} style={{ width: 42, textAlign: "center", padding: "6px 4px", borderRadius: 6, background: "var(--bg)", color: "var(--txt)", border: "1px solid var(--border)", fontSize: 14 }} />
+                          <span style={{ color: "var(--muted)" }}>-</span>
+                          <input type="number" inputMode="numeric" value={v.away ?? ""} onChange={e => setApPreds(s => ({ ...s, [m.id]: { ...s[m.id], away: e.target.value } }))} style={{ width: 42, textAlign: "center", padding: "6px 4px", borderRadius: 6, background: "var(--bg)", color: "var(--txt)", border: "1px solid var(--border)", fontSize: 14 }} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 120 }}>
+                            <img src={m.away_flag} alt="" style={{ width: 20, height: 15, objectFit: "cover", borderRadius: 2, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13 }}>{m.away}</span>
+                          </div>
+                          <button className="btn-small" onClick={() => savePlayerPred(m)} disabled={apSaving[m.id]} style={apSaved[m.id] ? { background: "var(--green-dim)", borderColor: "var(--green)", color: "var(--green)" } : {}}>{apSaving[m.id] ? "..." : apSaved[m.id] ? "✓" : "Guardar"}</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>}
+      </div>
 
       <div className="admin-section">
         <div className="admin-section-hdr" style={{cursor:"pointer"}} onClick={()=>toggleSec("clasificados")}>
@@ -6284,6 +6372,9 @@ function Album({ user, profiles, allPredictions, isAdmin, onRefresh }) {
   const [showFotos, setShowFotos] = useState(false);
   const [subiendoId, setSubiendoId] = useState(null);
   const [fotoMsg, setFotoMsg] = useState("");
+  const [optim, setOptim] = useState(false);
+  const [optProg, setOptProg] = useState({ done: 0, total: 0 });
+  const [optMsg, setOptMsg] = useState("");
   useEffect(() => {
     (async () => {
       const { data } = await sb.from("album_cromos").select("cromo_id, cantidad").eq("user_id", user.id);
@@ -6299,9 +6390,9 @@ function Album({ user, profiles, allPredictions, isAdmin, onRefresh }) {
     setFotoMsg("");
     setSubiendoId(p.id);
     try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `cromos/${p.id}-${Date.now()}.${ext}`;
-      const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      const blob = await compressImg(file, 512, 0.82);
+      const path = `cromos/${p.id}-${Date.now()}.jpg`;
+      const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
       if (up.error) throw up.error;
       const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
       const { data, error } = await sb.rpc("set_cromo_foto", { p_user_id: p.id, p_url: pub.publicUrl });
@@ -6311,6 +6402,34 @@ function Album({ user, profiles, allPredictions, isAdmin, onRefresh }) {
       setFotoMsg("No se pudo subir la foto de " + (p.name || "") + ": " + (e.message || e));
     }
     setSubiendoId(null);
+  }
+
+  async function optimizarFotos() {
+    const conFoto = (profiles || []).filter(p => p.cromo_foto);
+    if (conFoto.length === 0) { setOptMsg("No hay fotos cargadas para optimizar."); return; }
+    setOptim(true); setOptMsg(""); setOptProg({ done: 0, total: conFoto.length });
+    let ok = 0, fail = 0;
+    for (let i = 0; i < conFoto.length; i++) {
+      const p = conFoto[i];
+      setOptProg({ done: i, total: conFoto.length });
+      try {
+        const resp = await fetch(p.cromo_foto, { cache: "no-store" });
+        if (!resp.ok) throw new Error("fetch");
+        const orig = await resp.blob();
+        const blob = await compressImg(orig, 512, 0.82);
+        const path = `cromos/opt-${p.id}-${Date.now()}.jpg`;
+        const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+        if (up.error) throw up.error;
+        const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
+        const { data, error } = await sb.rpc("set_cromo_foto", { p_user_id: p.id, p_url: pub.publicUrl });
+        if (error || !data || !data.ok) throw new Error("rpc");
+        ok++;
+      } catch (e) { fail++; }
+    }
+    setOptProg({ done: conFoto.length, total: conFoto.length });
+    setOptim(false);
+    setOptMsg(`Listo: ${ok} optimizadas${fail ? ` · ${fail} fallaron` : ""}.`);
+    if (onRefresh) await onRefresh();
   }
 
   const cromos = [...(profiles || [])].sort((a, b) => (a.cromo_numero || 999) - (b.cromo_numero || 999));
@@ -6342,6 +6461,13 @@ function Album({ user, profiles, allPredictions, isAdmin, onRefresh }) {
           </button>
           {showFotos && (<>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>Subí la foto de cada cromo. Si no cargás ninguna, se usa el avatar (o las iniciales).</div>
+            <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9 }}>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Comprimí de una todas las fotos ya subidas para bajar el consumo de datos. (Tardá unos segundos; no cierres la pantalla.)</div>
+              <button onClick={optimizarFotos} disabled={optim} style={{ padding: "8px 14px", borderRadius: 7, border: "1px solid var(--gold)", background: "var(--gold-dim)", color: "var(--gold)", fontSize: 13, fontWeight: 700, cursor: optim ? "wait" : "pointer" }}>
+                {optim ? `Optimizando… ${optProg.done}/${optProg.total}` : "♻️ Optimizar fotos existentes"}
+              </button>
+              {optMsg && <div style={{ fontSize: 12, color: "var(--green)", marginTop: 8 }}>{optMsg}</div>}
+            </div>
             {fotoMsg && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 8 }}>{fotoMsg}</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12, maxHeight: 420, overflowY: "auto" }}>
               {cromos.map(p => (
@@ -6619,9 +6745,9 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   // ── gestión admin ──
   async function subirImagen(file) {
     setSubiendo(true);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `poster_${Date.now()}.${ext}`;
-    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    const blob = await compressImg(file, 700, 0.82);
+    const path = `poster_${Date.now()}.jpg`;
+    const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
     if (up.error) { setSubiendo(false); setModal({ type: "error", msg: "No se pudo subir la imagen: " + up.error.message }); return; }
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setNuevo(n => ({ ...n, imagen_url: pub.publicUrl }));
@@ -6667,9 +6793,9 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
   }
   async function subirImagenEdit(file) {
     setEditSubiendo(true);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `item_${Date.now()}.${ext}`;
-    const up = await sb.storage.from("tienda").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+    const blob = await compressImg(file, 700, 0.82);
+    const path = `item_${Date.now()}.jpg`;
+    const up = await sb.storage.from("tienda").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
     if (up.error) { setEditSubiendo(false); setModal({ type: "error", msg: "No se pudo subir la imagen: " + up.error.message }); return; }
     const { data: pub } = sb.storage.from("tienda").getPublicUrl(path);
     setEditForm(f => ({ ...f, imagen_url: pub.publicUrl }));
