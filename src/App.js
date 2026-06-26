@@ -6132,6 +6132,25 @@ function MarketOfferPopup({ count, onGo, onClose }) {
   );
 }
 
+// ── Alerta in-app: racha diaria + sobre de regalo ganado ──────────────────────
+function StreakPopup({ streak, premio, onGo, onClose }) {
+  const tipoTxt = premio === "cinco" ? "un sobre de 5 cartas" : "un sobre triple";
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.78)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 46, marginBottom: 4 }}>🔥</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 27, color: "var(--gold)", letterSpacing: 1, marginBottom: 6 }}>¡Racha de {streak} {streak === 1 ? "día" : "días"}!</div>
+        <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Por mantener tu racha te ganaste <strong style={{ color: "var(--gold)" }}>{tipoTxt}</strong> de regalo. 🎁</p>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Te espera en Coleccionables → Sobres.</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Después</button>
+          <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Abrir ahora 🎁</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Última hora: popup que muestra una imagen a pantalla completa ──────────────
 function BreakingNewsPopup({ news, onClose }) {
   return (
@@ -8347,6 +8366,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const [profCol, setProfCol] = useState(null); // uid del coleccionista que estoy mirando
   const [saldos, setSaldos] = useState(null);
   const [wishTop, setWishTop] = useState([]);
+  const [me, setMe] = useState(null);
   const [miRar, setMiRar] = useState("todas");
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
@@ -8365,7 +8385,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -8375,6 +8395,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       sb.from("nft_wishlist").select("nft_id").eq("user_id", user.id),
       sb.rpc("estado_sobres"),
       sb.rpc("wishlist_top", { p_limit: 6 }),
+      sb.from("profiles").select("streak_days, gift_triple, gift_cinco").eq("id", user.id).maybeSingle(),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -8384,6 +8405,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     setWishlist((wRes.data || []).map(r => r.nft_id));
     setEst(eRes.data || null);
     setWishTop(tRes.data || []);
+    setMe(meRes.data || null);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -8416,6 +8438,19 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     setOpening(null);
     if (error || !data || !data.ok) {
       setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo abrir el sobre." });
+      return;
+    }
+    await loadAll();
+    if (onRefresh) onRefresh();
+    setReveal({ items: data.items || [], godpack: !!data.godpack, tipo });
+  }
+
+  async function abrirRegalo(tipo) {
+    setOpening("regalo-" + tipo);
+    const { data, error } = await sb.rpc("abrir_sobre_regalo", { p_tipo: tipo });
+    setOpening(null);
+    if (error || !data || !data.ok) {
+      setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo abrir el regalo." });
       return;
     }
     await loadAll();
@@ -8602,6 +8637,35 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
 
       {sub === "sobres" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {me && (me.streak_days > 0 || me.gift_triple > 0 || me.gift_cinco > 0) && (
+            <div className="card" style={{ position: "relative", overflow: "hidden", padding: 16, border: "1px solid rgba(245,183,49,.45)" }}>
+              <div style={{ position: "absolute", top: -40, right: -30, width: 130, height: 130, borderRadius: "50%", background: "#f5b731", filter: "blur(44px)", opacity: 0.22, pointerEvents: "none" }} />
+              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 30 }}>🔥</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)" }}>Racha de {me.streak_days} {me.streak_days === 1 ? "día" : "días"}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Entrá cada día para no perderla. Día par = 🎴 triple · múltiplo de 5 = 🎁 sobre de 5.</div>
+                </div>
+              </div>
+              {(me.gift_cinco > 0 || me.gift_triple > 0) && (
+                <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8, marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>🎁 Sobres de regalo</div>
+                  {me.gift_cinco > 0 && (
+                    <button onClick={() => abrirRegalo("cinco")} disabled={opening === "regalo-cinco"}
+                      style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-cinco" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-cinco" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-cinco" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>🎁 Sobre de 5 de regalo</span>{me.gift_cinco > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_cinco}</span>}
+                    </button>
+                  )}
+                  {me.gift_triple > 0 && (
+                    <button onClick={() => abrirRegalo("triple")} disabled={opening === "regalo-triple"}
+                      style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-triple" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-triple" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-triple" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>🎴 Sobre triple de regalo</span>{me.gift_triple > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_triple}</span>}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1, badge: "linear-gradient(160deg,#3b82f6,#1e3a8a)", glow: "#3b82f6", tint: "rgba(59,130,246,.16)" },
             { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar.", lim: 2, badge: "linear-gradient(160deg,#ec4899,#7c3aed)", glow: "#ec4899", tint: "rgba(236,72,153,.16)" }].map(pk => {
             const isTri = pk.tipo === "triple";
@@ -9266,6 +9330,19 @@ export default function App() {
   useEffect(() => {
     if (loaded && mercadoPend > 0 && !marketAlertShownRef.current) { marketAlertShownRef.current = true; setShowMarketAlert(true); }
   }, [loaded, mercadoPend]);
+  const [showStreak, setShowStreak] = useState(false);
+  const [streakData, setStreakData] = useState(null);
+  const rachaCheckedRef = React.useRef(false);
+  useEffect(() => {
+    if (!user || rachaCheckedRef.current) return;
+    rachaCheckedRef.current = true;
+    (async () => {
+      try {
+        const { data } = await sb.rpc("tocar_racha");
+        if (data && data.ok && data.premio && !data.ya) { setStreakData({ streak: data.streak, premio: data.premio }); setShowStreak(true); }
+      } catch (e) {}
+    })();
+  }, [user]);
   const [breakingNews, setBreakingNews] = useState(null);       // noticia activa (o null)
   const [showNews, setShowNews] = useState(false);
   const newsHandledRef = React.useRef(null);                     // id de noticia ya procesada en esta sesión
@@ -9821,6 +9898,9 @@ export default function App() {
         })()}
         {user && showMarketAlert && !showPredReminder && (
           <MarketOfferPopup count={mercadoPend} onGo={() => { goTab("coleccion"); setShowMarketAlert(false); }} onClose={() => setShowMarketAlert(false)} />
+        )}
+        {user && showStreak && streakData && !showPredReminder && !showMarketAlert && (
+          <StreakPopup streak={streakData.streak} premio={streakData.premio} onGo={() => { goTab("coleccion"); setShowStreak(false); }} onClose={() => setShowStreak(false)} />
         )}
         {user && showNews && !showDebtorOverlay && (
           <BreakingNewsPopup news={breakingNews} onClose={dismissNews} />
