@@ -460,7 +460,7 @@ input,button,select{font-family:inherit;}
 .nft-num-d{font-size:.62em;color:#c4d2ee;}
 .nft-num-leg{color:#fff;text-shadow:0 0 1.5cqw rgba(245,200,90,.9);}
 .nft-num-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
-.nftbig{width:min(74vw,320px);transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;transition:transform .12s ease-out;animation:nftFloat 6s ease-in-out infinite;will-change:transform;box-shadow:0 18px 50px rgba(0,0,0,.6);}
+.nftbig{width:min(74vw,320px);transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;transition:transform .12s ease-out;animation:nftFloat 6s ease-in-out infinite;will-change:transform;box-shadow:0 18px 50px rgba(0,0,0,.6);touch-action:none;cursor:grab;}
 @keyframes nftFloat{0%,100%{translate:0 0}50%{translate:0 -7px}}
 .nft-frame{position:absolute;inset:0;border-radius:14px;pointer-events:none;border:2px solid transparent;transition:.4s;}
 .nftbig.r-limited .nft-frame{border-color:rgba(200,215,240,.7);box-shadow:0 0 26px rgba(120,150,210,.45);}
@@ -487,18 +487,19 @@ input,button,select{font-family:inherit;}
 .nft-godray{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,rgba(245,200,90,.28),transparent 60%);pointer-events:none;animation:nftGod 2.4s ease-in-out infinite;}
 @keyframes nftGod{0%,100%{opacity:.5}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.nftbig,.nft-holo,.nft-sheen::after,.nftbig::before,.nft-spark,.nft-pop,.nft-godray{animation:none!important;}}
-/* ===== Cartas v254: brillo más fuerte + efectos también en grilla ===== */
+/* ===== Cartas v255: brillo en grilla, limited plateada, sin borde girando ===== */
 .nft-holo{background:repeating-linear-gradient(115deg,rgba(255,40,142,.5) 0%,rgba(255,210,63,.5) 12%,rgba(45,255,155,.5) 24%,rgba(45,181,255,.5) 36%,rgba(177,77,255,.5) 48%,rgba(255,40,142,.5) 60%);background-size:300% 300%;}
 .nftbig.r-legendary .nft-holo{opacity:.62;}
-.nftcard.r-legendary .nft-holo{opacity:.4;animation:nftHolo 4.5s linear infinite;}
+.nftcard.r-legendary .nft-holo{opacity:.42;animation:nftHolo 4.5s linear infinite;}
+.nftcard.r-legendary{animation:nftBreath 2.8s ease-in-out infinite;}
+@keyframes nftBreath{0%,100%{box-shadow:inset 0 0 0 2px rgba(245,217,122,.75),0 0 16px rgba(245,183,49,.45);}50%{box-shadow:inset 0 0 0 2px rgba(245,217,122,1),0 0 32px rgba(245,183,49,.85);}}
+.nftbig.r-limited .nft-holo{opacity:.42;filter:saturate(.4) brightness(1.18);animation:nftHolo 5s linear infinite;}
+.nftcard.r-limited .nft-holo{opacity:.3;filter:saturate(.4) brightness(1.18);animation:nftHolo 5s linear infinite;}
+.nftcard.r-limited{animation:nftBreathS 3.2s ease-in-out infinite;}
+@keyframes nftBreathS{0%,100%{box-shadow:inset 0 0 0 2px rgba(205,220,245,.7),0 0 14px rgba(130,160,220,.4);}50%{box-shadow:inset 0 0 0 2px rgba(230,238,255,1),0 0 28px rgba(150,180,235,.72);}}
 .nftcard.r-limited .nft-sheen,.nftcard.r-legendary .nft-sheen{opacity:1;}
 .nftcard .nft-spark{animation:nftTwinkle 2.1s ease-in-out infinite;}
-.nftcard.r-limited{box-shadow:inset 0 0 0 2px rgba(200,215,240,.75),0 0 16px rgba(120,150,210,.45);}
-.nftcard.r-legendary{animation:nftBreath 2.8s ease-in-out infinite;}
-@keyframes nftBreath{0%,100%{box-shadow:inset 0 0 0 2px rgba(245,217,122,.7),0 0 14px rgba(245,183,49,.4);}50%{box-shadow:inset 0 0 0 2px rgba(245,217,122,1),0 0 30px rgba(245,183,49,.78);}}
-.nft-goldborder{position:absolute;inset:0;border-radius:14px;padding:2px;pointer-events:none;background:conic-gradient(from 0deg,#f5d97a,#fff3c4,#d4a93a,#fff8d6,#f5d97a);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:nftSpin 4s linear infinite;}
-@keyframes nftSpin{to{transform:rotate(360deg);}}
-@media (prefers-reduced-motion:reduce){.nftcard.r-legendary,.nft-goldborder,.nftcard .nft-spark{animation:none!important;}}
+@media (prefers-reduced-motion:reduce){.nftcard.r-legendary,.nftcard.r-limited,.nftcard .nft-spark{animation:none!important;}}
 /* ===== Reveal: cartas volteadas + efectos por rareza ===== */
 .flipwrap{position:relative;perspective:1000px;cursor:pointer;aspect-ratio:1792/2400;}
 .flipinner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.7,.2,1);}
@@ -7388,11 +7389,10 @@ function NFTCard({ nft, edition = null, big = false }) {
   return (
     <div ref={ref} className={`${big ? "nftbig" : "nftcard"} ${rc}`} onPointerMove={onMove} onPointerLeave={onLeave} style={st}>
       <div className={big ? "nftbig-art" : "nftimg"} style={{ backgroundImage: `url(${nft.imagen_url})` }} />
-      {nft.rareza === "legendary" && <div className="nft-holo" />}
+      {nft.rareza !== "common" && <div className="nft-holo" />}
       {nft.rareza !== "common" && <div className="nft-sheen" />}
       {big && <div className="nft-glare" />}
       {nft.rareza !== "common" && [0, 1, 2, 3].map(i => <span key={i} className={`nft-spark s${i}`} />)}
-      {nft.rareza === "legendary" && <div className="nft-goldborder" />}
       <div className="nft-frame" />
       {nft.rareza === "limited" && edition != null && (() => {
         const ns = nft.num_size != null ? Number(nft.num_size) : 8;
