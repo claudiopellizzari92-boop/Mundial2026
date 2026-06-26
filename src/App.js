@@ -525,6 +525,24 @@ input,button,select{font-family:inherit;}
 .epic-word{position:absolute;left:0;right:0;top:15%;text-align:center;font-family:'Bebas Neue';font-size:46px;letter-spacing:5px;color:#f7e2a0;text-shadow:0 0 26px rgba(245,200,90,.95);animation:epicWord 1.7s ease-out forwards;}
 @keyframes epicWord{0%{transform:scale(.4);opacity:0}28%{transform:scale(1.12);opacity:1}82%{opacity:1}100%{transform:scale(1);opacity:0}}
 @media (prefers-reduced-motion:reduce){.flipinner{transition:none}.reveal-burst::after,.epic-flash,.epic-rays span,.epic-word{animation:none!important;display:none}}
+/* ===== Ceremonia de apertura: el sobre ===== */
+.pack-stage{display:flex;flex-direction:column;align-items:center;gap:16px;padding:10px 0 4px;}
+.pack{width:172px;height:236px;border-radius:16px;position:relative;cursor:pointer;overflow:hidden;border:2px solid rgba(255,255,255,.18);box-shadow:0 16px 40px rgba(0,0,0,.55);animation:packIdle 1.5s ease-in-out infinite;will-change:transform;}
+.pack-shine{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.4),transparent 42%);pointer-events:none;}
+.pack-label{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-family:'Bebas Neue',sans-serif;font-size:25px;letter-spacing:2px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.55);z-index:2;}
+.pack-top{position:absolute;left:-2px;right:-2px;top:0;height:34px;background:rgba(255,255,255,.16);border-bottom:2px dashed rgba(255,255,255,.5);}
+.pk-cinco{background:linear-gradient(160deg,#5b8def,#2a4db5 60%,#16285f);}
+.pk-triple{background:linear-gradient(160deg,#b06bf0,#7c2fc4 60%,#421a78);}
+.pk-god{background:linear-gradient(160deg,#ffe79a,#f5b400 55%,#9a6b00);border-color:rgba(255,240,180,.6);box-shadow:0 16px 50px rgba(245,183,49,.6);}
+@keyframes packIdle{0%,100%{transform:rotate(-1.5deg) translateY(0)}50%{transform:rotate(1.5deg) translateY(-4px)}}
+.pack.tear{animation:packShake .82s ease-in forwards;}
+@keyframes packShake{0%{transform:rotate(0) translateY(0)}15%{transform:rotate(-4deg)}30%{transform:rotate(4deg)}45%{transform:rotate(-6deg)}60%{transform:rotate(6deg) scale(1.04)}80%{transform:scale(1.1);opacity:1}100%{transform:scale(1.22);opacity:0}}
+.pack.tear .pack-top{animation:packLid .82s ease-in forwards;}
+@keyframes packLid{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(-64px) rotate(-14deg);opacity:0}}
+.pack-burst{position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%) scale(0);background:radial-gradient(circle,#fff,rgba(255,255,255,.55) 38%,transparent 70%);z-index:3;pointer-events:none;}
+.pack.tear .pack-burst{animation:packBurst .82s ease-out forwards;}
+@keyframes packBurst{0%{transform:translate(-50%,-50%) scale(0);opacity:0}40%{opacity:1}100%{transform:translate(-50%,-50%) scale(36);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pack,.pack.tear,.pack.tear .pack-top,.pack.tear .pack-burst{animation:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7512,13 +7530,22 @@ function CardBack() {
 }
 
 // ── Modal de apertura de sobre con volteo + animaciones por rareza ────────────
-function RevealModal({ items, godpack, onClose }) {
+function RevealModal({ items, godpack, tipo, onClose }) {
   const [flipped, setFlipped] = useState(() => items.map(() => false));
   const [epic, setEpic] = useState(false);
   const [big, setBig] = useState(null);
+  const [phase, setPhase] = useState(items.length ? "pack" : "cards");
+  const [tearing, setTearing] = useState(false);
   const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
+  const packType = godpack ? "god" : (tipo === "triple" ? "triple" : "cinco");
 
-  function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); }
+  function openPack() {
+    if (tearing) return;
+    setTearing(true);
+    try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70] : 30); } catch (e) {}
+    setTimeout(() => setPhase("cards"), 820);
+  }
+  function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
   function flip(i) {
     setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
     if (items[i] && items[i].rareza === "legendary") fireEpic();
@@ -7534,7 +7561,7 @@ function RevealModal({ items, godpack, onClose }) {
 
   return (
     <>
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
+    <div onClick={phase === "cards" ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
       {godpack && <div className="nft-godray" />}
       {epic && (
         <div className="epic-overlay">
@@ -7544,6 +7571,17 @@ function RevealModal({ items, godpack, onClose }) {
         </div>
       )}
       <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 540, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 3 }}>
+        {phase === "pack" ? (
+          <div className="pack-stage">
+            <div className={`pack pk-${packType}${tearing ? " tear" : ""}`} onClick={openPack}>
+              <div className="pack-shine" />
+              <div className="pack-label">{godpack ? "GOD PACK" : tipo === "triple" ? "TRIPLE" : "SOBRE"}</div>
+              <div className="pack-top" />
+              <div className="pack-burst" />
+            </div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{tearing ? "¡Abriendo!" : "Tocá el sobre para abrir 👆"}</div>
+          </div>
+        ) : (<>
         {godpack && <div style={{ fontFamily: "Bebas Neue", fontSize: 30, color: "var(--gold)", letterSpacing: 2, textShadow: "0 0 16px rgba(245,200,90,.7)" }}>✨ GOD PACK ✨</div>}
         <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 16 }}>{allFlipped ? "Tocá una carta para verla en grande" : "Tocá las cartas para revelarlas"}</div>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
@@ -7571,6 +7609,7 @@ function RevealModal({ items, godpack, onClose }) {
           {!allFlipped && <button onClick={flipAll} style={{ padding: "9px 20px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--txt)", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Dar vuelta todas</button>}
           {allFlipped && <button onClick={onClose} style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>¡Joya!</button>}
         </div>
+        </>)}
       </div>
     </div>
     {big && (
@@ -8158,7 +8197,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     }
     await loadAll();
     if (onRefresh) onRefresh();
-    setReveal({ items: data.items || [], godpack: !!data.godpack });
+    setReveal({ items: data.items || [], godpack: !!data.godpack, tipo });
   }
 
   // ── admin ──
@@ -8747,7 +8786,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       })()}
 
       {/* Reveal de sobre (cartas volteadas) */}
-      {reveal && <RevealModal items={reveal.items} godpack={reveal.godpack} onClose={() => setReveal(null)} />}
+      {reveal && <RevealModal items={reveal.items} godpack={reveal.godpack} tipo={reveal.tipo} onClose={() => setReveal(null)} />}
 
       {/* Detalle de carta */}
       {/* perfil de coleccionista (al tocar una fila del ranking) */}
