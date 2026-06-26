@@ -575,6 +575,22 @@ input,button,select{font-family:inherit;}
 .god-sub{position:relative;margin-top:6px;font-size:15px;font-weight:800;letter-spacing:2px;color:#f5d97a;text-shadow:0 0 12px rgba(245,200,90,.85);animation:godSub 2.4s ease-out forwards;}
 @keyframes godSub{0%,15%{opacity:0}30%{opacity:1}82%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.god-flash,.god-rays,.god-rays span,.god-title,.god-sub{animation:none!important;}}
+/* ===== Casi legendary: suspenso + resolución limited ===== */
+.suspense-overlay{position:fixed;inset:0;z-index:7;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.suspense-aura{position:absolute;width:40vh;height:40vh;border-radius:50%;background:radial-gradient(circle,rgba(245,205,95,.85),rgba(245,183,49,.3) 45%,transparent 70%);filter:blur(20px);animation:suspGrow 1.15s ease-in forwards;}
+@keyframes suspGrow{0%{transform:scale(.2);opacity:0}25%{opacity:.7}100%{transform:scale(1.9);opacity:1}}
+.suspense-rays{position:absolute;left:50%;top:50%;animation:suspSpin 1.15s linear;}
+.suspense-rays span{position:absolute;left:0;top:0;width:5px;height:60vh;margin-left:-2.5px;transform-origin:top center;background:linear-gradient(rgba(245,210,110,0),rgba(245,215,120,.5),rgba(245,210,110,0));animation:suspRay 1.15s ease-in forwards;}
+@keyframes suspSpin{from{transform:rotate(0)}to{transform:rotate(210deg)}}
+@keyframes suspRay{0%{opacity:0}40%{opacity:.6}100%{opacity:.9}}
+.suspense-q{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,20vw,110px);color:#fff3c4;text-shadow:0 0 30px rgba(245,200,90,1);animation:suspQ 1.15s ease-in-out forwards;}
+@keyframes suspQ{0%{transform:scale(.5);opacity:0}30%{opacity:1}80%{transform:scale(1.1)}100%{transform:scale(1.25);opacity:.85}}
+.near-overlay{position:fixed;inset:0;z-index:8;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+.near-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(200,220,255,.55),transparent 62%);animation:nearFlash 1.4s ease-out forwards;}
+@keyframes nearFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+.near-word{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,13vw,72px);letter-spacing:4px;color:#dfeaff;text-shadow:0 0 26px rgba(150,190,255,.9);animation:nearWord 1.4s cubic-bezier(.2,.8,.2,1) forwards;}
+@keyframes nearWord{0%{transform:scale(.4);opacity:0}20%{transform:scale(1.12);opacity:1}32%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:scale(1.04)}}
+@media (prefers-reduced-motion:reduce){.suspense-aura,.suspense-rays,.suspense-rays span,.suspense-q,.near-flash,.near-word{animation:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7636,6 +7652,31 @@ function playLegendary() {
   const g2 = ac.createGain(); g2.gain.setValueAtTime(0.0001, t + 0.22); g2.gain.exponentialRampToValueAtTime(0.11, t + 0.32); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
   o2.connect(g2); g2.connect(ac.destination); o2.start(t + 0.22); o2.stop(t + 1.35);
 }
+function playSuspense() {
+  if (!_sndOn()) return;
+  const ac = _audio(); if (!ac) return;
+  const t = ac.currentTime, dur = 1.1;
+  const o = ac.createOscillator(); o.type = "sawtooth";
+  o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(900, t + dur);
+  const lfo = ac.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 14;
+  const lfoG = ac.createGain(); lfoG.gain.value = 30; lfo.connect(lfoG); lfoG.connect(o.frequency);
+  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11, t + 0.1); g.gain.setValueAtTime(0.11, t + dur - 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1600;
+  o.connect(lp); lp.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur); lfo.start(t); lfo.stop(t + dur);
+}
+function playNear() {
+  if (!_sndOn()) return;
+  const ac = _audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const notes = [659.25, 523.25];
+  notes.forEach(function (f, i) {
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const g = ac.createGain(); const st = t + i * 0.13;
+    g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.2, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.5);
+    o.connect(g); g.connect(ac.destination); o.start(st); o.stop(st + 0.55);
+  });
+}
 
 function RevealModal({ items, godpack, tipo, onClose }) {
   const [flipped, setFlipped] = useState(() => items.map(() => false));
@@ -7644,6 +7685,8 @@ function RevealModal({ items, godpack, tipo, onClose }) {
   const [phase, setPhase] = useState(items.length ? "pack" : "cards");
   const [tearing, setTearing] = useState(false);
   const [confetti, setConfetti] = useState(false);
+  const [suspense, setSuspense] = useState(null);
+  const [near, setNear] = useState(false);
   const [mute, setMute] = useState(() => { try { return localStorage.getItem("snd_off") === "1"; } catch (e) { return false; } });
   const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
   const packType = godpack ? "god" : (tipo === "triple" ? "triple" : "cinco");
@@ -7666,16 +7709,38 @@ function RevealModal({ items, godpack, tipo, onClose }) {
     try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70, 40, 130] : 30); } catch (e) {}
   }
   function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); fireConfetti(); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
+  function fireNear() { setNear(false); requestAnimationFrame(() => setNear(true)); setTimeout(() => setNear(false), 1400); try { if (navigator.vibrate) navigator.vibrate([0, 25, 30, 25]); } catch (e) {} }
+  function doFlip(i) { setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; }); }
+  function revealResolve(i) {
+    setSuspense(null);
+    doFlip(i);
+    const it = items[i];
+    if (it && it.rareza === "legendary") { fireEpic(); playLegendary(); }
+    else if (it && it.rareza === "limited") { fireNear(); playNear(); }
+  }
   function flip(i) {
-    setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
-    if (items[i] && items[i].rareza === "legendary") { fireEpic(); playLegendary(); } else playFlip();
+    if (flipped[i] || suspense != null) return;
+    const it = items[i];
+    if (it && (it.rareza === "legendary" || it.rareza === "limited")) {
+      setSuspense(i);
+      playSuspense();
+      try { if (navigator.vibrate) navigator.vibrate([0, 12, 50, 12]); } catch (e) {}
+      setTimeout(() => revealResolve(i), 1150);
+    } else {
+      doFlip(i);
+      playFlip();
+    }
   }
   function clickCard(i) {
+    if (suspense != null) return;
     if (flipped[i]) setBig(items[i]); else flip(i);
   }
   function flipAll() {
+    if (suspense != null) return;
     setFlipped(items.map(() => true));
-    if (items.some(it => it.rareza === "legendary")) { fireEpic(); playLegendary(); } else playFlip();
+    if (items.some(it => it.rareza === "legendary")) { fireEpic(); playLegendary(); }
+    else if (items.some(it => it.rareza === "limited")) { fireNear(); playNear(); }
+    else playFlip();
   }
   const allFlipped = flipped.every(Boolean);
 
@@ -7697,6 +7762,19 @@ function RevealModal({ items, godpack, tipo, onClose }) {
           <div className="epic-flash" />
           <div className="epic-rays">{[...Array(12)].map((_, i) => <span key={i} style={{ transform: `rotate(${i * 30}deg)` }} />)}</div>
           <div className="epic-word">¡LEGENDARY!</div>
+        </div>
+      )}
+      {suspense != null && (
+        <div className="suspense-overlay">
+          <div className="suspense-aura" />
+          <div className="suspense-rays">{[...Array(12)].map((_, i) => <span key={i} style={{ transform: `rotate(${i * 30}deg)` }} />)}</div>
+          <div className="suspense-q">?</div>
+        </div>
+      )}
+      {near && (
+        <div className="near-overlay">
+          <div className="near-flash" />
+          <div className="near-word">¡LIMITED!</div>
         </div>
       )}
       {phase === "god" && (
