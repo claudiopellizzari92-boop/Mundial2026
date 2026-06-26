@@ -8072,12 +8072,13 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const [profCol, setProfCol] = useState(null); // uid del coleccionista que estoy mirando
   const [saldos, setSaldos] = useState(null);
   const [wishTop, setWishTop] = useState([]);
+  const [miRar, setMiRar] = useState("todas");
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
     setLoadingSaldos(true);
     const { data, error } = await sb.rpc("saldos_todos");
     setLoadingSaldos(false);
-    if (error) { setModal({ msg: "No se pudieron cargar los saldos." }); return; }
+    if (error) { setModal({ msg: "Error saldos: " + (error.message || "") + " | " + (error.code || "") + " | " + (error.details || "") + " | " + (error.hint || "") }); return; }
     setSaldos(data || []);
   }
   const [nftReacts, setNftReacts] = useState([]);
@@ -8400,8 +8401,19 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
                 );
               })()}
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>⭐ Tocá la estrella para destacar hasta 3 cartas en tu perfil ({featured.length}/3).</div>
+              {(() => {
+                const cnt = (r) => mineList.filter(m => m.nft.rareza === r).length;
+                const tabs = [["todas", "Todas", mineList.length], ["common", "Comunes", cnt("common")], ["limited", "Limited", cnt("limited")], ["legendary", "Legendary", cnt("legendary")]];
+                return (
+                  <div className="pre-tabs" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+                    {tabs.map(([k, l, n]) => (
+                      <button key={k} className={`pre-tab ${miRar === k ? "active" : ""}`} onClick={() => setMiRar(k)}>{l} ({n})</button>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="nftgrid">
-                {mineList.map(m => (
+                {(miRar === "todas" ? mineList : mineList.filter(m => m.nft.rareza === miRar)).map(m => (
                   <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer", position: "relative" }}>
                     <NFTCard nft={m.nft} edition={m.eds[0]} />
                     <button onClick={(e) => { e.stopPropagation(); toggleFeatured(m.nft); }} title="Destacar en tu perfil"
