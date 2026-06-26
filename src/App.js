@@ -577,13 +577,13 @@ input,button,select{font-family:inherit;}
 @media (prefers-reduced-motion:reduce){.god-flash,.god-rays,.god-rays span,.god-title,.god-sub{animation:none!important;}}
 /* ===== Casi legendary: suspenso + resolución limited ===== */
 .suspense-overlay{position:fixed;inset:0;z-index:7;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-.suspense-aura{position:absolute;width:40vh;height:40vh;border-radius:50%;background:radial-gradient(circle,rgba(245,205,95,.85),rgba(245,183,49,.3) 45%,transparent 70%);filter:blur(20px);animation:suspGrow 1.15s ease-in forwards;}
+.suspense-aura{position:absolute;width:40vh;height:40vh;border-radius:50%;background:radial-gradient(circle,rgba(245,205,95,.85),rgba(245,183,49,.3) 45%,transparent 70%);filter:blur(20px);animation:suspGrow 2s ease-in forwards;}
 @keyframes suspGrow{0%{transform:scale(.2);opacity:0}25%{opacity:.7}100%{transform:scale(1.9);opacity:1}}
-.suspense-rays{position:absolute;left:50%;top:50%;animation:suspSpin 1.15s linear;}
-.suspense-rays span{position:absolute;left:0;top:0;width:5px;height:60vh;margin-left:-2.5px;transform-origin:top center;background:linear-gradient(rgba(245,210,110,0),rgba(245,215,120,.5),rgba(245,210,110,0));animation:suspRay 1.15s ease-in forwards;}
+.suspense-rays{position:absolute;left:50%;top:50%;animation:suspSpin 2s linear;}
+.suspense-rays span{position:absolute;left:0;top:0;width:5px;height:60vh;margin-left:-2.5px;transform-origin:top center;background:linear-gradient(rgba(245,210,110,0),rgba(245,215,120,.5),rgba(245,210,110,0));animation:suspRay 2s ease-in forwards;}
 @keyframes suspSpin{from{transform:rotate(0)}to{transform:rotate(210deg)}}
 @keyframes suspRay{0%{opacity:0}40%{opacity:.6}100%{opacity:.9}}
-.suspense-q{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,20vw,110px);color:#fff3c4;text-shadow:0 0 30px rgba(245,200,90,1);animation:suspQ 1.15s ease-in-out forwards;}
+.suspense-q{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,20vw,110px);color:#fff3c4;text-shadow:0 0 30px rgba(245,200,90,1);animation:suspQ 2s ease-in-out forwards;}
 @keyframes suspQ{0%{transform:scale(.5);opacity:0}30%{opacity:1}80%{transform:scale(1.1)}100%{transform:scale(1.25);opacity:.85}}
 .near-overlay{position:fixed;inset:0;z-index:8;pointer-events:none;display:flex;align-items:center;justify-content:center;}
 .near-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(200,220,255,.55),transparent 62%);animation:nearFlash 1.4s ease-out forwards;}
@@ -7655,7 +7655,7 @@ function playLegendary() {
 function playSuspense() {
   if (!_sndOn()) return;
   const ac = _audio(); if (!ac) return;
-  const t = ac.currentTime, dur = 1.1;
+  const t = ac.currentTime, dur = 2.0;
   const o = ac.createOscillator(); o.type = "sawtooth";
   o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(900, t + dur);
   const lfo = ac.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 14;
@@ -7725,7 +7725,7 @@ function RevealModal({ items, godpack, tipo, onClose }) {
       setSuspense(i);
       playSuspense();
       try { if (navigator.vibrate) navigator.vibrate([0, 12, 50, 12]); } catch (e) {}
-      setTimeout(() => revealResolve(i), 1150);
+      setTimeout(() => revealResolve(i), 2000);
     } else {
       doFlip(i);
       playFlip();
