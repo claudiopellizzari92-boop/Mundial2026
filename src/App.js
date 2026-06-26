@@ -543,6 +543,19 @@ input,button,select{font-family:inherit;}
 .pack.tear .pack-burst{animation:packBurst .82s ease-out forwards;}
 @keyframes packBurst{0%{transform:translate(-50%,-50%) scale(0);opacity:0}40%{opacity:1}100%{transform:translate(-50%,-50%) scale(36);opacity:0}}
 @media (prefers-reduced-motion:reduce){.pack,.pack.tear,.pack.tear .pack-top,.pack.tear .pack-burst{animation:none!important;}}
+/* ===== Suspenso: el dorso brilla según rareza (antes de revelar) ===== */
+.flipwrap{z-index:0;}
+.flipwrap .flipinner{z-index:1;}
+.flipwrap::before{content:"";position:absolute;inset:-3px;border-radius:17px;z-index:0;opacity:0;pointer-events:none;transition:opacity .4s;}
+.flipwrap.back-limited:not(.done)::before{opacity:1;animation:backPulseS 1.5s ease-in-out infinite;}
+.flipwrap.back-legendary:not(.done)::before{opacity:1;animation:backPulse 1.2s ease-in-out infinite;}
+@keyframes backPulseS{0%,100%{box-shadow:0 0 13px 1px rgba(150,190,255,.5)}50%{box-shadow:0 0 26px 5px rgba(150,190,255,.9)}}
+@keyframes backPulse{0%,100%{box-shadow:0 0 16px 2px rgba(245,200,90,.55)}50%{box-shadow:0 0 36px 8px rgba(245,200,90,1)}}
+/* ===== Confeti dorado (legendary / god pack) ===== */
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
+.confetti span{position:absolute;top:-7%;border-radius:2px;opacity:0;animation-name:confettiFall;animation-timing-function:cubic-bezier(.3,.6,.5,1);animation-fill-mode:forwards;}
+@keyframes confettiFall{0%{transform:translateY(0) rotate(0);opacity:0}10%{opacity:1}100%{transform:translateY(108vh) rotate(560deg);opacity:.9}}
+@media (prefers-reduced-motion:reduce){.flipwrap::before,.confetti{display:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7516,13 +7529,14 @@ function PackIcon({ variant }) {
 const rarRank = { legendary: 0, limited: 1, common: 2 };
 
 // ── Dorso de carta (boca abajo) ───────────────────────────────────────────────
-function CardBack() {
+function CardBack({ rareza }) {
+  const col = rareza === "limited" ? "190,215,255" : "245,217,122";
   return (
     <div className="cardback">
       <svg viewBox="0 0 100 133.93" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-        <circle cx="50" cy="50" r="19" fill="none" stroke="rgba(245,217,122,.7)" strokeWidth="1.1" />
-        <text x="50" y="50.5" textAnchor="middle" dominantBaseline="central" fontFamily="'Bebas Neue',sans-serif" fontSize="24" fill="#f5d97a">?</text>
-        <text x="50" y="84" textAnchor="middle" fontFamily="'Bebas Neue',sans-serif" fontSize="6.5" letterSpacing="1.2" fill="rgba(245,217,122,.85)">QUINIELA MUNDIAL</text>
+        <circle cx="50" cy="50" r="19" fill="none" stroke={`rgba(${col},.7)`} strokeWidth="1.1" />
+        <text x="50" y="50.5" textAnchor="middle" dominantBaseline="central" fontFamily="'Bebas Neue',sans-serif" fontSize="24" fill={`rgb(${col})`}>?</text>
+        <text x="50" y="84" textAnchor="middle" fontFamily="'Bebas Neue',sans-serif" fontSize="6.5" letterSpacing="1.2" fill={`rgba(${col},.85)`}>QUINIELA MUNDIAL</text>
         <text x="50" y="122" textAnchor="middle" fontFamily="sans-serif" fontSize="4.6" fill="rgba(255,255,255,.5)">Tocá para revelar</text>
       </svg>
     </div>
@@ -7582,20 +7596,22 @@ function RevealModal({ items, godpack, tipo, onClose }) {
   const [big, setBig] = useState(null);
   const [phase, setPhase] = useState(items.length ? "pack" : "cards");
   const [tearing, setTearing] = useState(false);
+  const [confetti, setConfetti] = useState(false);
   const [mute, setMute] = useState(() => { try { return localStorage.getItem("snd_off") === "1"; } catch (e) { return false; } });
   const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
   const packType = godpack ? "god" : (tipo === "triple" ? "triple" : "cinco");
 
+  function fireConfetti() { setConfetti(false); requestAnimationFrame(() => setConfetti(true)); setTimeout(() => setConfetti(false), 2200); }
   function toggleMute() { const nv = !mute; setMute(nv); try { localStorage.setItem("snd_off", nv ? "1" : "0"); } catch (e) {} }
   function openPack() {
     if (tearing) return;
     setTearing(true);
     playTear();
-    if (godpack) setTimeout(playLegendary, 380);
+    if (godpack) { setTimeout(playLegendary, 380); setTimeout(fireConfetti, 360); }
     try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70] : 30); } catch (e) {}
     setTimeout(() => setPhase("cards"), 820);
   }
-  function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
+  function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); fireConfetti(); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
   function flip(i) {
     setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
     if (items[i] && items[i].rareza === "legendary") { fireEpic(); playLegendary(); } else playFlip();
@@ -7613,6 +7629,15 @@ function RevealModal({ items, godpack, tipo, onClose }) {
     <>
     <div onClick={phase === "cards" ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 18 }}>
       {godpack && <div className="nft-godray" />}
+      {confetti && (
+        <div className="confetti">
+          {[...Array(34)].map((_, i) => {
+            const cols = ["#f5d97a", "#fff3c4", "#ffd23f", "#ffffff", "#e8b94a"];
+            const sz = 6 + Math.random() * 5;
+            return <span key={i} style={{ left: (Math.random() * 100).toFixed(1) + "%", width: sz.toFixed(1) + "px", height: (sz * 1.6).toFixed(1) + "px", background: cols[i % cols.length], animationDelay: (Math.random() * 0.35).toFixed(2) + "s", animationDuration: (1.3 + Math.random() * 0.9).toFixed(2) + "s" }} />;
+          })}
+        </div>
+      )}
       {epic && (
         <div className="epic-overlay">
           <div className="epic-flash" />
@@ -7638,9 +7663,9 @@ function RevealModal({ items, godpack, tipo, onClose }) {
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           {items.map((it, i) => (
             <div key={i} style={{ width: w }}>
-              <div className={`flipwrap ${flipped[i] ? "done" : ""}`} onClick={() => clickCard(i)}>
+              <div className={`flipwrap back-${it.rareza} ${flipped[i] ? "done" : ""}`} onClick={() => clickCard(i)}>
                 <div className={`flipinner ${flipped[i] ? "flipped" : ""}`}>
-                  <div className="flipface"><CardBack /></div>
+                  <div className="flipface"><CardBack rareza={it.rareza} /></div>
                   <div className="flipface flipfront-nft">
                     <NFTCard nft={it} edition={it.rareza === "limited" ? it.edition : null} />
                     {flipped[i] && it.rareza !== "common" && <div className={`reveal-burst burst-${it.rareza}`} />}
