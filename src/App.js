@@ -6098,6 +6098,24 @@ function PredReminderPopup({ reminder, onGo, onClose, onSnooze }) {
   );
 }
 
+// ── Alerta in-app: ofertas pendientes en el mercado ───────────────────────────
+function MarketOfferPopup({ count, onGo, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--card)", border: "1px solid var(--gold)", borderRadius: 16, maxWidth: 360, width: "100%", padding: "26px 22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 42, marginBottom: 6 }}>📨</div>
+        <div style={{ fontFamily: "Bebas Neue", fontSize: 25, color: "var(--gold)", letterSpacing: 1, marginBottom: 8 }}>¡Tenés movimientos!</div>
+        <p style={{ fontSize: 14, color: "var(--txt)", lineHeight: 1.5, marginBottom: 6 }}>Tenés <strong style={{ color: "var(--gold)" }}>{count}</strong> {count === 1 ? "novedad" : "novedades"} en el mercado de cartas.</p>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Entrá a revisar las ofertas y decidí si aceptás.</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Más tarde</button>
+          <button onClick={onGo} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "var(--gold)", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ver mercado 🃏</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Última hora: popup que muestra una imagen a pantalla completa ──────────────
 function BreakingNewsPopup({ news, onClose }) {
   return (
@@ -7802,9 +7820,14 @@ function Trades({ user, nfts, owned, allOwned, profiles, saldo, isAdmin, onRefre
     const { data, error } = await sb.rpc("hacer_oferta", { p_trade_id: offerModal.id, p_offer_owned_id: offerCard ? offerCard.owned_id : null, p_petros: p });
     setBusy(false);
     if (error || !data || !data.ok) { setMsg((data && data.error) || (error && error.message) || "No se pudo ofertar."); return; }
+    const ownerId = offerModal.from_user;
     setOfferModal(null); setOfferCard(null); setOfferPetros("");
     await loadTrades(); if (onRefresh) onRefresh();
     setMsg("📨 ¡Oferta enviada! Esperá que la acepten.");
+    if (ownerId && ownerId !== user.id) {
+      const myName = (profiles.find(p => p.id === user.id) || {}).name || "Alguien";
+      sendPushNotification("users", [ownerId], { title: "📨 ¡Nueva oferta por tu carta!", body: `${myName} te hizo una oferta en el mercado. Entrá a verla.`, tag: `oferta-${Date.now()}`, url: "/" });
+    }
   }
   async function aceptar(offerId) {
     setBusy(true);
@@ -9160,6 +9183,11 @@ export default function App() {
   const [showDebtorVideo, setShowDebtorVideo] = useState(false);
   const [debtorVideoIndex, setDebtorVideoIndex] = useState(0);
   const [showPredReminder, setShowPredReminder] = useState(false);
+  const [showMarketAlert, setShowMarketAlert] = useState(false);
+  const marketAlertShownRef = React.useRef(false);
+  useEffect(() => {
+    if (loaded && mercadoPend > 0 && !marketAlertShownRef.current) { marketAlertShownRef.current = true; setShowMarketAlert(true); }
+  }, [loaded, mercadoPend]);
   const [breakingNews, setBreakingNews] = useState(null);       // noticia activa (o null)
   const [showNews, setShowNews] = useState(false);
   const newsHandledRef = React.useRef(null);                     // id de noticia ya procesada en esta sesión
@@ -9698,6 +9726,9 @@ export default function App() {
           const r = getPendingPredReminder(matches, allPredictions, user.id);
           return r ? <PredReminderPopup reminder={r} onGo={() => { goTab("predicciones"); setShowPredReminder(false); }} onClose={() => setShowPredReminder(false)} onSnooze={(date, until) => { snoozePredReminder(date, until); setShowPredReminder(false); }} /> : null;
         })()}
+        {user && showMarketAlert && !showPredReminder && (
+          <MarketOfferPopup count={mercadoPend} onGo={() => { goTab("coleccion"); setShowMarketAlert(false); }} onClose={() => setShowMarketAlert(false)} />
+        )}
         {user && showNews && !showDebtorOverlay && (
           <BreakingNewsPopup news={breakingNews} onClose={dismissNews} />
         )}
