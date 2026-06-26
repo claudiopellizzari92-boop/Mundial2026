@@ -2940,7 +2940,7 @@ function shareCanvas(canvas, filename, shareText) {
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ user, matches, predictions, onGoTab, achievements, equippedBadge, onEquip }) {
+function Dashboard({ user, matches, predictions, onGoTab, onGoCompare, achievements, equippedBadge, onEquip }) {
   const [ultimaCronica, setUltimaCronica] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // día elegido en el bloque "Tus pronósticos"
   const [myWc, setMyWc] = useState([]);
@@ -3101,7 +3101,7 @@ function Dashboard({ user, matches, predictions, onGoTab, achievements, equipped
             const ptsColor = pts > 0 ? "var(--green)" : pts < 0 ? "var(--red)" : "var(--muted)";
             const ptsBg = pts > 0 ? "var(--green-dim)" : pts < 0 ? "var(--red-dim)" : "var(--surface)";
             return (
-              <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--surface)",borderRadius:8}}>
+              <div key={m.id} onClick={()=>onGoCompare && onGoCompare(m.id)} title="Ver qué pronosticó cada uno" style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--surface)",borderRadius:8,cursor:"pointer"}}>
                 <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"flex-end",gap:6,fontSize:13,color:"var(--txt)"}}>
                   <span style={{textAlign:"right"}}>{m.home}</span>
                   <img src={m.home_flag} alt={m.home} style={{width:20,height:15,objectFit:"cover",borderRadius:2,flexShrink:0}}/>
@@ -4490,7 +4490,7 @@ function PreTournamentCompare({ user, profiles }) {
   );
 }
 
-function Compare({ user, matches, allPredictions, profiles }) {
+function Compare({ user, matches, allPredictions, profiles, autoOpenMatchId, onAutoOpened }) {
   const [now, setNow] = useState(new Date());
   const [expanded, setExpanded] = useState({});
   const [reactions, setReactions] = useState({});
@@ -4562,6 +4562,16 @@ function Compare({ user, matches, allPredictions, profiles }) {
   const firstUnlockedDay = allDays.find(d => !byDay[d].some(m => isLocked(m.kickoff_at, matches, m.match_date)));
   const defaultDay = todayDay || lastLockedDay || firstUnlockedDay || allDays[0];
   const [activeDay, setActiveDay] = useState(null);
+  useEffect(() => {
+    if (!autoOpenMatchId) return;
+    const targetDay = allDays.find(d => (byDay[d] || []).some(m => m.id === autoOpenMatchId));
+    setView("partidos");
+    if (targetDay) setActiveDay(targetDay);
+    setExpanded(prev => ({ ...prev, [autoOpenMatchId]: true }));
+    const id = autoOpenMatchId;
+    setTimeout(() => { const el = document.getElementById("cmp-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 280);
+    if (onAutoOpened) onAutoOpened();
+  }, [autoOpenMatchId]);
   const dayBarRef = React.useRef(null);
 
   useEffect(() => {
@@ -4678,7 +4688,7 @@ function Compare({ user, matches, allPredictions, profiles }) {
             const iPredicted = matchPreds.some(p => p.user_id === user.id);
             const canSee = iPredicted || matchPreds.length > 0;
             return (
-              <div key={m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
+              <div key={m.id} id={"cmp-" + m.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r)", overflow: "hidden" }}>
                 <div onClick={() => toggleExpand(m.id)} style={{ padding: "12px 16px", background: "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="group-badge">{m.group_name ? `Grupo ${m.group_name}` : m.phase}</span>
@@ -9139,7 +9149,9 @@ export default function App() {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileToOpen, setProfileToOpen] = useState(null);
+  const [compareMatchId, setCompareMatchId] = useState(null);
   function openMyProfile() { setProfileToOpen(user.id); goTab("standings"); }
+  function goToCompare(matchId) { setCompareMatchId(matchId); goTab("compare"); }
   const [notifStatus, setNotifStatus] = useState("idle"); // idle | requesting | granted | denied | unsupported
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
   const [notifDebug, setNotifDebug] = useState("");
@@ -9656,10 +9668,10 @@ export default function App() {
       </div>
       <main className="main">
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
-        {tab==="home"      && (loaded ? <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/> : <SkeletonDashboard/>)}
+        {tab==="home"      && (loaded ? <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} onGoCompare={goToCompare} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/> : <SkeletonDashboard/>)}
         {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
-        {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
+        {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} autoOpenMatchId={compareMatchId} onAutoOpened={()=>setCompareMatchId(null)}/>}
         {tab==="standings" && (loaded ? <Standings user={user} predictions={allPredictions} matches={matches} profiles={profiles} onRefresh={loadData} isAdmin={isAdmin} allAchievements={unlockedAchievements} autoOpenUserId={profileToOpen} onAutoOpened={()=>setProfileToOpen(null)}/> : <SkeletonStandings/>)}
         {tab==="stats"     && <StatsDeep user={user} matches={matches} predictions={allPredictions} snapshots={snapshots} profiles={profiles}/>}
         {tab==="fame"      && <HallOfFame profiles={profiles} predictions={allPredictions} matches={matches} snapshots={snapshots}/>}
