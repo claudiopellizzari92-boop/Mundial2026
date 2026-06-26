@@ -556,6 +556,12 @@ input,button,select{font-family:inherit;}
 .confetti span{position:absolute;top:-7%;border-radius:2px;opacity:0;animation-name:confettiFall;animation-timing-function:cubic-bezier(.3,.6,.5,1);animation-fill-mode:forwards;}
 @keyframes confettiFall{0%{transform:translateY(0) rotate(0);opacity:0}10%{opacity:1}100%{transform:translateY(108vh) rotate(560deg);opacity:.9}}
 @media (prefers-reduced-motion:reduce){.flipwrap::before,.confetti{display:none!important;}}
+/* ===== Vista héroe: resplandor ambiental detrás de la carta ===== */
+.hero-glow{position:absolute;top:50%;left:50%;width:120%;height:120%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;filter:blur(36px);opacity:0;}
+.hero-legendary{opacity:.85;background:radial-gradient(circle,rgba(245,205,95,.9),rgba(245,183,49,.25) 45%,transparent 70%);animation:heroPulse 2.6s ease-in-out infinite;}
+.hero-limited{opacity:.7;background:radial-gradient(circle,rgba(150,190,255,.82),rgba(120,150,210,.2) 45%,transparent 70%);}
+@keyframes heroPulse{0%,100%{opacity:.6}50%{opacity:.95}}
+@media (prefers-reduced-motion:reduce){.hero-legendary{animation:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -8926,9 +8932,13 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       })()}
 
       {detail && (
-        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
+        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: detail.rareza === "legendary" ? "radial-gradient(circle at 50% 36%, rgba(74,55,12,.94), rgba(0,0,0,.93) 62%)" : detail.rareza === "limited" ? "radial-gradient(circle at 50% 36%, rgba(28,44,74,.94), rgba(0,0,0,.93) 62%)" : "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 18, overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: "100%", padding: "20px 18px", textAlign: "center" }}>
-            <div style={{ display: "flex", justifyContent: "center" }}><NFTCard nft={detail} edition={detail.rareza === "limited" ? detEd : null} big /></div>
+            <div style={{ display: "flex", justifyContent: "center", position: "relative" }}>
+              <div className={`hero-glow hero-${detail.rareza}`} />
+              <div style={{ position: "relative", zIndex: 1 }}><NFTCard nft={detail} edition={detail.rareza === "limited" ? detEd : null} big /></div>
+            </div>
+            {detail.rareza !== "common" && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>✋ Arrastrá la carta para inclinarla</div>}
             <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
             {(() => {
