@@ -591,6 +591,8 @@ input,button,select{font-family:inherit;}
 .near-word{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,13vw,72px);letter-spacing:4px;color:#dfeaff;text-shadow:0 0 26px rgba(150,190,255,.9);animation:nearWord 1.4s cubic-bezier(.2,.8,.2,1) forwards;}
 @keyframes nearWord{0%{transform:scale(.4);opacity:0}20%{transform:scale(1.12);opacity:1}32%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:scale(1.04)}}
 @media (prefers-reduced-motion:reduce){.suspense-aura,.suspense-rays,.suspense-rays span,.suspense-q,.near-flash,.near-word{animation:none!important;}}
+@keyframes passPulse{0%,100%{box-shadow:0 0 10px rgba(245,183,49,.4);transform:translateY(0)}50%{box-shadow:0 0 18px rgba(245,183,49,.75);transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){@keyframes passPulse{0%,100%{box-shadow:0 0 12px rgba(245,183,49,.5)}}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -8367,6 +8369,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const [saldos, setSaldos] = useState(null);
   const [wishTop, setWishTop] = useState([]);
   const [me, setMe] = useState(null);
+  const [pase, setPase] = useState(null);
   const [miRar, setMiRar] = useState("todas");
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
@@ -8385,7 +8388,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes, paseRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -8396,6 +8399,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       sb.rpc("estado_sobres"),
       sb.rpc("wishlist_top", { p_limit: 6 }),
       sb.from("profiles").select("streak_days, gift_triple, gift_cinco").eq("id", user.id).maybeSingle(),
+      sb.rpc("pase_estado"),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -8406,6 +8410,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     setEst(eRes.data || null);
     setWishTop(tRes.data || []);
     setMe(meRes.data || null);
+    setPase(paseRes.data || null);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -8456,6 +8461,27 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     await loadAll();
     if (onRefresh) onRefresh();
     setReveal({ items: data.items || [], godpack: !!data.godpack, tipo });
+  }
+
+  async function reclamarHoy() {
+    setOpening("pase");
+    const { data, error } = await sb.rpc("reclamar_pase");
+    if (error || !data || !data.ok) {
+      setOpening(null);
+      setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo reclamar el premio." });
+      await loadAll();
+      return;
+    }
+    const tipo = data.tipo;
+    const { data: d2 } = await sb.rpc("abrir_sobre_regalo", { p_tipo: tipo });
+    setOpening(null);
+    await loadAll();
+    if (onRefresh) onRefresh();
+    if (d2 && d2.ok) {
+      setReveal({ items: d2.items || [], godpack: !!d2.godpack, tipo });
+    } else {
+      setModal({ msg: "Reclamaste la casilla. Tu sobre quedó guardado en 'Sobres de regalo sin abrir'." });
+    }
   }
 
   // ── admin ──
@@ -8637,35 +8663,81 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
 
       {sub === "sobres" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {me && (me.streak_days > 0 || me.gift_triple > 0 || me.gift_cinco > 0) && (
-            <div className="card" style={{ position: "relative", overflow: "hidden", padding: 16, border: "1px solid rgba(245,183,49,.45)" }}>
-              <div style={{ position: "absolute", top: -40, right: -30, width: 130, height: 130, borderRadius: "50%", background: "#f5b731", filter: "blur(44px)", opacity: 0.22, pointerEvents: "none" }} />
-              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 30 }}>🔥</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)" }}>Racha de {me.streak_days} {me.streak_days === 1 ? "día" : "días"}</div>
-                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Entrá cada día para no perderla. Día par = 🎴 triple · múltiplo de 5 = 🎁 sobre de 5.</div>
+          {pase && pase.ok !== false && (() => {
+            const total = pase.total || 0;
+            const hoy = pase.dia_hoy || 0;
+            const reclam = new Set(pase.reclamados || []);
+            const casillas = [];
+            for (let n = 1; n <= total; n++) { const tipo = n % 5 === 0 ? "cinco" : (n % 2 === 0 ? "triple" : null); if (tipo) casillas.push({ n, tipo }); }
+            const ganadas = casillas.filter(c => reclam.has(c.n)).length;
+            const puedeHoy = pase.premio_hoy && !pase.reclamado_hoy && hoy >= 1 && hoy <= total;
+            return (
+              <div className="card" style={{ position: "relative", overflow: "hidden", padding: 16, border: "1px solid rgba(245,183,49,.45)" }}>
+                <div style={{ position: "absolute", top: -40, right: -30, width: 130, height: 130, borderRadius: "50%", background: "#f5b731", filter: "blur(44px)", opacity: 0.2, pointerEvents: "none" }} />
+                <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 26 }}>🏆</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)" }}>Pase del Mundial</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>Entrá cada día hasta la final (19 jul) y reclamá tu premio.</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", lineHeight: 1 }}>{hoy >= 1 && hoy <= total ? `Día ${hoy}` : (hoy > total ? "Fin" : "Pronto")}</div>
+                    <div style={{ fontSize: 10, color: "var(--muted)" }}>{ganadas} reclamados</div>
+                  </div>
                 </div>
+                {puedeHoy && (
+                  <button onClick={reclamarHoy} disabled={opening === "pase"}
+                    style={{ position: "relative", width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10, border: "none", background: opening === "pase" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "pase" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 15, cursor: opening === "pase" ? "default" : "pointer", boxShadow: opening === "pase" ? "none" : "0 4px 16px rgba(245,183,49,.4)" }}>
+                    {opening === "pase" ? "Abriendo…" : `🎁 Reclamar premio de hoy (${pase.premio_hoy === "cinco" ? "sobre de 5" : "triple"})`}
+                  </button>
+                )}
+                {!puedeHoy && pase.reclamado_hoy && (
+                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--green)", fontWeight: 700, textAlign: "center" }}>✅ Ya reclamaste el premio de hoy. Volvé mañana.</div>
+                )}
+                {!puedeHoy && !pase.reclamado_hoy && hoy >= 1 && hoy <= total && !pase.premio_hoy && (
+                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--muted)", textAlign: "center" }}>Hoy no hay premio, pero entrá igual para no perder los próximos. 🔥</div>
+                )}
+                <div style={{ position: "relative", display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginTop: 12 }}>
+                  {casillas.map(c => {
+                    const claimed = reclam.has(c.n);
+                    const isToday = c.n === hoy;
+                    const lost = c.n < hoy && !claimed;
+                    const future = c.n > hoy;
+                    const claimableNow = isToday && !pase.reclamado_hoy;
+                    let bg = "var(--surface)", brd = "var(--border)", op = 1, estado = "";
+                    const ico = c.tipo === "cinco" ? "🎁" : "🎴";
+                    if (claimed) { bg = "var(--green-dim)"; brd = "var(--green)"; estado = "✅"; }
+                    else if (claimableNow) { bg = "rgba(245,183,49,.18)"; brd = "var(--gold)"; estado = "🎁"; }
+                    else if (lost) { op = 0.4; estado = "✗"; }
+                    else if (future) { op = 0.55; estado = "🔒"; }
+                    return (
+                      <div key={c.n} style={{ flexShrink: 0, width: 64, padding: "8px 4px", borderRadius: 10, background: bg, border: `1px solid ${brd}`, textAlign: "center", opacity: op, boxShadow: claimableNow ? "0 0 12px rgba(245,183,49,.5)" : "none", animation: claimableNow ? "passPulse 1.6s ease-in-out infinite" : "none" }}>
+                        <div style={{ fontSize: 9, color: "var(--muted)", fontWeight: 700 }}>DÍA {c.n}</div>
+                        <div style={{ fontSize: 22, margin: "2px 0" }}>{ico}</div>
+                        <div style={{ fontSize: 8, color: c.tipo === "cinco" ? "#7ab8ff" : "#f0a0d0", fontWeight: 800 }}>{c.tipo === "cinco" ? "5 CARTAS" : "TRIPLE"}</div>
+                        <div style={{ fontSize: 11, marginTop: 2 }}>{estado}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {me && (me.gift_cinco > 0 || me.gift_triple > 0) && (
+                  <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8, marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>🎁 Sobres de regalo sin abrir</div>
+                    {me.gift_cinco > 0 && (
+                      <button onClick={() => abrirRegalo("cinco")} disabled={opening === "regalo-cinco"} style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-cinco" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-cinco" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-cinco" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>🎁 Sobre de 5 de regalo</span>{me.gift_cinco > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_cinco}</span>}
+                      </button>
+                    )}
+                    {me.gift_triple > 0 && (
+                      <button onClick={() => abrirRegalo("triple")} disabled={opening === "regalo-triple"} style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-triple" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-triple" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-triple" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>🎴 Sobre triple de regalo</span>{me.gift_triple > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_triple}</span>}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              {(me.gift_cinco > 0 || me.gift_triple > 0) && (
-                <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8, marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-                  <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>🎁 Sobres de regalo</div>
-                  {me.gift_cinco > 0 && (
-                    <button onClick={() => abrirRegalo("cinco")} disabled={opening === "regalo-cinco"}
-                      style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-cinco" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-cinco" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-cinco" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>🎁 Sobre de 5 de regalo</span>{me.gift_cinco > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_cinco}</span>}
-                    </button>
-                  )}
-                  {me.gift_triple > 0 && (
-                    <button onClick={() => abrirRegalo("triple")} disabled={opening === "regalo-triple"}
-                      style={{ padding: "11px 16px", borderRadius: 10, border: "none", background: opening === "regalo-triple" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "regalo-triple" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 14, cursor: opening === "regalo-triple" ? "default" : "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>🎴 Sobre triple de regalo</span>{me.gift_triple > 1 && <span style={{ fontSize: 12, opacity: 0.8 }}>x{me.gift_triple}</span>}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })()}
           {[{ tipo: "cinco", nombre: "Sobre de 5", emoji: "🎁", cant: "5 cartas", precio: precioSimple, desc: "Cinco cartas al azar.", lim: 1, badge: "linear-gradient(160deg,#3b82f6,#1e3a8a)", glow: "#3b82f6", tint: "rgba(59,130,246,.16)" },
             { tipo: "triple", nombre: "Sobre Triple", emoji: "🎴", cant: "3 cartas", precio: precioTriple, desc: "Tres cartas al azar.", lim: 2, badge: "linear-gradient(160deg,#ec4899,#7c3aed)", glow: "#ec4899", tint: "rgba(236,72,153,.16)" }].map(pk => {
             const isTri = pk.tipo === "triple";
@@ -9330,19 +9402,7 @@ export default function App() {
   useEffect(() => {
     if (loaded && mercadoPend > 0 && !marketAlertShownRef.current) { marketAlertShownRef.current = true; setShowMarketAlert(true); }
   }, [loaded, mercadoPend]);
-  const [showStreak, setShowStreak] = useState(false);
-  const [streakData, setStreakData] = useState(null);
-  const rachaCheckedRef = React.useRef(false);
-  useEffect(() => {
-    if (!user || rachaCheckedRef.current) return;
-    rachaCheckedRef.current = true;
-    (async () => {
-      try {
-        const { data } = await sb.rpc("tocar_racha");
-        if (data && data.ok && data.premio && !data.ya) { setStreakData({ streak: data.streak, premio: data.premio }); setShowStreak(true); }
-      } catch (e) {}
-    })();
-  }, [user]);
+  // La racha automática se reemplazó por el Pase del Mundial (se reclama manualmente).
   const [breakingNews, setBreakingNews] = useState(null);       // noticia activa (o null)
   const [showNews, setShowNews] = useState(false);
   const newsHandledRef = React.useRef(null);                     // id de noticia ya procesada en esta sesión
@@ -9898,9 +9958,6 @@ export default function App() {
         })()}
         {user && showMarketAlert && !showPredReminder && (
           <MarketOfferPopup count={mercadoPend} onGo={() => { goTab("coleccion"); setShowMarketAlert(false); }} onClose={() => setShowMarketAlert(false)} />
-        )}
-        {user && showStreak && streakData && !showPredReminder && !showMarketAlert && (
-          <StreakPopup streak={streakData.streak} premio={streakData.premio} onGo={() => { goTab("coleccion"); setShowStreak(false); }} onClose={() => setShowStreak(false)} />
         )}
         {user && showNews && !showDebtorOverlay && (
           <BreakingNewsPopup news={breakingNews} onClose={dismissNews} />
