@@ -7530,32 +7530,82 @@ function CardBack() {
 }
 
 // ── Modal de apertura de sobre con volteo + animaciones por rareza ────────────
+// ── Sonidos de apertura (Web Audio API, sin archivos · anda en iPhone con un toque) ──
+let _ac = null;
+function _audio() {
+  try {
+    if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (_ac.state === "suspended") _ac.resume();
+    return _ac;
+  } catch (e) { return null; }
+}
+function _sndOn() { try { return localStorage.getItem("snd_off") !== "1"; } catch (e) { return true; } }
+function playTear() {
+  if (!_sndOn()) return;
+  const ac = _audio(); if (!ac) return;
+  const t = ac.currentTime, dur = 0.45;
+  const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.setValueAtTime(1300, t); bp.frequency.exponentialRampToValueAtTime(380, t + dur); bp.Q.value = 0.8;
+  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(bp); bp.connect(g); g.connect(ac.destination); src.start(t); src.stop(t + dur);
+}
+function playFlip() {
+  if (!_sndOn()) return;
+  const ac = _audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const o = ac.createOscillator(); o.type = "triangle"; o.frequency.setValueAtTime(420, t); o.frequency.exponentialRampToValueAtTime(840, t + 0.08);
+  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 0.13);
+}
+function playLegendary() {
+  if (!_sndOn()) return;
+  const ac = _audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach(function (f, i) {
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const g = ac.createGain(); const st = t + i * 0.1;
+    g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.24, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.9);
+    o.connect(g); g.connect(ac.destination); o.start(st); o.stop(st + 0.95);
+  });
+  const o2 = ac.createOscillator(); o2.type = "sine"; o2.frequency.value = 1568;
+  const g2 = ac.createGain(); g2.gain.setValueAtTime(0.0001, t + 0.22); g2.gain.exponentialRampToValueAtTime(0.11, t + 0.32); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+  o2.connect(g2); g2.connect(ac.destination); o2.start(t + 0.22); o2.stop(t + 1.35);
+}
+
 function RevealModal({ items, godpack, tipo, onClose }) {
   const [flipped, setFlipped] = useState(() => items.map(() => false));
   const [epic, setEpic] = useState(false);
   const [big, setBig] = useState(null);
   const [phase, setPhase] = useState(items.length ? "pack" : "cards");
   const [tearing, setTearing] = useState(false);
+  const [mute, setMute] = useState(() => { try { return localStorage.getItem("snd_off") === "1"; } catch (e) { return false; } });
   const w = items.length >= 3 ? 102 : items.length === 2 ? 150 : 230;
   const packType = godpack ? "god" : (tipo === "triple" ? "triple" : "cinco");
 
+  function toggleMute() { const nv = !mute; setMute(nv); try { localStorage.setItem("snd_off", nv ? "1" : "0"); } catch (e) {} }
   function openPack() {
     if (tearing) return;
     setTearing(true);
+    playTear();
+    if (godpack) setTimeout(playLegendary, 380);
     try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70] : 30); } catch (e) {}
     setTimeout(() => setPhase("cards"), 820);
   }
   function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
   function flip(i) {
     setFlipped(prev => { if (prev[i]) return prev; const n = prev.slice(); n[i] = true; return n; });
-    if (items[i] && items[i].rareza === "legendary") fireEpic();
+    if (items[i] && items[i].rareza === "legendary") { fireEpic(); playLegendary(); } else playFlip();
   }
   function clickCard(i) {
     if (flipped[i]) setBig(items[i]); else flip(i);
   }
   function flipAll() {
     setFlipped(items.map(() => true));
-    if (items.some(it => it.rareza === "legendary")) fireEpic();
+    if (items.some(it => it.rareza === "legendary")) { fireEpic(); playLegendary(); } else playFlip();
   }
   const allFlipped = flipped.every(Boolean);
 
@@ -7571,6 +7621,7 @@ function RevealModal({ items, godpack, tipo, onClose }) {
         </div>
       )}
       <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 540, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 3 }}>
+        <button onClick={toggleMute} aria-label="sonido" style={{ position: "absolute", top: 10, right: 12, width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)", background: "rgba(0,0,0,.35)", color: "#fff", fontSize: 14, cursor: "pointer", zIndex: 6, lineHeight: 1 }}>{mute ? "🔇" : "🔊"}</button>
         {phase === "pack" ? (
           <div className="pack-stage">
             <div className={`pack pk-${packType}${tearing ? " tear" : ""}`} onClick={openPack}>
