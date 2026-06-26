@@ -562,6 +562,19 @@ input,button,select{font-family:inherit;}
 .hero-limited{opacity:.7;background:radial-gradient(circle,rgba(150,190,255,.82),rgba(120,150,210,.2) 45%,transparent 70%);}
 @keyframes heroPulse{0%,100%{opacity:.6}50%{opacity:.95}}
 @media (prefers-reduced-motion:reduce){.hero-legendary{animation:none!important;}}
+/* ===== God Pack: cinemática a pantalla completa ===== */
+.god-cine{position:fixed;inset:0;z-index:8;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;}
+.god-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,250,230,.92),rgba(245,200,90,.5) 40%,transparent 76%);animation:godFlash 2.4s ease-out forwards;}
+@keyframes godFlash{0%{opacity:0}8%{opacity:1}45%{opacity:.45}100%{opacity:0}}
+.god-rays{position:absolute;left:50%;top:50%;animation:godSpin 8s linear infinite;}
+.god-rays span{position:absolute;left:0;top:0;width:6px;height:72vh;margin-left:-3px;transform-origin:top center;background:linear-gradient(rgba(245,210,110,0),rgba(245,215,120,.55),rgba(245,210,110,0));animation:godRayFade 2.4s ease-out forwards;}
+@keyframes godSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes godRayFade{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+.god-title{position:relative;font-family:'Bebas Neue',sans-serif;font-size:clamp(46px,16vw,74px);letter-spacing:6px;color:#fff3c4;text-shadow:0 0 30px rgba(245,200,90,1),0 0 60px rgba(245,183,49,.85);animation:godTitle 2.4s cubic-bezier(.2,.8,.2,1) forwards;}
+@keyframes godTitle{0%{transform:scale(.3);opacity:0}18%{transform:scale(1.15);opacity:1}30%{transform:scale(1)}82%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+.god-sub{position:relative;margin-top:6px;font-size:15px;font-weight:800;letter-spacing:2px;color:#f5d97a;text-shadow:0 0 12px rgba(245,200,90,.85);animation:godSub 2.4s ease-out forwards;}
+@keyframes godSub{0%,15%{opacity:0}30%{opacity:1}82%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.god-flash,.god-rays,.god-rays span,.god-title,.god-sub{animation:none!important;}}
 `;
 
 const initials = (name = "") => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -7613,9 +7626,16 @@ function RevealModal({ items, godpack, tipo, onClose }) {
     if (tearing) return;
     setTearing(true);
     playTear();
-    if (godpack) { setTimeout(playLegendary, 380); setTimeout(fireConfetti, 360); }
-    try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70] : 30); } catch (e) {}
-    setTimeout(() => setPhase("cards"), 820);
+    if (godpack) {
+      setTimeout(playLegendary, 380);
+      setTimeout(fireConfetti, 360);
+      setTimeout(fireConfetti, 1700);
+      setTimeout(() => setPhase("god"), 820);
+      setTimeout(() => setPhase("cards"), 3200);
+    } else {
+      setTimeout(() => setPhase("cards"), 820);
+    }
+    try { if (navigator.vibrate) navigator.vibrate(godpack ? [0, 30, 30, 70, 40, 130] : 30); } catch (e) {}
   }
   function fireEpic() { setEpic(false); requestAnimationFrame(() => setEpic(true)); setTimeout(() => setEpic(false), 1800); fireConfetti(); try { if (navigator.vibrate) navigator.vibrate([0, 45, 35, 95]); } catch (e) {} }
   function flip(i) {
@@ -7651,6 +7671,15 @@ function RevealModal({ items, godpack, tipo, onClose }) {
           <div className="epic-word">¡LEGENDARY!</div>
         </div>
       )}
+      {phase === "god" && (
+        <div className="god-cine">
+          <div className="god-flash" />
+          <div className="god-rays">{[...Array(16)].map((_, i) => <span key={i} style={{ transform: `rotate(${i * 22.5}deg)` }} />)}</div>
+          <div className="god-title">GOD PACK</div>
+          <div className="god-sub">EL SOBRE LEGENDARIO</div>
+        </div>
+      )}
+      {phase !== "god" && (
       <div onClick={e => e.stopPropagation()} className="card" style={{ maxWidth: 540, width: "100%", padding: "22px 18px", textAlign: "center", position: "relative", zIndex: 3 }}>
         <button onClick={toggleMute} aria-label="sonido" style={{ position: "absolute", top: 10, right: 12, width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)", background: "rgba(0,0,0,.35)", color: "#fff", fontSize: 14, cursor: "pointer", zIndex: 6, lineHeight: 1 }}>{mute ? "🔇" : "🔊"}</button>
         {phase === "pack" ? (
@@ -7693,6 +7722,7 @@ function RevealModal({ items, godpack, tipo, onClose }) {
         </div>
         </>)}
       </div>
+      )}
     </div>
     {big && (
       <div onClick={() => setBig(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1400, padding: 18 }}>
