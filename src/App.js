@@ -9217,7 +9217,7 @@ export default function App() {
   const hasNewChronicle = !!latestChronicleKey && latestChronicleKey !== chronicaSeenKey;
   const [appLastTab, setAppLastTab] = useState({ inicio: "home", jugar: "predicciones", resultados: "standings", comunidad: "cronica", coleccionables: "coleccion", info: "info", adminG: "admin" });
   const [openGroup, setOpenGroup] = useState(null);
-  function goTab(t) {
+  function goTab(t, opts) {
     setTab(t);
     setMenuOpen(false);
     const g = APP_GRUPOS.find(gr => gr.tabs.some(x => x[0] === t));
@@ -9226,8 +9226,23 @@ export default function App() {
       setChronicaSeenKey(latestChronicleKey);
       localStorage.setItem("cronica-seen", latestChronicleKey);
     }
+    if (!opts || !opts.fromPop) {
+      try { if (t !== "home") window.history.pushState({ tab: t }, ""); } catch (e) {}
+    }
   }
   const grupoActivoApp = APP_GRUPOS.find(g => g.tabs.some(t => t[0] === tab)) || APP_GRUPOS[0];
+
+  // Botón "atrás" del teléfono: navega entre pestañas en vez de cerrar la app
+  useEffect(() => {
+    try { window.history.replaceState({ tab: "home" }, ""); } catch (e) {}
+    const onPop = (e) => {
+      const t = (e && e.state && e.state.tab) || "home";
+      setTab(t);
+      setMenuOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   function toggleTheme() {
     const next = !darkMode;
