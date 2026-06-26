@@ -592,6 +592,8 @@ input,button,select{font-family:inherit;}
 @keyframes nearWord{0%{transform:scale(.4);opacity:0}20%{transform:scale(1.12);opacity:1}32%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:scale(1.04)}}
 @media (prefers-reduced-motion:reduce){.suspense-aura,.suspense-rays,.suspense-rays span,.suspense-q,.near-flash,.near-word{animation:none!important;}}
 @keyframes passPulse{0%,100%{box-shadow:0 0 10px rgba(245,183,49,.4);transform:translateY(0)}50%{box-shadow:0 0 18px rgba(245,183,49,.75);transform:translateY(-2px)}}
+.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+.no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
 @media (prefers-reduced-motion:reduce){@keyframes passPulse{0%,100%{box-shadow:0 0 12px rgba(245,183,49,.5)}}}
 `;
 
@@ -8697,7 +8699,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
                 {!puedeHoy && !pase.reclamado_hoy && hoy >= 1 && hoy <= total && !pase.premio_hoy && (
                   <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--muted)", textAlign: "center" }}>Hoy no hay premio, pero entrá igual para no perder los próximos. 🔥</div>
                 )}
-                <div style={{ position: "relative", display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginTop: 12 }}>
+                <div className="no-scrollbar" style={{ position: "relative", display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginTop: 12 }}>
                   {casillas.map(c => {
                     const claimed = reclam.has(c.n);
                     const isToday = c.n === hoy;
