@@ -8465,9 +8465,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     setReveal({ items: data.items || [], godpack: !!data.godpack, tipo });
   }
 
-  async function reclamarHoy() {
-    setOpening("pase");
-    const { data, error } = await sb.rpc("reclamar_pase");
+  async function reclamarDia(dia) {
+    setOpening("pase-" + dia);
+    const { data, error } = await sb.rpc("reclamar_pase", { p_dia: dia });
     if (error || !data || !data.ok) {
       setOpening(null);
       setModal({ msg: (data && data.error) || (error && error.message) || "No se pudo reclamar el premio." });
@@ -8672,7 +8672,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
             const casillas = [];
             for (let n = 1; n <= total; n++) { const tipo = n % 5 === 0 ? "cinco" : (n % 2 === 0 ? "triple" : null); if (tipo) casillas.push({ n, tipo }); }
             const ganadas = casillas.filter(c => reclam.has(c.n)).length;
-            const puedeHoy = pase.premio_hoy && !pase.reclamado_hoy && hoy >= 1 && hoy <= total;
+            const pendientes = casillas.filter(c => c.n <= hoy && !reclam.has(c.n));
             return (
               <div className="card" style={{ position: "relative", overflow: "hidden", padding: 16, border: "1px solid rgba(245,183,49,.45)" }}>
                 <div style={{ position: "absolute", top: -40, right: -30, width: 130, height: 130, borderRadius: "50%", background: "#f5b731", filter: "blur(44px)", opacity: 0.2, pointerEvents: "none" }} />
@@ -8680,40 +8680,36 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
                   <span style={{ fontSize: 26 }}>🏆</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)" }}>Pase del Mundial</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>Entrá cada día hasta la final (19 jul) y reclamá tu premio.</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>Entrá cada día hasta la final (19 jul) y reclamá tus premios.</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontFamily: "Bebas Neue", fontSize: 20, color: "var(--gold)", lineHeight: 1 }}>{hoy >= 1 && hoy <= total ? `Día ${hoy}` : (hoy > total ? "Fin" : "Pronto")}</div>
                     <div style={{ fontSize: 10, color: "var(--muted)" }}>{ganadas} reclamados</div>
                   </div>
                 </div>
-                {puedeHoy && (
-                  <button onClick={reclamarHoy} disabled={opening === "pase"}
-                    style={{ position: "relative", width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10, border: "none", background: opening === "pase" ? "var(--surface)" : "linear-gradient(135deg,#f7d774,#f5b731)", color: opening === "pase" ? "var(--muted)" : "#1a1a1a", fontWeight: 800, fontSize: 15, cursor: opening === "pase" ? "default" : "pointer", boxShadow: opening === "pase" ? "none" : "0 4px 16px rgba(245,183,49,.4)" }}>
-                    {opening === "pase" ? "Abriendo…" : `🎁 Reclamar premio de hoy (${pase.premio_hoy === "cinco" ? "sobre de 5" : "triple"})`}
-                  </button>
-                )}
-                {!puedeHoy && pase.reclamado_hoy && (
-                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--green)", fontWeight: 700, textAlign: "center" }}>✅ Ya reclamaste el premio de hoy. Volvé mañana.</div>
-                )}
-                {!puedeHoy && !pase.reclamado_hoy && hoy >= 1 && hoy <= total && !pase.premio_hoy && (
-                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--muted)", textAlign: "center" }}>Hoy no hay premio, pero entrá igual para no perder los próximos. 🔥</div>
-                )}
+                {pendientes.length > 0 ? (
+                  <div style={{ position: "relative", marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(245,183,49,.14)", border: "1px solid var(--gold)", textAlign: "center", fontSize: 13, fontWeight: 700, color: "var(--gold)" }}>
+                    🎁 Tenés {pendientes.length} premio{pendientes.length > 1 ? "s" : ""} para reclamar. Tocá las casillas iluminadas 👇
+                  </div>
+                ) : (hoy >= 1 && hoy <= total ? (
+                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--green)", fontWeight: 700, textAlign: "center" }}>✅ Estás al día. Volvé mañana por más premios. 🔥</div>
+                ) : (hoy > total ? (
+                  <div style={{ position: "relative", marginTop: 12, fontSize: 12, color: "var(--muted)", textAlign: "center" }}>El pase del Mundial terminó. ¡Gracias por jugar! 🏆</div>
+                ) : null))}
                 <div className="no-scrollbar" style={{ position: "relative", display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginTop: 12 }}>
                   {casillas.map(c => {
                     const claimed = reclam.has(c.n);
-                    const isToday = c.n === hoy;
-                    const lost = c.n < hoy && !claimed;
                     const future = c.n > hoy;
-                    const claimableNow = isToday && !pase.reclamado_hoy;
+                    const disponible = !claimed && !future;
+                    const loadingThis = opening === ("pase-" + c.n);
                     let bg = "var(--surface)", brd = "var(--border)", op = 1, estado = "";
                     const ico = c.tipo === "cinco" ? "🎁" : "🎴";
                     if (claimed) { bg = "var(--green-dim)"; brd = "var(--green)"; estado = "✅"; }
-                    else if (claimableNow) { bg = "rgba(245,183,49,.18)"; brd = "var(--gold)"; estado = "🎁"; }
-                    else if (lost) { op = 0.4; estado = "✗"; }
+                    else if (disponible) { bg = "rgba(245,183,49,.18)"; brd = "var(--gold)"; estado = loadingThis ? "⏳" : "🎁"; }
                     else if (future) { op = 0.55; estado = "🔒"; }
                     return (
-                      <div key={c.n} style={{ flexShrink: 0, width: 64, padding: "8px 4px", borderRadius: 10, background: bg, border: `1px solid ${brd}`, textAlign: "center", opacity: op, boxShadow: claimableNow ? "0 0 12px rgba(245,183,49,.5)" : "none", animation: claimableNow ? "passPulse 1.6s ease-in-out infinite" : "none" }}>
+                      <div key={c.n} onClick={disponible && !loadingThis ? () => reclamarDia(c.n) : undefined}
+                        style={{ flexShrink: 0, width: 64, padding: "8px 4px", borderRadius: 10, background: bg, border: `1px solid ${brd}`, textAlign: "center", opacity: op, cursor: disponible && !loadingThis ? "pointer" : "default", boxShadow: disponible ? "0 0 12px rgba(245,183,49,.5)" : "none", animation: disponible && !loadingThis ? "passPulse 1.6s ease-in-out infinite" : "none" }}>
                         <div style={{ fontSize: 9, color: "var(--muted)", fontWeight: 700 }}>DÍA {c.n}</div>
                         <div style={{ fontSize: 22, margin: "2px 0" }}>{ico}</div>
                         <div style={{ fontSize: 8, color: c.tipo === "cinco" ? "#7ab8ff" : "#f0a0d0", fontWeight: 800 }}>{c.tipo === "cinco" ? "5 CARTAS" : "TRIPLE"}</div>
