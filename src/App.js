@@ -594,6 +594,10 @@ input,button,select{font-family:inherit;}
 @keyframes passPulse{0%,100%{box-shadow:0 0 10px rgba(245,183,49,.4);transform:translateY(0)}50%{box-shadow:0 0 18px rgba(245,183,49,.75);transform:translateY(-2px)}}
 .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
 .no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
+.nft-new-badge{position:absolute;top:6px;right:6px;z-index:5;background:linear-gradient(135deg,#2adf7a,#15a85a);color:#03210f;font-weight:900;font-size:11px;letter-spacing:.5px;padding:3px 9px;border-radius:999px;box-shadow:0 2px 9px rgba(42,223,122,.65),inset 0 0 0 2px rgba(255,255,255,.28);transform:rotate(8deg);font-family:'Bebas Neue',sans-serif;pointer-events:none;animation:newPop .5s cubic-bezier(.2,1.4,.4,1) .15s both,newGlow 1.5s ease-in-out 1s infinite;}
+@keyframes newPop{0%{transform:rotate(8deg) scale(0);opacity:0}60%{transform:rotate(8deg) scale(1.2);opacity:1}100%{transform:rotate(8deg) scale(1);opacity:1}}
+@keyframes newGlow{0%,100%{box-shadow:0 2px 9px rgba(42,223,122,.55),inset 0 0 0 2px rgba(255,255,255,.28)}50%{box-shadow:0 2px 16px rgba(42,223,122,.95),inset 0 0 0 2px rgba(255,255,255,.4)}}
+@media (prefers-reduced-motion:reduce){.nft-new-badge{animation:none!important;transform:rotate(8deg)!important;opacity:1!important;}}
 @media (prefers-reduced-motion:reduce){@keyframes passPulse{0%,100%{box-shadow:0 0 12px rgba(245,183,49,.5)}}}
 `;
 
@@ -7833,6 +7837,7 @@ function RevealModal({ items, godpack, tipo, onClose }) {
                   <div className="flipface flipfront-nft">
                     <NFTCard nft={it} edition={it.rareza === "limited" ? it.edition : null} />
                     {flipped[i] && it.rareza !== "common" && <div className={`reveal-burst burst-${it.rareza}`} />}
+                    {flipped[i] && it.nuevo && <div className="nft-new-badge">¡NUEVA!</div>}
                   </div>
                 </div>
               </div>
