@@ -2964,7 +2964,7 @@ function shareCanvas(canvas, filename, shareText) {
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ user, matches, predictions, onGoTab, onGoCompare, achievements, equippedBadge, onEquip }) {
+function Dashboard({ user, matches, predictions, onGoTab, onGoCompare, achievements, equippedBadge, onEquip, nftPend = 0 }) {
   const [ultimaCronica, setUltimaCronica] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // día elegido en el bloque "Tus pronósticos"
   const [myWc, setMyWc] = useState([]);
@@ -3096,6 +3096,20 @@ function Dashboard({ user, matches, predictions, onGoTab, onGoCompare, achieveme
               <span style={{color:"var(--gold)",fontSize:12,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>Leer ›</span>
             </div>
           : <p>¡Bienvenido! Seguí de cerca la tabla de posiciones.</p>}
+    </div>
+
+    <div onClick={() => onGoTab && onGoTab("coleccion")} style={{ position: "relative", overflow: "hidden", cursor: "pointer", borderRadius: 14, padding: "16px 18px", marginBottom: 16, background: "linear-gradient(135deg, rgba(245,183,49,.16), rgba(120,80,255,.14))", border: "1px solid rgba(245,183,49,.45)", display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ position: "absolute", top: -30, right: -20, width: 120, height: 120, borderRadius: "50%", background: "#f5b731", filter: "blur(46px)", opacity: 0.25, pointerEvents: "none" }} />
+      <span style={{ fontSize: 34, flexShrink: 0 }}>🎴</span>
+      <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)", lineHeight: 1.15 }}>
+          {nftPend > 0 ? `¡Tenés ${nftPend} ${nftPend === 1 ? "sobre/premio" : "sobres y premios"} sin abrir!` : "¡Coleccioná las cartas del Mundial!"}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3, lineHeight: 1.3 }}>
+          {nftPend > 0 ? "Abrí tus sobres de regalo y reclamá los premios del pase. 🎁" : "Abrí sobres, conseguí legendarias y armá tu álbum. 🔥"}
+        </div>
+      </div>
+      <span style={{ position: "relative", flexShrink: 0, background: "var(--gold)", color: "#1a1a1a", fontWeight: 800, fontSize: 13, padding: "8px 14px", borderRadius: 9, whiteSpace: "nowrap" }}>Abrir →</span>
     </div>
 
     <div className="dash-grid">
@@ -9376,6 +9390,8 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [mercadoPend, setMercadoPend] = useState(0);
   useEffect(() => { (async () => { try { const { data } = await sb.rpc("mercado_pendientes"); setMercadoPend(data || 0); } catch (e) {} })(); }, [tab]);
+  const [nftPend, setNftPend] = useState(0);
+  useEffect(() => { (async () => { try { const { data } = await sb.rpc("nft_pendientes"); setNftPend((data && data.total) || 0); } catch (e) {} })(); }, [tab]);
   const [booting, setBooting] = useState(true);
   const [matches, setMatches] = useState([]);
   const [loadError, setLoadError] = useState(false);
@@ -9850,7 +9866,7 @@ export default function App() {
         <div className="nav-user">
           <button onClick={()=>goTab("tienda")} title="Mi cartera" style={{display:"inline-flex",alignItems:"center",gap:5,background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"6px 10px",color:"var(--gold)",fontWeight:800,fontSize:14,lineHeight:1}}><PetroCoin size={16}/> {isAdmin ? "∞" : myWallet}</button>
           <button className="mobile-only" onClick={()=>goTab("tienda")} title="Tienda" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 9px",fontSize:18,lineHeight:1,alignItems:"center"}}>🛒</button>
-          <button onClick={()=>goTab("coleccion")} title="Colección NFT" style={{background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 11px",color:"var(--gold)",fontWeight:800,fontSize:13,lineHeight:1,letterSpacing:0.5,alignItems:"center"}}>NFT</button>
+          <button onClick={()=>goTab("coleccion")} title="Colección NFT" style={{position:"relative",background:"var(--gold-dim)",border:"1px solid var(--gold)",borderRadius:8,cursor:"pointer",padding:"7px 11px",color:"var(--gold)",fontWeight:800,fontSize:13,lineHeight:1,letterSpacing:0.5,alignItems:"center"}}>NFT{nftPend > 0 && <span style={{position:"absolute",top:-6,right:-6,minWidth:17,height:17,padding:"0 4px",borderRadius:9,background:"var(--red)",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid var(--bg)",boxShadow:"0 0 6px rgba(255,70,70,.6)"}}>{nftPend}</span>}</button>
           <div onClick={openMyProfile} style={{cursor:"pointer"}} title="Ver mi perfil">
             <Avatar profile={user.profile} />
           </div>
@@ -9929,7 +9945,7 @@ export default function App() {
       </div>
       <main className="main">
         {achievementToast && <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />}
-        {tab==="home"      && (loaded ? <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} onGoCompare={goToCompare} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge}/> : <SkeletonDashboard/>)}
+        {tab==="home"      && (loaded ? <Dashboard user={user} matches={matches} predictions={allPredictions} onGoTab={goTab} onGoCompare={goToCompare} achievements={unlockedAchievements} equippedBadge={equippedBadge} onEquip={handleEquipBadge} nftPend={nftPend}/> : <SkeletonDashboard/>)}
         {tab==="predicciones" && <PrediccionesTab user={user} matches={matches} myPredictions={myPredictions} allPredictions={allPredictions} profiles={profiles} onSave={loadData}/>}
         {tab==="cronica"   && <CronicaTab user={user} isAdmin={isAdmin} matches={matches} allPredictions={allPredictions} profiles={profiles}/>}
         {tab==="compare"   && <Compare user={user} matches={matches} allPredictions={allPredictions} profiles={profiles} autoOpenMatchId={compareMatchId} onAutoOpened={()=>setCompareMatchId(null)}/>}
