@@ -1,8 +1,7 @@
 // Service Worker — Quiniela Mundial 2026
-// Versión: 2026-06-14-v2
+// Versión: 2026-06-26-v1
 // LIMPIA cachés viejos y toma control inmediato
-const SW_VERSION = "2026-06-14-v2";
-
+const SW_VERSION = "2026-06-26-v1";
 // Al instalar: limpiar TODOS los cachés anteriores
 self.addEventListener("install", function (event) {
   event.waitUntil(
@@ -19,7 +18,6 @@ self.addEventListener("install", function (event) {
     })
   );
 });
-
 // Al activar: tomar control de todos los clientes inmediatamente
 self.addEventListener("activate", function (event) {
   event.waitUntil(
@@ -28,36 +26,29 @@ self.addEventListener("activate", function (event) {
     })
   );
 });
-
 // NO interceptar fetch — dejar que la red maneje todo
-
 // Push notifications
 self.addEventListener("push", function (event) {
   if (!event.data) return;
-
   let raw = {};
   try {
     raw = event.data.json();
   } catch (e) {
     raw = {};
   }
-
   // FCM puede entregar el contenido en distintos lugares según el tipo de mensaje.
   // Buscamos título/cuerpo en todas las ubicaciones posibles, en orden de prioridad.
   const n = raw.notification || {};
   const webpushN = (raw.webpush && raw.webpush.notification) || {};
   const d = raw.data || {};
-
   const title =
     raw.title || n.title || webpushN.title || d.title || "Quiniela 2026";
   const body =
     raw.body || n.body || webpushN.body || d.body || "";
   const tag =
     raw.tag || webpushN.tag || n.tag || d.tag || "quiniela";
-
   // Si no hay texto en absoluto, intentar como texto plano
   const finalBody = body || (event.data.text ? event.data.text() : "");
-
   event.waitUntil(
     self.registration.showNotification(title, {
       body: finalBody,
@@ -69,7 +60,6 @@ self.addEventListener("push", function (event) {
     })
   );
 });
-
 // Notification click
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
