@@ -8395,6 +8395,8 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const [wishTop, setWishTop] = useState([]);
   const [me, setMe] = useState(null);
   const [pase, setPase] = useState(null);
+  const [firstOwners, setFirstOwners] = useState({});
+  const [ownedEver, setOwnedEver] = useState(new Set());
   const [miRar, setMiRar] = useState("todas");
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
@@ -8413,7 +8415,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes, paseRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes, paseRes, foRes, oeRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -8425,6 +8427,8 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       sb.rpc("wishlist_top", { p_limit: 6 }),
       sb.from("profiles").select("streak_days, gift_triple, gift_cinco").eq("id", user.id).maybeSingle(),
       sb.rpc("pase_estado"),
+      sb.from("nft_first_owner").select("nft_id, user_id"),
+      sb.from("nft_owned_ever").select("nft_id").eq("user_id", user.id),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -8436,6 +8440,10 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     setWishTop(tRes.data || []);
     setMe(meRes.data || null);
     setPase(paseRes.data || null);
+    const foMap = {};
+    (foRes.data || []).forEach(r => { foMap[r.nft_id] = r.user_id; });
+    setFirstOwners(foMap);
+    setOwnedEver(new Set((oeRes.data || []).map(r => r.nft_id)));
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -8881,11 +8889,26 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
                         </div>
                       );
                     }
+                    const tuve = ownedEver.has(nft.id);
+                    const foUid = firstOwners[nft.id];
+                    const foName = foUid ? (foUid === user.id ? "Vos" : ((profiles.find(p => p.id === foUid) || {}).name || "Alguien")) : null;
+                    if (tuve) {
+                      return (
+                        <div key={nft.id} onClick={() => setDetail(nft)} style={{ position: "relative", cursor: "pointer", opacity: 0.72 }}>
+                          <div style={{ filter: "grayscale(.55)" }}><NFTCard nft={nft} edition={nft.rareza === "limited" ? 1 : null} /></div>
+                          <div style={{ position: "absolute", top: 6, left: 6, background: "rgba(0,0,0,.62)", color: "#cbd5e8", fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 6, zIndex: 4, letterSpacing: 0.3 }}>LA TUVISTE</div>
+                          <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nft.nombre}</div>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[nft.rareza].c }}>{NFT_RAR[nft.rareza].t}</div>
+                          {foName && <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 1 }}>🥇 {foName}</div>}
+                        </div>
+                      );
+                    }
                     return (
                       <div key={nft.id} style={{ position: "relative" }}>
                         <NFTCard nft={nft} locked />
                         <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>???</div>
                         <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[nft.rareza].c, opacity: 0.55 }}>{NFT_RAR[nft.rareza].t}</div>
+                        {foName && <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 1, opacity: 0.85 }}>🥇 {foName}</div>}
                       </div>
                     );
                   });
@@ -9272,6 +9295,12 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
             {detail.rareza !== "common" && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>✋ Arrastrá la carta para inclinarla</div>}
             <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
+            {(() => {
+              const foUid = firstOwners[detail.id];
+              if (!foUid) return null;
+              const foName = foUid === user.id ? "Vos 👑" : ((profiles.find(p => p.id === foUid) || {}).name || "Alguien");
+              return <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 6, fontWeight: 700 }}>🥇 Primero en conseguirla: {foName}</div>;
+            })()}
             {(() => {
               const myEds = owned.filter(o => o.nft_id === detail.id).map(o => o.edition).sort((a, b) => a - b);
               if (detail.rareza !== "limited" || myEds.length < 2) return null;
