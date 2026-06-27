@@ -8397,6 +8397,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const [pase, setPase] = useState(null);
   const [firstOwners, setFirstOwners] = useState({});
   const [ownedEver, setOwnedEver] = useState(new Set());
+  const [histOwners, setHistOwners] = useState({});
   const [miRar, setMiRar] = useState("todas");
   const [loadingSaldos, setLoadingSaldos] = useState(false);
   async function cargarSaldos() {
@@ -8415,7 +8416,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
   const nameOf = (uid) => (profiles.find(p => p.id === uid)?.name) || "Alguien";
 
   async function loadAll() {
-    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes, paseRes, foRes, oeRes] = await Promise.all([
+    const [nRes, oRes, aRes, cRes, pRes, rRes, wRes, eRes, tRes, meRes, paseRes, foRes, oeRes, hiRes] = await Promise.all([
       sb.from("nfts").select("*").order("created_at", { ascending: true }),
       sb.from("nft_owned").select("*, nft:nfts(*)").eq("user_id", user.id),
       sb.from("nft_owned").select("nft_id,user_id,edition"),
@@ -8429,6 +8430,7 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       sb.rpc("pase_estado"),
       sb.from("nft_first_owner").select("nft_id, user_id"),
       sb.from("nft_owned_ever").select("nft_id").eq("user_id", user.id),
+      sb.from("nft_historial").select("nft_id, user_id, fecha").order("fecha", { ascending: true }),
     ]);
     setNfts(nRes.data || []);
     setOwned(oRes.data || []);
@@ -8444,6 +8446,9 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
     (foRes.data || []).forEach(r => { foMap[r.nft_id] = r.user_id; });
     setFirstOwners(foMap);
     setOwnedEver(new Set((oeRes.data || []).map(r => r.nft_id)));
+    const hMap = {};
+    (hiRes.data || []).forEach(r => { if (!hMap[r.nft_id]) hMap[r.nft_id] = []; hMap[r.nft_id].push(r.user_id); });
+    setHistOwners(hMap);
     const compras = pRes.data || [];
     setSpent(compras.reduce((s, p) => s + (p.precio || 0), 0));
     // sobres abiertos hoy (medianoche de Aruba, UTC-4)
@@ -9296,10 +9301,29 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
             <div style={{ fontSize: 19, fontWeight: 800, marginTop: 14 }}>{detail.nombre}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: NFT_RAR[detail.rareza].c, marginTop: 2 }}>{NFT_RAR[detail.rareza].t}{detail.rareza === "limited" ? ` · ${countOwned(detail.id)}/${detail.supply_max || 19}` : detail.rareza === "legendary" ? " · 1 de 1" : ` · ${countOwned(detail.id)} en circulación`}</div>
             {(() => {
-              const foUid = firstOwners[detail.id];
-              if (!foUid) return null;
-              const foName = foUid === user.id ? "Vos 👑" : ((profiles.find(p => p.id === foUid) || {}).name || "Alguien");
-              return <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 6, fontWeight: 700 }}>🥇 Primero en conseguirla: {foName}</div>;
+              const cadena = histOwners[detail.id] || [];
+              const fo = firstOwners[detail.id];
+              const lista = cadena.length > 0 ? cadena : (fo ? [fo] : []);
+              if (lista.length === 0) return null;
+              const actuales = new Set(allOwned.filter(o => o.nft_id === detail.id).map(o => o.user_id));
+              const nombreDe = (uid) => uid === user.id ? "Vos" : ((profiles.find(p => p.id === uid) || {}).name || "Alguien");
+              return (
+                <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--border)", textAlign: "left" }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>👥 Historial de dueños</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {lista.map((uid, i) => {
+                      const esActual = actuales.has(uid);
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: i === 0 ? "var(--gold)" : "var(--card)", color: i === 0 ? "#1a1a1a" : "var(--muted)", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{i === 0 ? "🥇" : i + 1}</span>
+                          <span style={{ fontSize: 13, fontWeight: esActual ? 800 : 600, color: esActual ? "var(--gold)" : "var(--txt)" }}>{nombreDe(uid)}</span>
+                          {esActual && <span style={{ fontSize: 9, fontWeight: 800, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 999, padding: "1px 7px" }}>● ACTUAL</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
             })()}
             {(() => {
               const myEds = owned.filter(o => o.nft_id === detail.id).map(o => o.edition).sort((a, b) => a - b);
