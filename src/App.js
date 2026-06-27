@@ -594,6 +594,9 @@ input,button,select{font-family:inherit;}
 @keyframes passPulse{0%,100%{box-shadow:0 0 10px rgba(245,183,49,.4);transform:translateY(0)}50%{box-shadow:0 0 18px rgba(245,183,49,.75);transform:translateY(-2px)}}
 .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
 .no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
+.nft-locked{position:absolute;inset:0;border-radius:inherit;background:radial-gradient(circle at 50% 45%,rgba(10,14,26,.45),rgba(6,9,18,.82) 75%);display:flex;align-items:center;justify-content:center;z-index:4;}
+.nft-locked-ic{font-size:30px;opacity:.7;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));}
+.nftbig .nft-locked-ic{font-size:64px;}
 .nft-new-badge{position:absolute;top:6px;right:6px;z-index:5;background:linear-gradient(135deg,#2adf7a,#15a85a);color:#03210f;font-weight:900;font-size:11px;letter-spacing:.5px;padding:3px 9px;border-radius:999px;box-shadow:0 2px 9px rgba(42,223,122,.65),inset 0 0 0 2px rgba(255,255,255,.28);transform:rotate(8deg);font-family:'Bebas Neue',sans-serif;pointer-events:none;animation:newPop .5s cubic-bezier(.2,1.4,.4,1) .15s both,newGlow 1.5s ease-in-out 1s infinite;}
 @keyframes newPop{0%{transform:rotate(8deg) scale(0);opacity:0}60%{transform:rotate(8deg) scale(1.2);opacity:1}100%{transform:rotate(8deg) scale(1);opacity:1}}
 @keyframes newGlow{0%,100%{box-shadow:0 2px 9px rgba(42,223,122,.55),inset 0 0 0 2px rgba(255,255,255,.28)}50%{box-shadow:0 2px 16px rgba(42,223,122,.95),inset 0 0 0 2px rgba(255,255,255,.4)}}
@@ -7503,11 +7506,11 @@ function Tienda({ user, matches, allPredictions, profiles, onRefresh, isAdmin })
 }
 
 // ── NFT: carta con efectos por rareza y número dinámico ───────────────────────
-function NFTCard({ nft, edition = null, big = false }) {
+function NFTCard({ nft, edition = null, big = false, locked = false }) {
   const rc = nft.rareza === "legendary" ? "r-legendary" : nft.rareza === "limited" ? "r-limited" : "r-common";
   const ref = React.useRef(null);
   function onMove(e) {
-    if (!big) return;
+    if (!big || locked) return;
     const el = ref.current; if (!el) return;
     const r = el.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
@@ -7523,13 +7526,14 @@ function NFTCard({ nft, edition = null, big = false }) {
   const st = { "--nx": nft.num_x != null ? nft.num_x : 50, "--ny": nft.num_y != null ? nft.num_y : 90, "--ns": nft.num_size != null ? nft.num_size : 9 };
   return (
     <div ref={ref} className={`${big ? "nftbig" : "nftcard"} ${rc}`} onPointerMove={onMove} onPointerLeave={onLeave} style={st}>
-      <div className={big ? "nftbig-art" : "nftimg"} style={{ backgroundImage: `url(${nft.imagen_url})` }} />
-      {nft.rareza !== "common" && <div className="nft-holo" />}
-      {nft.rareza !== "common" && <div className="nft-sheen" />}
-      {big && <div className="nft-glare" />}
-      {nft.rareza !== "common" && [0, 1, 2, 3].map(i => <span key={i} className={`nft-spark s${i}`} />)}
+      <div className={big ? "nftbig-art" : "nftimg"} style={{ backgroundImage: `url(${nft.imagen_url})`, ...(locked ? { filter: "brightness(0.09) grayscale(1)" } : {}) }} />
+      {!locked && nft.rareza !== "common" && <div className="nft-holo" />}
+      {!locked && nft.rareza !== "common" && <div className="nft-sheen" />}
+      {!locked && big && <div className="nft-glare" />}
+      {!locked && nft.rareza !== "common" && [0, 1, 2, 3].map(i => <span key={i} className={`nft-spark s${i}`} />)}
       <div className="nft-frame" />
-      {nft.rareza === "limited" && edition != null && (() => {
+      {locked && <div className="nft-locked"><span className="nft-locked-ic">🔒</span></div>}
+      {!locked && nft.rareza === "limited" && edition != null && (() => {
         const ns = nft.num_size != null ? Number(nft.num_size) : 8;
         const nx = nft.num_x != null ? Number(nft.num_x) : 50;
         const ny = nft.num_y != null ? Number(nft.num_y) : 90;
@@ -8811,13 +8815,12 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
       )}
 
       {sub === "mia" && (
-        mineList.length === 0
-          ? <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía no tenés cartas. Abrí un sobre para empezar tu colección. 🎁</div>
+        nfts.length === 0
+          ? <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Todavía no hay cartas en el juego.</div>
           : <>
-              {(() => {
+              {mineList.length > 0 && (() => {
                 const comunes = owned.filter(o => o.nft && o.nft.rareza === "common").length;
                 const rew = (cfg && cfg.reciclar_common != null) ? cfg.reciclar_common : 3;
-                const puede = comunes >= 5;
                 return (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
                     <div style={{ fontSize: 11, color: "var(--muted)" }}>Reciclaje: 5 comunes → {rew} · 1 limited → {(cfg && cfg.reciclar_limited) || 10} · 1 legendary → {(cfg && cfg.reciclar_legendary) || 1000} Petros</div>
@@ -8828,31 +8831,65 @@ function Coleccion({ user, profiles, allPredictions, isAdmin, onRefresh, mercado
                   </div>
                 );
               })()}
-              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>⭐ Tocá la estrella para destacar hasta 3 cartas en tu perfil ({featured.length}/3).</div>
               {(() => {
-                const cnt = (r) => mineList.filter(m => m.nft.rareza === r).length;
-                const tabs = [["todas", "Todas", mineList.length], ["common", "Comunes", cnt("common")], ["limited", "Limited", cnt("limited")], ["legendary", "Legendary", cnt("legendary")]];
+                const tengo = mineList.length;
+                const totalC = nfts.length;
+                const pct = totalC > 0 ? Math.round((tengo / totalC) * 100) : 0;
+                return (
+                  <div className="card" style={{ padding: "12px 14px", marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 800 }}>📖 Álbum completo</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "var(--gold)" }}>{tengo} / {totalC} <span style={{ fontSize: 11, color: "var(--muted)" }}>({pct}%)</span></span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 6, background: "var(--surface)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: pct + "%", borderRadius: 6, background: "linear-gradient(90deg,#f7d774,#f5b731)", transition: "width .4s" }} />
+                    </div>
+                    {mineList.length > 0 && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>⭐ Tocá la estrella para destacar hasta 3 cartas en tu perfil ({featured.length}/3).</div>}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const cntMias = (r) => mineList.filter(m => m.nft.rareza === r).length;
+                const cntTot = (r) => nfts.filter(n => n.rareza === r).length;
+                const tabs = [["todas", "Todas", mineList.length, nfts.length], ["common", "Comunes", cntMias("common"), cntTot("common")], ["limited", "Limited", cntMias("limited"), cntTot("limited")], ["legendary", "Legendary", cntMias("legendary"), cntTot("legendary")]];
                 return (
                   <div className="pre-tabs" style={{ marginBottom: 12, flexWrap: "wrap" }}>
-                    {tabs.map(([k, l, n]) => (
-                      <button key={k} className={`pre-tab ${miRar === k ? "active" : ""}`} onClick={() => setMiRar(k)}>{l} ({n})</button>
+                    {tabs.map(([k, l, n, t]) => (
+                      <button key={k} className={`pre-tab ${miRar === k ? "active" : ""}`} onClick={() => setMiRar(k)}>{l} ({n}/{t})</button>
                     ))}
                   </div>
                 );
               })()}
               <div className="nftgrid">
-                {(miRar === "todas" ? mineList : mineList.filter(m => m.nft.rareza === miRar)).map(m => (
-                  <div key={m.nft.id} onClick={() => setDetail(m.nft)} style={{ cursor: "pointer", position: "relative" }}>
-                    <NFTCard nft={m.nft} edition={m.eds[0]} />
-                    <button onClick={(e) => { e.stopPropagation(); toggleFeatured(m.nft); }} title="Destacar en tu perfil"
-                      style={{ position: "absolute", top: 6, right: 6, width: 27, height: 27, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.55)", color: featured.some(f => f.nft_id === m.nft.id) ? "#f5d97a" : "#fff", fontSize: 15, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
-                      {featured.some(f => f.nft_id === m.nft.id) ? "★" : "☆"}
-                    </button>
-                    <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nft.nombre}</div>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[m.nft.rareza].c }}>{NFT_RAR[m.nft.rareza].t}{m.eds.length > 1 ? ` · x${m.eds.length}` : ""}</div>
-                    {m.nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{m.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
-                  </div>
-                ))}
+                {(() => {
+                  const orden = { legendary: 0, limited: 1, common: 2 };
+                  const todas = [...nfts].sort((a, b) => (orden[a.rareza] - orden[b.rareza]) || String(a.nombre).localeCompare(String(b.nombre)));
+                  const filtradas = miRar === "todas" ? todas : todas.filter(n => n.rareza === miRar);
+                  return filtradas.map(nft => {
+                    const mine = mineList.find(m => m.nft.id === nft.id);
+                    if (mine) {
+                      return (
+                        <div key={nft.id} onClick={() => setDetail(nft)} style={{ cursor: "pointer", position: "relative" }}>
+                          <NFTCard nft={nft} edition={mine.eds[0]} />
+                          <button onClick={(e) => { e.stopPropagation(); toggleFeatured(nft); }} title="Destacar en tu perfil"
+                            style={{ position: "absolute", top: 6, right: 6, width: 27, height: 27, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.55)", color: featured.some(f => f.nft_id === nft.id) ? "#f5d97a" : "#fff", fontSize: 15, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>
+                            {featured.some(f => f.nft_id === nft.id) ? "★" : "☆"}
+                          </button>
+                          <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nft.nombre}</div>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[nft.rareza].c }}>{NFT_RAR[nft.rareza].t}{mine.eds.length > 1 ? ` · x${mine.eds.length}` : ""}</div>
+                          {nft.rareza === "limited" && <div style={{ fontSize: 10, color: "var(--muted)" }}>{mine.eds.map(e => "#" + String(e).padStart(2, "0")).join(" ")}</div>}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={nft.id} style={{ position: "relative" }}>
+                        <NFTCard nft={nft} locked />
+                        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>???</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: NFT_RAR[nft.rareza].c, opacity: 0.55 }}>{NFT_RAR[nft.rareza].t}</div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </>
       )}
